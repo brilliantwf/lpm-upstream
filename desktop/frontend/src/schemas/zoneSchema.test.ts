@@ -48,6 +48,18 @@ describe("zone schemas", () => {
     }
   });
 
+  describe("collapsed", () => {
+    const schemas = { project: projectSchema, repo: repoSchema, global: globalSchema };
+
+    for (const [name, schema] of Object.entries(schemas)) {
+      it(`let a zone fold into one button with a boolean in the ${name} file`, () => {
+        const collapsed = schema.definitions.zone.properties.collapsed;
+        expect(collapsed).toMatchObject({ type: "boolean" });
+        expect(collapsed.description).toBeTruthy();
+      });
+    }
+  });
+
   it("keep zones out of templates", () => {
     expect(templateSchema.properties).not.toHaveProperty("zones");
   });

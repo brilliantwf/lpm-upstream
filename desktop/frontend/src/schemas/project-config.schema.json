@@ -169,7 +169,8 @@
               "position": { "type": "number", "description": "Sort key among the zone's layers. Lower values come first; ties break by key." }
             }
           }
-        }
+        },
+        "collapsed": { "type": "boolean", "description": "Folds the zone into one button; hovering it shows the zone's buttons in a popup." }
       }
     },
     "service": {

@@ -179,6 +179,15 @@ describe("a folded zone", () => {
     expect(popupEl()).toBeNull();
   });
 
+  it("closes the popup when the window is resized", () => {
+    mount(folded(), "header", foldedLayers());
+    act(() => container.querySelector<HTMLButtonElement>("[data-collapsed-zone] button[aria-haspopup]")!.click());
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+    expect(popupEl()).toBeNull();
+  });
+
   it("keeps a press inside the popup from reaching the row's drag handler", () => {
     const spy = vi.fn();
     act(() =>

@@ -94,9 +94,11 @@ export function ZonePopup({
     };
     document.addEventListener("mousedown", onMouseDown);
     document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", onClose);
     return () => {
       document.removeEventListener("mousedown", onMouseDown);
       document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", onClose);
     };
   }, [anchorRef, onClose, returnFocusRef]);
   return createPortal(
