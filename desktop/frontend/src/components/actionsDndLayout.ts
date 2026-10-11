@@ -83,20 +83,14 @@ export function groupAcceptsDrag(group: ActionGroup, activeId: string | null): b
 
 // A paged zone's dots pill hangs below its frame; a button dropped over it
 // joins the zone's open layer, so it is a drop target of its own.
-export const ZONE_DOTS_PREFIX = "zone-dots:";
+const ZONE_DOTS_PREFIX = "zone-dots:";
 export function zoneDotsId(name: string): string {
   return `${ZONE_DOTS_PREFIX}${name}`;
-}
-export function isZoneDotsId(id: string): boolean {
-  return id.startsWith(ZONE_DOTS_PREFIX);
-}
-export function zoneOfDotsId(id: string): string {
-  return id.slice(ZONE_DOTS_PREFIX.length);
 }
 
 // A folded zone's button takes drops like its dots: a release there joins the
 // zone's open layer at its end, and a rest springs the popup open.
-export const ZONE_FOLD_PREFIX = "zone-fold:";
+const ZONE_FOLD_PREFIX = "zone-fold:";
 export function zoneFoldId(name: string): string {
   return `${ZONE_FOLD_PREFIX}${name}`;
 }
@@ -104,10 +98,10 @@ export function isZoneFoldId(id: string): boolean {
   return id.startsWith(ZONE_FOLD_PREFIX);
 }
 export function isZoneAppendId(id: string): boolean {
-  return isZoneDotsId(id) || isZoneFoldId(id);
+  return id.startsWith(ZONE_DOTS_PREFIX) || isZoneFoldId(id);
 }
 export function zoneOfAppendId(id: string): string {
-  return isZoneDotsId(id) ? zoneOfDotsId(id) : id.slice(ZONE_FOLD_PREFIX.length);
+  return id.slice((isZoneFoldId(id) ? ZONE_FOLD_PREFIX : ZONE_DOTS_PREFIX).length);
 }
 
 export const NEST_ID_PREFIX = "nest:";

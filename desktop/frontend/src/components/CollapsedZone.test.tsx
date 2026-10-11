@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ZoneInfo } from "../types";
 import { CLOSE_DELAY_MS } from "../hooks/useHoverPopup";
 import { CollapsedZone } from "./CollapsedZone";
-import { HOVER_OPEN_MS } from "./ZoneDots";
+import { ZONE_SPRING_MS } from "./springLoad";
 
 const zone: ZoneInfo = { name: "ship", label: "Ship", rows: 1, source: "project", collapsed: true };
 
@@ -80,7 +80,7 @@ describe("CollapsedZone during a drag", () => {
   it("springs the popup open after a rest during a button drag", () => {
     render({ dragging: true, buttonDrag: true });
     pointer(label(), "pointerover");
-    wait(HOVER_OPEN_MS - 1);
+    wait(ZONE_SPRING_MS - 1);
     expect(popupEl()).toBeNull();
     wait(1);
     expect(popupEl()).not.toBeNull();
@@ -89,23 +89,23 @@ describe("CollapsedZone during a drag", () => {
   it("doesn't spring open for a zone drag", () => {
     render({ dragging: true });
     pointer(label(), "pointerover");
-    wait(HOVER_OPEN_MS * 2);
+    wait(ZONE_SPRING_MS * 2);
     expect(popupEl()).toBeNull();
   });
 
   it("stops a spring when the pointer moves on", () => {
     render({ dragging: true, buttonDrag: true });
     pointer(label(), "pointerover");
-    wait(HOVER_OPEN_MS - 100);
+    wait(ZONE_SPRING_MS - 100);
     pointer(label(), "pointerout");
-    wait(HOVER_OPEN_MS);
+    wait(ZONE_SPRING_MS);
     expect(popupEl()).toBeNull();
   });
 
   it("closes a beat after a drop away from it", () => {
     render({ dragging: true, buttonDrag: true });
     pointer(label(), "pointerover");
-    wait(HOVER_OPEN_MS);
+    wait(ZONE_SPRING_MS);
     pointer(label(), "pointerout");
     wait(1000);
     expect(popupEl()).not.toBeNull();

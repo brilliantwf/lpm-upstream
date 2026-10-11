@@ -11,12 +11,12 @@ import { ActionsGroup } from "./ActionsGroup";
 import { ActionsSortableItem } from "./ActionsSortableItem";
 import { ActionView } from "./ActionView";
 import { CollapsedZone } from "./CollapsedZone";
+import { Remeasure } from "./Remeasure";
 import { ZoneCollapseButton } from "./ZoneCollapseButton";
 import { ZoneDots } from "./ZoneDots";
 import { ZoneEmptyHint } from "./ZoneEmptyHint";
 import { ZoneExtractPlaceholder } from "./ZoneExtractPlaceholder";
 import { ZoneFrame } from "./ZoneFrame";
-import { ZoneGridRemeasure } from "./ZoneGridRemeasure";
 import { ZoneLayerPager } from "./ZoneLayerPager";
 import { ZoneLayerRemeasure } from "./ZoneLayerRemeasure";
 import { holdsButtonsDuringDrag, zoneFrameState, zoneOwnsDrag } from "./zoneFrameState";
@@ -62,7 +62,6 @@ export function ZoneView({
   const { state, holdsButtons } = zoneFrameState({ ids: open.ids, activeId, overGroup, group, origin });
   const extracting = extractGroup === group;
   const editable = isZoneEditable(projectName, zone);
-  const collapse = () => void setZoneCollapsed(projectName, zone, true);
   const showLayer = (key: string) => openLayerOfListKey(projectName, key);
   const layerAt = (dir: 1 | -1) => layers[openIndex + dir];
   const swipe = useLayerSwipe(
@@ -75,9 +74,10 @@ export function ZoneView({
   const handleContextMenu = (e: MouseEvent<HTMLDivElement>) => {
     // Skip what an action's menu already took: a right-click on a split
     // button's border or its portaled dropdown bubbles here outside any button.
-    // The layer dots and name are the zone's own, so they open its menu.
+    // The layer dots and name, and a folded zone's own button, are the zone's,
+    // so they open its menu.
     const target = e.target as HTMLElement;
-    const actionButton = target.closest("button") && !target.closest("[data-zone-dots]");
+    const actionButton = target.closest("button") && !target.closest("[data-zone-dots], [data-collapsed-zone]");
     if (!onZoneContextMenu || e.defaultPrevented || actionButton) return;
     e.preventDefault();
     onZoneContextMenu(e, zone);
@@ -92,8 +92,8 @@ export function ZoneView({
       scope={projectName}
     />
   );
-  const staticGrid = (layer: ZoneLayerView, holdsButtons = true) => (
-    <div className={ZONE_GRID_CLASS} style={zoneGridStyle(zone.rows, holdsButtons)}>
+  const staticGrid = (layer: ZoneLayerView) => (
+    <div className={ZONE_GRID_CLASS} style={zoneGridStyle(zone.rows, true)}>
       {layer.actions.map((action) => (
         <div key={action.name} className="h-full min-w-0">
           {actionView(action)}
@@ -118,8 +118,15 @@ export function ZoneView({
       ))}
     </ActionsGroup>
   );
-  const body = (
-    <>
+  const frame = (
+    <ZoneFrame
+      label={zone.label}
+      rows={zone.rows}
+      display={display}
+      state={state}
+      onContextMenu={handleContextMenu}
+      onWheel={pager ? swipe : undefined}
+    >
       {pager ? (
         <ZoneLayerPager
           layers={layers}
@@ -158,50 +165,30 @@ export function ZoneView({
           ]}
         />
       )}
+      {/* A popup holds its left edge while a preview takes a button out of
+          its grid, so its drop area shrinks and its dots shift without any
+          row changing. */}
       {zone.collapsed && buttonDrag && (
-        <ZoneGridRemeasure buttons={open.ids} ids={[groupDropId(group), zoneDotsId(zone.name)]} />
+        <Remeasure on={open.ids.join("\n")} ids={[groupDropId(group), zoneDotsId(zone.name)]} />
       )}
-    </>
-  );
-  if (zone.collapsed) {
-    const expand = () => void setZoneCollapsed(projectName, zone, false);
-    // Bubbled from the popup through its portal: an action's own right-click
-    // is its menu, not the zone's.
-    const handleFoldedContextMenu = (e: MouseEvent<HTMLDivElement>) => {
-      const target = e.target as HTMLElement;
-      const inPopupButton = target.closest("[data-zone-popup]") && target.closest("button") && !target.closest("[data-zone-dots]");
-      if (!onZoneContextMenu || e.defaultPrevented || inPopupButton) return;
-      e.preventDefault();
-      onZoneContextMenu(e, zone);
-    };
-    return (
-      <CollapsedZone
-        zone={zone}
-        display={display}
-        editable={editable}
-        dragging={activeId !== null}
-        buttonDrag={buttonDrag}
-        ownsDrag={ownsDrag}
-        onExpand={expand}
-        onContextMenu={handleFoldedContextMenu}
-      >
-        <ZoneFrame label={zone.label} rows={zone.rows} display={display} state={state} onWheel={pager ? swipe : undefined}>
-          {body}
-        </ZoneFrame>
-      </CollapsedZone>
-    );
-  }
-  return (
-    <ZoneFrame
-      label={zone.label}
-      rows={zone.rows}
-      display={display}
-      state={state}
-      onContextMenu={handleContextMenu}
-      onWheel={pager ? swipe : undefined}
-    >
-      {body}
-      {editable && activeId === null && <ZoneCollapseButton display={display} onCollapse={collapse} />}
+      {!zone.collapsed && editable && activeId === null && (
+        <ZoneCollapseButton display={display} onCollapse={() => void setZoneCollapsed(projectName, zone, true)} />
+      )}
     </ZoneFrame>
+  );
+  if (!zone.collapsed) return frame;
+  return (
+    <CollapsedZone
+      zone={zone}
+      display={display}
+      editable={editable}
+      dragging={activeId !== null}
+      buttonDrag={buttonDrag}
+      ownsDrag={ownsDrag}
+      onExpand={() => void setZoneCollapsed(projectName, zone, false)}
+      onContextMenu={handleContextMenu}
+    >
+      {frame}
+    </CollapsedZone>
   );
 }

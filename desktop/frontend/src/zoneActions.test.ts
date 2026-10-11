@@ -8,7 +8,6 @@ const h = vi.hoisted(() => ({
   editProjectDoc: vi.fn(),
   editRepoDoc: vi.fn(),
   editGlobalDoc: vi.fn(),
-  editFirstLayer: vi.fn(),
   editAllLayers: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -26,7 +25,6 @@ vi.mock("./yamlQueue", () => ({
   projectLayer: () => "project",
   repoLayer: () => "repo",
   globalLayer: "global",
-  editFirstLayer: h.editFirstLayer,
   editAllLayers: h.editAllLayers,
 }));
 
@@ -53,20 +51,8 @@ const editFile = (layer: Layer) => async (mutate: (doc: Doc) => void) => {
   files[layer] = String(doc);
 };
 
-// editFirstLayer's round trip: a layer is saved only when the edit changed it.
-let layerSaves: Layer[];
-const editFirstFile = async (layers: Layer[], attempt: (doc: Doc) => boolean) => {
-  for (const layer of layers) {
-    const doc = YAML.parseDocument(files[layer] || "{}");
-    if (!attempt(doc)) continue;
-    files[layer] = String(doc);
-    layerSaves.push(layer);
-    return true;
-  }
-  return false;
-};
-
 // editAllLayers' round trip: every layer the edit changed is saved.
+let layerSaves: Layer[];
 const editAllFiles = async (layers: Layer[], attempt: (doc: Doc) => boolean) => {
   for (const layer of layers) {
     const doc = YAML.parseDocument(files[layer] || "{}");
@@ -135,7 +121,6 @@ beforeEach(() => {
   h.editRepoDoc.mockReset().mockImplementation((_name, mutate) => editFile("repo")(mutate));
   h.editGlobalDoc.mockReset().mockImplementation(editFile("global"));
   layerSaves = [];
-  h.editFirstLayer.mockReset().mockImplementation(editFirstFile);
   h.editAllLayers.mockReset().mockImplementation(editAllFiles);
 });
 
@@ -329,9 +314,10 @@ describe("setZoneCollapsed", () => {
 
   it("folds only the file that declares the zone", async () => {
     files.global = "zones:\n  build:\n    rows: 1\n";
+    files.project = "zones:\n  build:\n    position: 2\n";
     await setZoneCollapsed(NAME, zone({ source: "global" }), true);
-    expect(h.editAllLayers).not.toHaveBeenCalled();
     expect(layerSaves).toEqual(["global"]);
+    expect(saved("project").zones.build).toEqual({ position: 2 });
   });
 
   it("leaves a peer project's repo and global files alone when it unfolds", async () => {

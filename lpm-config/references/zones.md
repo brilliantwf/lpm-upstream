@@ -102,7 +102,7 @@ actions:
 
 ### Fold a zone
 
-`collapsed: true` shows the zone as one button, `Label ▾ | ⤢`. Hovering the label shows the zone's buttons in a popup; `⤢` unfolds it. Write it in the zone's source file, the one whose entry has `rows`. To unfold, delete the key instead of writing `false`.
+`collapsed: true` shows the zone as one button, `Label ▾ | ↔`. Hovering the label shows the zone's buttons in a popup; `↔` unfolds it. Write it in the zone's source file, the one whose entry has `rows`. To unfold, delete the key instead of writing `false`.
 
 ```yaml
 zones:

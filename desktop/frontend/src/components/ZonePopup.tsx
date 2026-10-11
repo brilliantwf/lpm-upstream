@@ -7,7 +7,7 @@ import { InBar } from "./InBar";
 const GAP_PX = 6;
 const VIEWPORT_MARGIN_PX = 8;
 
-export interface PopupPlacement {
+interface PopupPlacement {
   left: number;
   top?: number;
   bottom?: number;

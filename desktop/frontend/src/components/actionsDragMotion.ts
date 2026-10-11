@@ -62,21 +62,22 @@ export const modifiers = [centreMenuItemOnPointer];
 export const fitContent = { width: "auto", height: "auto" } as const;
 export const OUTSIDE_STYLE = { opacity: 0.5 } as const;
 
+function elementAt(selector: string, { x, y }: { x: number; y: number }): Element | null {
+  return (
+    [...document.querySelectorAll(selector)].find((el) => {
+      const r = el.getBoundingClientRect();
+      return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    }) ?? null
+  );
+}
+
 // Open menus are portaled; their rects cover whatever action rows they overlap.
-export function overMenu({ x, y }: { x: number; y: number }): boolean {
-  return [...document.querySelectorAll("[data-actions-menu]")].some((menu) => {
-    const r = menu.getBoundingClientRect();
-    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
-  });
+export function overMenu(point: { x: number; y: number }): boolean {
+  return elementAt("[data-actions-menu]", point) !== null;
 }
 
 // A folded zone's popup is portaled over the rows, and over other folded
 // zones' buttons; under the pointer, it hides what it covers.
-export function popupAt({ x, y }: { x: number; y: number }): Element | null {
-  return (
-    [...document.querySelectorAll("[data-zone-popup]")].find((panel) => {
-      const r = panel.getBoundingClientRect();
-      return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
-    }) ?? null
-  );
+export function popupAt(point: { x: number; y: number }): Element | null {
+  return elementAt("[data-zone-popup]", point);
 }

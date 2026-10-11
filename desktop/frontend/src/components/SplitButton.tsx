@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { useAnchoredPanel } from "../hooks/useAnchoredPanel";
-import type { ActionInfo } from "../types";
+import type { ActionInfo, ZoneDisplay } from "../types";
 import { ChevronDownIcon } from "./icons";
 import { withEmoji } from "../withEmoji";
 import { actionButtonStyle, actionTextColor } from "../actionColors";
@@ -17,7 +17,7 @@ import {
 } from "./splitPrimary";
 
 // A row's palette, and which way its dropdowns open.
-export const SPLIT_TONE = {
+const TONE = {
   header: {
     side: "below",
     border: "border border-[var(--border)] bg-[var(--action-tint,var(--bg-secondary))]",
@@ -53,7 +53,7 @@ const ZONE_FIT = {
 
 const SIZE_CLASSES = {
   default: {
-    ...SPLIT_TONE.header,
+    ...TONE.header,
     ...ROW_FIT,
     height: "h-8",
     rounded: "rounded-lg",
@@ -63,7 +63,7 @@ const SIZE_CLASSES = {
     chevronPad: "px-1.5",
   },
   compact: {
-    ...SPLIT_TONE.footer,
+    ...TONE.footer,
     ...ROW_FIT,
     height: "",
     rounded: "rounded-md",
@@ -72,11 +72,15 @@ const SIZE_CLASSES = {
     padding: "px-2.5 py-1 text-[11px]",
     chevronPad: "px-1.5",
   },
-  zone: { ...SPLIT_TONE.header, ...ZONE_FIT },
-  footerZone: { ...SPLIT_TONE.footer, ...ZONE_FIT },
+  zone: { ...TONE.header, ...ZONE_FIT },
+  footerZone: { ...TONE.footer, ...ZONE_FIT },
 } as const;
 
 export type ActionSize = keyof typeof SIZE_CLASSES;
+
+export function rowButtonClasses(display: ZoneDisplay) {
+  return SIZE_CLASSES[display === "footer" ? "compact" : "default"];
+}
 
 // Footer buttons open their dropdowns upward, the rest downward.
 export function splitPanelSide(size: ActionSize): "above" | "below" {

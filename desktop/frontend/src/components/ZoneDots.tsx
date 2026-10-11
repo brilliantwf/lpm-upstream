@@ -4,10 +4,9 @@ import type { ZoneLayerView } from "../actionsLayoutModel";
 import type { ZoneDisplay } from "../types";
 import { layerName } from "../zoneLayers";
 import { zoneDotsId } from "./actionsDndLayout";
+import { LIVE_DURING_DRAG, ZONE_SPRING_MS } from "./springLoad";
 import type { ZoneFrameState } from "./ZoneFrame";
 import { zoneNotchBackground } from "./zoneNotch";
-
-export const HOVER_OPEN_MS = 500;
 
 const TONE: Record<ZoneDisplay, { label: string; dot: string }> = {
   header: {
@@ -19,10 +18,6 @@ const TONE: Record<ZoneDisplay, { label: string; dot: string }> = {
     dot: "bg-[color-mix(in_srgb,var(--composer-fg)_26%,transparent)] group-hover/dot:bg-[color-mix(in_srgb,var(--composer-fg)_50%,transparent)]",
   },
 };
-
-// globals.css turns pointer events off inside the action rows mid-drag; the
-// dots take them back so a dragged button can hover one open.
-const LIVE_DURING_DRAG = { pointerEvents: "auto" } as const;
 
 const dotSize = (dragging: boolean) => (dragging ? "h-2 w-2" : "h-1 w-1");
 
@@ -62,7 +57,7 @@ export function ZoneDots({ zone, layers, openKey, dragging, display, frameState,
     timer.current = setTimeout(() => {
       timer.current = null;
       onOpen(key);
-    }, HOVER_OPEN_MS);
+    }, ZONE_SPRING_MS);
   };
 
   return (

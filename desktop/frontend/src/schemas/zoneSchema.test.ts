@@ -48,16 +48,10 @@ describe("zone schemas", () => {
     }
   });
 
-  describe("collapsed", () => {
-    const schemas = { project: projectSchema, repo: repoSchema, global: globalSchema };
-
-    for (const [name, schema] of Object.entries(schemas)) {
-      it(`let a zone fold into one button with a boolean in the ${name} file`, () => {
-        const collapsed = schema.definitions.zone.properties.collapsed;
-        expect(collapsed).toMatchObject({ type: "boolean" });
-        expect(collapsed.description).toBeTruthy();
-      });
-    }
+  it("hold exactly the keys a zone entry takes, with collapsed a boolean", () => {
+    const zone = projectSchema.definitions.zone;
+    expect(Object.keys(zone.properties).sort()).toEqual(["collapsed", "display", "label", "layers", "position", "rows"]);
+    expect(zone.properties.collapsed).toMatchObject({ type: "boolean" });
   });
 
   it("keep zones out of templates", () => {

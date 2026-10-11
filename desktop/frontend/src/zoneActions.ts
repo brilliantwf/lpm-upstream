@@ -4,7 +4,6 @@ import { useAppStore } from "./store/app";
 import {
   type ConfigLayer,
   editAllLayers,
-  editFirstLayer,
   editGlobalDoc,
   editProjectDoc,
   editRepoDoc,
@@ -21,8 +20,8 @@ import {
   setZoneCollapsedInDoc,
   setZoneDetailsInDoc,
 } from "./zoneConfig";
-import { isPeerName } from "./peer/markers";
 import { removeZoneFromDoc } from "./zoneDoc";
+import { isZoneEditable } from "./zoneEditable";
 import { layoutWithoutZone } from "./components/actionsDndLayout";
 
 type Mutate = Parameters<typeof editProjectDoc>[1];
@@ -88,20 +87,19 @@ function zoneSourceLayer(projectName: string, source: ZoneInfo["source"]): Confi
   return projectLayer(projectName);
 }
 
-// Unfolding clears a fold from every file the user may edit (project, repo and
-// global; a peer project's repo and global files are out of reach, so only its
-// own), so a hand-written note in any of them can't keep the zone shut. A file
-// the fold doesn't change isn't rewritten.
+const ZONE_SOURCES: readonly ZoneInfo["source"][] = ["project", "repo", "global"];
+
+// Folding writes to the zone's own file. Unfolding clears a fold from every
+// file the user may edit, so a hand-written note in any of them can't keep the
+// zone shut. A file the fold doesn't change isn't rewritten.
 export function setZoneCollapsed(projectName: string, zone: ZoneInfo, collapsed: boolean): Promise<void> {
-  const setCollapsed = (to: boolean) => (doc: Parameters<Mutate>[0]) => setZoneCollapsedInDoc(doc, zone.name, to);
-  return runZoneEdit(async () => {
-    if (collapsed) {
-      await editFirstLayer([zoneSourceLayer(projectName, zone.source)], setCollapsed(true));
-      return;
-    }
-    const layers = isPeerName(projectName)
-      ? [projectLayer(projectName)]
-      : [projectLayer(projectName), repoLayer(projectName), globalLayer];
-    await editAllLayers(layers, setCollapsed(false));
-  }, "Could not save the zone");
+  const sources = collapsed ? [zone.source] : ZONE_SOURCES.filter((source) => isZoneEditable(projectName, { source }));
+  return runZoneEdit(
+    () =>
+      editAllLayers(
+        sources.map((source) => zoneSourceLayer(projectName, source)),
+        (doc) => setZoneCollapsedInDoc(doc, zone.name, collapsed),
+      ),
+    "Could not save the zone",
+  );
 }

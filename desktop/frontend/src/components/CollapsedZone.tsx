@@ -1,31 +1,25 @@
 import { useDroppable } from "@dnd-kit/core";
-import { type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode, useCallback, useEffect, useRef } from "react";
+import { type KeyboardEvent, type MouseEvent, type ReactNode, useCallback, useEffect, useRef } from "react";
 import { useHoverPopup } from "../hooks/useHoverPopup";
 import type { ZoneDisplay, ZoneInfo } from "../types";
 import { zoneFoldId } from "./actionsDndLayout";
 import { ChevronDownIcon, ExpandIcon } from "./icons";
-import { SPLIT_TONE } from "./SplitButton";
+import { LIVE_DURING_DRAG, ZONE_SPRING_MS } from "./springLoad";
+import { rowButtonClasses } from "./SplitButton";
 import { ZonePopup } from "./ZonePopup";
-import { HOVER_OPEN_MS } from "./ZoneDots";
 
-// The bar's own button sizes: a header button is h-8, a footer one compact.
-const SHAPE: Record<ZoneDisplay, { height: string; rounded: string; roundedL: string; roundedR: string; padding: string; expandPad: string }> = {
-  header: { height: "h-8", rounded: "rounded-lg", roundedL: "rounded-l-lg", roundedR: "rounded-r-lg", padding: "px-3.5 text-xs", expandPad: "px-2" },
-  footer: { height: "", rounded: "rounded-md", roundedL: "rounded-l-md", roundedR: "rounded-r-md", padding: "px-2.5 py-1 text-[11px]", expandPad: "px-1.5" },
-};
-
-// globals.css turns pointer events off inside the action rows mid-drag; the
-// folded button takes them back so a dragged button can rest on it.
-const LIVE_DURING_DRAG: CSSProperties = { pointerEvents: "auto" };
+const EXPAND_PAD: Record<ZoneDisplay, string> = { header: "px-2", footer: "px-1.5" };
 
 // Shared with the drag preview, so a folded zone looks the same in flight.
 export function collapsedZoneClasses(display: ZoneDisplay, editable: boolean) {
-  const tone = SPLIT_TONE[display];
-  const shape = SHAPE[display];
+  const bar = rowButtonClasses(display);
   return {
-    root: `inline-flex shrink-0 items-stretch select-none ${shape.height} ${shape.rounded} ${tone.border}`,
-    label: `flex items-center gap-1 whitespace-nowrap font-medium ${editable ? shape.roundedL : shape.rounded} ${shape.padding}`,
-    expand: `flex items-center ${shape.roundedR} ${tone.dividerBorder} ${shape.expandPad}`,
+    root: `inline-flex shrink-0 items-stretch select-none ${bar.height} ${bar.rounded} ${bar.border}`,
+    label: `flex items-center gap-1 whitespace-nowrap font-medium ${editable ? bar.roundedL : bar.rounded} ${bar.padding}`,
+    expand: `flex items-center ${bar.roundedR} ${bar.dividerBorder} ${EXPAND_PAD[display]}`,
+    text: bar.text,
+    hover: bar.hover,
+    active: bar.active,
   };
 }
 
@@ -57,7 +51,6 @@ export function CollapsedZone({ zone, display, editable, dragging, buttonDrag, o
     },
     [setNodeRef],
   );
-  const tone = SPLIT_TONE[display];
   const classes = collapsedZoneClasses(display, editable);
   const springOpened = useRef(false);
   const springTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,14 +79,17 @@ export function CollapsedZone({ zone, display, editable, dragging, buttonDrag, o
       springTimer.current = null;
       springOpened.current = true;
       show();
-    }, HOVER_OPEN_MS);
+    }, ZONE_SPRING_MS);
   };
   const openedByKey = useRef(false);
+  const showFromKey = () => {
+    openedByKey.current = true;
+    show();
+  };
   const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
     if (e.key !== "ArrowDown") return;
     e.preventDefault();
-    openedByKey.current = true;
-    popup.show();
+    showFromKey();
   };
   useEffect(() => {
     if (!popup.open) openedByKey.current = false;
@@ -110,10 +106,7 @@ export function CollapsedZone({ zone, display, editable, dragging, buttonDrag, o
         type="button"
         aria-haspopup="true"
         aria-expanded={popup.open}
-        onClick={(e) => {
-          if (e.detail === 0) openedByKey.current = true;
-          popup.show();
-        }}
+        onClick={(e) => (e.detail === 0 ? showFromKey() : show())}
         onKeyDown={onKeyDown}
         onPointerEnter={() => {
           popup.trigger.onPointerEnter();
@@ -124,7 +117,7 @@ export function CollapsedZone({ zone, display, editable, dragging, buttonDrag, o
           clearSpring();
         }}
         style={dragging ? LIVE_DURING_DRAG : undefined}
-        className={`${classes.label} transition-colors duration-100 ${popup.open ? tone.active : tone.text} ${tone.hover}`}
+        className={`${classes.label} transition-colors duration-100 ${popup.open ? classes.active : classes.text} ${classes.hover}`}
       >
         {zone.label}
         <ChevronDownIcon />
@@ -136,7 +129,7 @@ export function CollapsedZone({ zone, display, editable, dragging, buttonDrag, o
           title="Expand zone"
           onClick={onExpand}
           onPointerDown={(e) => e.stopPropagation()}
-          className={`${classes.expand} transition-colors duration-100 ${tone.text} ${tone.hover}`}
+          className={`${classes.expand} transition-colors duration-100 ${classes.text} ${classes.hover}`}
         >
           <ExpandIcon />
         </button>

@@ -175,8 +175,9 @@ export function createActionsCollision({
   // its buttons lies over it in turn.
   const inPopup = (args: CollisionArgs): CollisionArgs => {
     const point = args.pointerCoordinates;
-    const panel = point && !overMenu(point) ? popupAt(point) : null;
-    if (!panel) return args;
+    if (!point) return args;
+    const panel = popupAt(point);
+    if (!panel || overMenu(point)) return args;
     const droppableContainers = args.droppableContainers.filter((c) => !!c.node.current && panel.contains(c.node.current));
     return { ...args, droppableContainers };
   };
