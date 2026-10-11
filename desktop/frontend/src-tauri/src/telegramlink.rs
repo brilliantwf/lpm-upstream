@@ -45,8 +45,11 @@ pub struct Link {
     chat: Option<String>,
 }
 
+/// Under ~/.lpm, and one of the files config sync carries to a paired Mac.
+pub const FILE: &str = "telegram.json";
+
 fn path() -> PathBuf {
-    config::lpm_dir().join("telegram.json")
+    config::lpm_dir().join(FILE)
 }
 
 impl Link {
@@ -70,12 +73,21 @@ impl Link {
     }
 
     pub fn load() -> Link {
-        let mut link: Link = std::fs::read_to_string(path())
+        std::fs::read(path())
             .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default();
+            .and_then(|bytes| Link::parse(&bytes).ok())
+            .unwrap_or_default()
+    }
+
+    pub fn parse(bytes: &[u8]) -> Result<Link, String> {
+        let mut link: Link = serde_json::from_slice(bytes).map_err(|e| format!("{FILE}: {e}"))?;
         link.adopt_single_chat();
-        link
+        Ok(link)
+    }
+
+    /// No bot and no chats: what Disconnect leaves behind.
+    pub fn is_empty(&self) -> bool {
+        self.bot.is_none() && self.chats.is_empty()
     }
 
     pub fn save(&self) -> Result<(), String> {
@@ -84,13 +96,6 @@ impl Link {
         let text = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
         std::fs::write(&tmp, text).map_err(|e| e.to_string())?;
         std::fs::rename(&tmp, &path).map_err(|e| e.to_string())
-    }
-
-    pub fn remove_file() -> Result<(), String> {
-        match std::fs::remove_file(path()) {
-            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),
-            _ => Ok(()),
-        }
     }
 
     fn adopt_single_chat(&mut self) {
@@ -231,6 +236,16 @@ fn unique_key(name: &str, taken: &[&str]) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_disconnected_link_reads_back_empty_and_an_old_one_does_not() {
+        let disconnected = serde_json::to_vec(&Link::default()).unwrap();
+        assert!(Link::parse(&disconnected).unwrap().is_empty());
+        assert!(!Link::for_bot("lpm_bot".into()).is_empty());
+        let single_chat = br#"{ "chatId": 42, "chat": "Ada" }"#;
+        assert!(!Link::parse(single_chat).unwrap().is_empty());
+        assert!(Link::parse(b"not json").is_err());
+    }
 
     #[test]
     fn names_a_chat_by_title_then_person() {

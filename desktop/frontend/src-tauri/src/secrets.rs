@@ -6,6 +6,14 @@
 // Values are write-only from the UI's point of view: `get` exists for the
 // synthesizer, `has` is what the frontend asks so a key is never sent back to a
 // renderer that only needs to know whether one is set.
+//
+// On macOS reading a value asks the user to allow it whenever the item's access
+// list doesn't name the running build — and a locally built lpm is a new build
+// every time. So `has` reads the item's attributes only, which never asks, and a
+// value read once is kept for the life of the process.
+
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 
 pub const OPENAI_API_KEY: &str = "openai-api-key";
 pub const TELEGRAM_BOT_TOKEN: &str = "telegram-bot-token";
@@ -49,6 +57,16 @@ mod imp {
                 CFString::new(account).as_CFType(),
             ),
         ]
+    }
+
+    pub fn exists(account: &str) -> Result<bool, String> {
+        let query = CFDictionary::from_CFType_pairs(&query_pairs(account));
+        let status = unsafe { SecItemCopyMatching(query.as_concrete_TypeRef(), std::ptr::null_mut()) };
+        match status {
+            0 => Ok(true),
+            s if s == errSecItemNotFound => Ok(false),
+            s => Err(format!("read keychain: status {s}")),
+        }
     }
 
     pub fn get(account: &str) -> Result<Option<String>, String> {
@@ -179,22 +197,53 @@ mod imp {
     }
 }
 
+// Values this process has read or written. Only lpm writes these items, and only
+// from the app process, so a value seen once stays right until it sets or
+// deletes it here.
+fn cache() -> std::sync::MutexGuard<'static, HashMap<String, String>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+    CACHE
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+}
+
 pub fn get(account: &str) -> Result<Option<String>, String> {
-    imp::get(account)
+    if let Some(value) = cache().get(account) {
+        return Ok(Some(value.clone()));
+    }
+    let value = imp::get(account)?;
+    if let Some(v) = &value {
+        cache().insert(account.to_string(), v.clone());
+    }
+    Ok(value)
 }
 
 pub fn set(account: &str, value: &str) -> Result<(), String> {
     let value = value.trim();
     if value.is_empty() {
-        return imp::delete(account);
+        return delete(account);
     }
-    imp::set(account, value)
+    imp::set(account, value)?;
+    cache().insert(account.to_string(), value.to_string());
+    Ok(())
 }
 
 pub fn delete(account: &str) -> Result<(), String> {
+    cache().remove(account);
     imp::delete(account)
 }
 
 pub fn has(account: &str) -> bool {
-    matches!(imp::get(account), Ok(Some(_)))
+    if cache().contains_key(account) {
+        return true;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        matches!(imp::exists(account), Ok(true))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        matches!(imp::get(account), Ok(Some(_)))
+    }
 }

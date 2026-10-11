@@ -392,13 +392,21 @@ marks a **tombstone** (a synced-dir file known to be deleted; `hash` empty).
 ### Wire item
 
 ```json
-{ "kind", "name", "enc": "text|b64", "content", "mtime", "deleted"?, "rev"?, "device"? }
+{ "kind", "name", "enc": "text|b64", "content", "mtime", "deleted"?, "rev"?, "device"?, "secret"? }
 ```
 
 Text files travel as UTF-8, binaries as base64. `deleted:true` (v2) is a pushed
 deletion — empty content, the host removes the file (path-validated like a write,
 synced-dir files only). `rev`/`device` (v2 push) let the host record the base
 without holding the pusher's digest map.
+
+`secret` rides only with `telegram.json` (bot + chats): the bot token, which the
+file leaves out. The receiver stores it in its own secret store (Keychain on
+macOS), never on disk; a sender that can't read its token leaves it off and the
+receiver keeps its own. An empty link (no bot, no chats) is a disconnect and makes
+the receiver drop its token. The digest covers the file only, so the token never
+enters the digest map or the backups. An older peer refuses `telegram.json` as a
+global it doesn't sync, so the token never reaches it.
 
 ### Revision sidecar & direction (configSync2)
 

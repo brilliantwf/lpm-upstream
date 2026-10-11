@@ -1254,6 +1254,7 @@ impl PeerClientHub {
                         deleted: true,
                         rev,
                         device,
+                        secret: None,
                     };
                     if let Ok(val) = serde_json::to_value(&w) {
                         let base = v2.then(|| crate::syncstate::BaseState {

@@ -130,6 +130,10 @@ pub struct WireItem {
     pub rev: u64,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub device: String,
+    /// A secret the unit's file leaves out — telegram.json's bot token — sent
+    /// beside it so it lands in the receiver's secret store, not on its disk.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret: Option<String>,
 }
 
 /// The composite sidecar key for a unit: "project/<name>", "global/<rel>",
@@ -713,6 +717,9 @@ pub fn read_item(kind: &str, name: &str) -> Result<WireItem, String> {
         bytes = without_account_list(bytes);
     }
     let mtime = mtime_millis(&path);
+    let secret = (kind == "global" && name == crate::telegramlink::FILE)
+        .then(|| crate::telegramsync::outgoing_secret(&bytes))
+        .flatten();
     let binary = kind == "global" && name.starts_with("generator-icons/");
     let (enc, content) = match (!binary)
         .then(|| std::str::from_utf8(&bytes).ok())
@@ -727,6 +734,7 @@ pub fn read_item(kind: &str, name: &str) -> Result<WireItem, String> {
         enc,
         content,
         mtime,
+        secret,
         ..Default::default()
     })
 }
@@ -806,7 +814,12 @@ pub fn apply_item(item: &WireItem) -> Result<Applied, String> {
     let stored = match item.kind.as_str() {
         "project" => apply_project(&item.name, &bytes)?,
         "template" => apply_template(&item.name, &bytes)?,
-        "global" => apply_global(&item.name, &bytes)?,
+        "global" => {
+            if item.name == crate::telegramlink::FILE {
+                crate::telegramsync::adopt(&bytes, item.secret.as_deref())?;
+            }
+            apply_global(&item.name, &bytes)?
+        }
         other => return Err(format!("unknown item kind: {other}")),
     };
     Ok(Applied {
@@ -1337,6 +1350,23 @@ mod tests {
         assert!(safe_global_rel("scripts").is_err());
         assert!(is_deletable_global("scripts/disk-cleanup.sh"));
         assert!(!is_deletable_global("scripts/.DS_Store"));
+    }
+
+    #[test]
+    fn a_secret_rides_only_when_there_is_one() {
+        let plain = WireItem {
+            kind: "global".into(),
+            name: "global.yml".into(),
+            ..Default::default()
+        };
+        assert!(serde_json::to_value(&plain).unwrap().get("secret").is_none());
+        let with = WireItem {
+            secret: Some("123:abc".into()),
+            ..plain
+        };
+        let back: WireItem = serde_json::from_value(serde_json::to_value(&with).unwrap()).unwrap();
+        assert_eq!(back.secret.as_deref(), Some("123:abc"));
+        assert!(safe_global_rel("telegram.json").is_ok());
     }
 
     #[test]

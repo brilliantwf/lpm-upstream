@@ -222,10 +222,13 @@ pub fn telegram_remove_chat(key: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Leaves an empty link rather than no file: config sync treats a missing file as
+/// this Mac's own business and would bring the other Mac's back, while an empty
+/// one crosses and disconnects that Mac too.
 #[tauri::command(async)]
 pub fn telegram_disconnect() -> Result<(), String> {
     secrets::delete(secrets::TELEGRAM_BOT_TOKEN)?;
-    Link::remove_file()
+    Link::default().save()
 }
 
 #[cfg(test)]

@@ -208,6 +208,7 @@ mod sendto;
 mod telegram;
 mod telegramfmt;
 mod telegramlink;
+mod telegramsync;
 mod tts;
 mod uninstall;
 mod updatejob;

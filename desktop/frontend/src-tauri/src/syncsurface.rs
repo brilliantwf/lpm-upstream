@@ -90,6 +90,13 @@ const GLOBAL_FILES: &[GlobalFile] = &[
         sync: true,
         export: true,
     },
+    // The bot token rides beside it on the peer channel (telegramsync.rs); an
+    // export archive would carry the chats without it, so it stays out.
+    GlobalFile {
+        name: "telegram.json",
+        sync: true,
+        export: false,
+    },
 ];
 
 // Synced dirs are walked recursively, so `memory/<project>/<session>.md` rides the
@@ -233,6 +240,7 @@ mod tests {
                 "pr-title-instructions.txt",
                 "pr-description-instructions.txt",
                 "branch-name-instructions.txt",
+                "telegram.json",
             ]
         );
     }
