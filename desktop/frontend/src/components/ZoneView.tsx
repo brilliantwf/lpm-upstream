@@ -3,20 +3,25 @@ import type { ZoneLayerView } from "../actionsLayoutModel";
 import type { ActionInfo, ZoneDisplay, ZoneInfo } from "../types";
 import { useLayerSwipe } from "../hooks/useLayerSwipe";
 import { openLayerOfListKey, useOpenLayer } from "../store/zoneLayers";
+import { setZoneCollapsed } from "../zoneActions";
+import { isZoneEditable } from "../zoneEditable";
 import { zoneListKey } from "../zoneLayers";
 import { useActionsActiveId, useActionsDragOrigin, useActionsOverGroup, useExtractGroup } from "./ActionsDnd";
 import { ActionsGroup } from "./ActionsGroup";
 import { ActionsSortableItem } from "./ActionsSortableItem";
 import { ActionView } from "./ActionView";
+import { CollapsedZone } from "./CollapsedZone";
+import { ZoneCollapseButton } from "./ZoneCollapseButton";
 import { ZoneDots } from "./ZoneDots";
 import { ZoneEmptyHint } from "./ZoneEmptyHint";
 import { ZoneExtractPlaceholder } from "./ZoneExtractPlaceholder";
 import { ZoneFrame } from "./ZoneFrame";
+import { ZoneGridRemeasure } from "./ZoneGridRemeasure";
 import { ZoneLayerPager } from "./ZoneLayerPager";
 import { ZoneLayerRemeasure } from "./ZoneLayerRemeasure";
-import { holdsButtonsDuringDrag, zoneFrameState } from "./zoneFrameState";
+import { holdsButtonsDuringDrag, zoneFrameState, zoneOwnsDrag } from "./zoneFrameState";
 import { ZONE_GRID_CLASS, zoneButtonSize, zoneEndSlot, zoneGridStyle } from "./zoneGeometry";
-import { groupDropId, isZoneItemId, nestId, zoneGroup } from "./actionsDndLayout";
+import { groupDropId, isZoneItemId, nestId, zoneDotsId, zoneGroup } from "./actionsDndLayout";
 
 interface ZoneViewProps {
   zone: ZoneInfo;
@@ -53,8 +58,11 @@ export function ZoneView({
   // A dragged-out menu item has no over group; it's over the zone it would join.
   const overGroup = useActionsOverGroup() ?? extractGroup;
   const origin = useActionsDragOrigin();
+  const ownsDrag = zoneOwnsDrag(zone.name, layers, activeId, origin);
   const { state, holdsButtons } = zoneFrameState({ ids: open.ids, activeId, overGroup, group, origin });
   const extracting = extractGroup === group;
+  const editable = isZoneEditable(projectName, zone);
+  const collapse = () => void setZoneCollapsed(projectName, zone, true);
   const showLayer = (key: string) => openLayerOfListKey(projectName, key);
   const layerAt = (dir: 1 | -1) => layers[openIndex + dir];
   const swipe = useLayerSwipe(
@@ -84,6 +92,15 @@ export function ZoneView({
       scope={projectName}
     />
   );
+  const staticGrid = (layer: ZoneLayerView, holdsButtons = true) => (
+    <div className={ZONE_GRID_CLASS} style={zoneGridStyle(zone.rows, holdsButtons)}>
+      {layer.actions.map((action) => (
+        <div key={action.name} className="h-full min-w-0">
+          {actionView(action)}
+        </div>
+      ))}
+    </div>
+  );
   const openList = (gridHoldsButtons: boolean) => (
     <ActionsGroup
       group={group}
@@ -101,31 +118,16 @@ export function ZoneView({
       ))}
     </ActionsGroup>
   );
-  return (
-    <ZoneFrame
-      label={zone.label}
-      rows={zone.rows}
-      display={display}
-      state={state}
-      onContextMenu={handleContextMenu}
-      onWheel={pager ? swipe : undefined}
-    >
+  const body = (
+    <>
       {pager ? (
         <ZoneLayerPager
           layers={layers}
           openKey={open.key}
           renderPage={(layer, isOpen) =>
-            isOpen ? (
-              openList(layers.some((view) => holdsButtonsDuringDrag(view.ids, activeId, origin, zoneGroup(view.key))))
-            ) : (
-              <div className={ZONE_GRID_CLASS} style={zoneGridStyle(zone.rows, true)}>
-                {layer.actions.map((action) => (
-                  <div key={action.name} className="h-full min-w-0">
-                    {actionView(action)}
-                  </div>
-                ))}
-              </div>
-            )
+            isOpen
+              ? openList(layers.some((view) => holdsButtonsDuringDrag(view.ids, activeId, origin, zoneGroup(view.key))))
+              : staticGrid(layer)
           }
         />
       ) : (
@@ -143,12 +145,63 @@ export function ZoneView({
           onOpen={showLayer}
         />
       )}
-      {pager && buttonDrag && (
+      {/* A popup opened mid-drag is first laid out off to the side, as a layer
+          sliding in is; its drop targets are measured again once it's placed. */}
+      {(pager || zone.collapsed) && buttonDrag && (
         <ZoneLayerRemeasure
           openKey={open.key}
-          ids={[groupDropId(group), ...open.ids, ...open.ids.map(nestId)]}
+          ids={[
+            groupDropId(group),
+            ...open.ids,
+            ...open.ids.map(nestId),
+            ...(zone.collapsed ? [zoneDotsId(zone.name)] : []),
+          ]}
         />
       )}
+      {zone.collapsed && buttonDrag && (
+        <ZoneGridRemeasure buttons={open.ids} ids={[groupDropId(group), zoneDotsId(zone.name)]} />
+      )}
+    </>
+  );
+  if (zone.collapsed) {
+    const expand = () => void setZoneCollapsed(projectName, zone, false);
+    // Bubbled from the popup through its portal: an action's own right-click
+    // is its menu, not the zone's.
+    const handleFoldedContextMenu = (e: MouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement;
+      const inPopupButton = target.closest("[data-zone-popup]") && target.closest("button") && !target.closest("[data-zone-dots]");
+      if (!onZoneContextMenu || e.defaultPrevented || inPopupButton) return;
+      e.preventDefault();
+      onZoneContextMenu(e, zone);
+    };
+    return (
+      <CollapsedZone
+        zone={zone}
+        display={display}
+        editable={editable}
+        dragging={activeId !== null}
+        buttonDrag={buttonDrag}
+        ownsDrag={ownsDrag}
+        onExpand={expand}
+        onContextMenu={handleFoldedContextMenu}
+      >
+        <ZoneFrame label={zone.label} rows={zone.rows} display={display} state={state} onWheel={pager ? swipe : undefined}>
+          {body}
+        </ZoneFrame>
+      </CollapsedZone>
+    );
+  }
+  return (
+    <ZoneFrame
+      label={zone.label}
+      rows={zone.rows}
+      display={display}
+      state={state}
+      onContextMenu={handleContextMenu}
+      onWheel={pager ? swipe : undefined}
+    >
+      {body}
+      {editable && activeId === null && <ZoneCollapseButton display={display} onCollapse={collapse} />}
     </ZoneFrame>
   );
 }

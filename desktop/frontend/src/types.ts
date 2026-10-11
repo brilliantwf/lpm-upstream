@@ -64,6 +64,8 @@ export interface ZoneInfo {
   source: "project" | "repo" | "global";
   // Sorted; absent or empty means one implicit layer.
   layers?: LayerInfo[];
+  // Folded into one button; absent means expanded.
+  collapsed?: boolean;
 }
 
 export const zoneDisplayOf = (zone: Pick<ZoneInfo, "display">): ZoneDisplay =>

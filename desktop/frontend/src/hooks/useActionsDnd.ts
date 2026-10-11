@@ -23,13 +23,14 @@ import {
   isCrumbId,
   isGroupDropId,
   isNestId,
-  isZoneDotsId,
+  isZoneAppendId,
+  isZoneFoldId,
   listOf,
   nestTargetOf,
   resolveTarget,
   sameLayout,
   zoneGroup,
-  zoneOfDotsId,
+  zoneOfAppendId,
 } from "../components/actionsDndLayout";
 
 export interface UseActionsDndOptions {
@@ -216,8 +217,8 @@ export function useActionsDnd({
     // The dots switch layers on a hover. Nothing moves while the pointer is on
     // them: a button joining the open layer could widen the zone and slide the
     // dots out from under the pointer before the hover opens another layer.
-    if (isZoneDotsId(String(over.id))) {
-      setOverGroup(zoneGroup(openListOfRef.current(zoneOfDotsId(String(over.id)))));
+    if (isZoneAppendId(String(over.id))) {
+      setOverGroup(zoneGroup(openListOfRef.current(zoneOfAppendId(String(over.id)))));
       return;
     }
     const target = resolveTarget(String(over.id), currentLayout);
@@ -309,12 +310,14 @@ export function useActionsDnd({
       onMoveRef.current(current, baseline);
       return;
     }
-    // Let go on a zone's dots: the button joins the end of the layer showing.
-    const dotsGroup = isZoneDotsId(overId) ? zoneGroup(openListOfRef.current(zoneOfDotsId(overId))) : null;
+    // Let go on a zone's dots or folded button: the button joins the end of the layer showing.
+    const dotsGroup = isZoneAppendId(overId) ? zoneGroup(openListOfRef.current(zoneOfAppendId(overId))) : null;
     const target = dotsGroup ? { group: dotsGroup, index: listOf(baseline, dotsGroup).length } : resolveTarget(overId, current);
     if (!target) return revertToBaseline(baseline);
     const final = applyMove(baseline, draggedId, target);
     if (sameLayout(baseline, final)) return revertToBaseline(baseline);
+    // Into a folded zone: no slot shows for the button to fly to.
+    if (isZoneFoldId(overId)) setSettle("absorb");
     onMoveRef.current(final, baseline);
   }, [revertToBaseline, indicatorRef, menuDropRef]);
 

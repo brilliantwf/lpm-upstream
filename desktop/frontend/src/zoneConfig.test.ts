@@ -7,6 +7,7 @@ import {
   type NewZone,
   addZoneAroundActionToDoc,
   addZoneToDoc,
+  setZoneCollapsedInDoc,
   setZoneDetailsInDoc,
   zoneDetailsOf,
   zoneKeyFor,
@@ -293,5 +294,38 @@ describe("zoneKeyFor", () => {
   it("stays unique among the project's zones", () => {
     expect(zoneKeyFor("Deploy", ["deploy", "deploy-2"])).toBe("deploy-3");
     expect(zoneKeyFor("", ["zone"])).toBe("zone-2");
+  });
+});
+
+describe("setZoneCollapsedInDoc", () => {
+  it("folds a zone in place", () => {
+    const out = run("zones:\n  build:\n    rows: 2\n    label: Build\n", (doc) =>
+      setZoneCollapsedInDoc(doc, "build", true),
+    );
+    expect(out.zones.build).toEqual({ rows: 2, label: "Build", collapsed: true });
+  });
+
+  it("drops the key to unfold", () => {
+    const out = run("zones:\n  build:\n    rows: 2\n    collapsed: true\n", (doc) =>
+      setZoneCollapsedInDoc(doc, "build", false),
+    );
+    expect(out.zones.build).toEqual({ rows: 2 });
+  });
+
+  it("tells whether it changed the file", () => {
+    const changed = (yaml: string, collapsed: boolean) => setZoneCollapsedInDoc(YAML.parseDocument(yaml), "build", collapsed);
+    expect(changed("zones:\n  build:\n    rows: 2\n", true)).toBe(true);
+    expect(changed("zones:\n  build:\n    collapsed: true\n", true)).toBe(false);
+    expect(changed("zones:\n  build:\n    collapsed: true\n", false)).toBe(true);
+    expect(changed("zones:\n  build:\n    rows: 2\n", false)).toBe(false);
+    expect(changed("root: /tmp\n", true)).toBe(false);
+    expect(changed("root: /tmp\n", false)).toBe(false);
+  });
+
+  it("leaves a file without the zone alone", () => {
+    expect(run("root: /tmp\n", (doc) => setZoneCollapsedInDoc(doc, "build", true))).toEqual({ root: "/tmp" });
+    expect(run("zones:\n  other:\n    rows: 1\n", (doc) => setZoneCollapsedInDoc(doc, "build", true))).toEqual({
+      zones: { other: { rows: 1 } },
+    });
   });
 });

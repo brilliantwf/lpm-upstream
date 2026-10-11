@@ -110,3 +110,14 @@ export function setZoneDetailsInDoc(doc: Doc, name: string, { label, rows }: Zon
   if (trimmed) entry.set("label", trimmed);
   else entry.delete("label");
 }
+
+// A zone missing from this file has nothing to fold here. Returns whether the
+// file changed, so an edit that changed nothing isn't saved.
+export function setZoneCollapsedInDoc(doc: Doc, name: string, collapsed: boolean): boolean {
+  const entry = zonesOf(doc, false)?.get(name, true);
+  if (!YAML.isMap(entry)) return false;
+  if (!collapsed) return entry.delete("collapsed");
+  if (entry.get("collapsed") === true) return false;
+  entry.set("collapsed", true);
+  return true;
+}

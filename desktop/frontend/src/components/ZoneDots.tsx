@@ -7,7 +7,7 @@ import { zoneDotsId } from "./actionsDndLayout";
 import type { ZoneFrameState } from "./ZoneFrame";
 import { zoneNotchBackground } from "./zoneNotch";
 
-const HOVER_OPEN_MS = 500;
+export const HOVER_OPEN_MS = 500;
 
 const TONE: Record<ZoneDisplay, { label: string; dot: string }> = {
   header: {

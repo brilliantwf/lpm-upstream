@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ClientRect, CollisionDetection } from "@dnd-kit/core";
 import type { ActionsLayout } from "../types";
 import { createActionsCollision } from "./actionsCollision";
-import { groupDropId, isNestId, isZoneItemId, nestId, zoneDotsId, zoneGroup, zoneItemId } from "./actionsDndLayout";
+import { groupDropId, isNestId, isZoneItemId, nestId, zoneDotsId, zoneFoldId, zoneGroup, zoneItemId } from "./actionsDndLayout";
 
 type Args = Parameters<CollisionDetection>[0];
 
@@ -533,6 +533,36 @@ describe("a zone with layers", () => {
   it("never targets the dots themselves from outside every droppable", () => {
     const { ids } = setup(undefined, layered, openB);
     expect(ids(argsAt("lint", 245, 200, { rects: withDots() }))).not.toContain(DOTS);
+  });
+
+  // Folded, the zone registers no grid: only its row item and the fold target,
+  // which covers the same button.
+  const FOLD = zoneFoldId("tools");
+  const foldedScene = (): [string, ClientRect][] => {
+    const tools = scene().find(([id]) => id === TOOLS)![1];
+    return [
+      ...scene().filter(
+        ([id]) => id !== TOOLS_AREA && !["ios", "android", "web"].some((name) => id === name || id === nestId(name)),
+      ),
+      [FOLD, tools],
+    ];
+  };
+  const foldCenter = () => {
+    const rect = foldedScene().find(([id]) => id === FOLD)![1];
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  };
+
+  it("targets a folded zone's button with a button over it", () => {
+    const { ids } = setup(undefined, layered, openB);
+    const { x, y } = foldCenter();
+    expect(ids(argsAt("lint", x, y, { rects: foldedScene() }))).toEqual([FOLD]);
+  });
+
+  it("takes a menu item over a folded zone's button at its open layer's end", () => {
+    const { ids, indicator } = setup(undefined, layered, openB);
+    const { x, y } = foldCenter();
+    ids(argsAt("deploy:staging", x, y, { rects: foldedScene() }));
+    expect(indicator()).toEqual({ group: "zone:tools/b", index: 1 });
   });
 
   it("answers a still pointer afresh once a hover on the dots opens another layer", () => {

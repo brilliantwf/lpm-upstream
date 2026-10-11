@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type ActionGroup, zoneGroup, zoneItemId } from "./actionsDndLayout";
-import { zoneFrameState } from "./zoneFrameState";
+import { zoneFrameState, zoneOwnsDrag } from "./zoneFrameState";
 
 const group = zoneGroup("ci");
 
@@ -80,5 +80,22 @@ describe("zoneFrameState across layers and lift-off", () => {
     expect(lifted.holdsButtons).toBe(true);
     const hovering = zoneFrameState({ ids: ["lint"], activeId: "lint", overGroup: "zone:tools", group: "zone:tools", origin: "header" });
     expect(hovering.holdsButtons).toBe(false);
+  });
+});
+
+describe("zoneOwnsDrag", () => {
+  const layers = [{ ids: ["ios", "deploy"] }, { ids: ["web"] }];
+
+  it("owns a button picked up from any of its layers", () => {
+    expect(zoneOwnsDrag("tools", layers, "web", "zone:tools/b")).toBe(true);
+    expect(zoneOwnsDrag("tools", layers, "lint", "header")).toBe(false);
+    expect(zoneOwnsDrag("tools", layers, "ci", "zone:deploy")).toBe(false);
+  });
+
+  it("owns a menu item dragged out of one of its buttons' menus", () => {
+    expect(zoneOwnsDrag("tools", layers, "deploy:prod", null)).toBe(true);
+    expect(zoneOwnsDrag("tools", layers, "web:docs:api", null)).toBe(true);
+    expect(zoneOwnsDrag("tools", layers, "lint:fix", null)).toBe(false);
+    expect(zoneOwnsDrag("tools", layers, null, null)).toBe(false);
   });
 });

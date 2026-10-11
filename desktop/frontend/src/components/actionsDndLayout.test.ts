@@ -18,6 +18,7 @@ import {
   sameLayout,
   zoneGroup,
   zoneDotsId,
+  zoneFoldId,
   zoneItemId,
   zoneNameOfItem,
   zoneOfButton,
@@ -246,12 +247,13 @@ describe("zoneUnderPointer", () => {
 });
 
 describe("movedByZoneResize", () => {
-  it("lists every header item, then the dots, drop area and buttons of each header zone", () => {
+  it("lists every header item, then the dots, fold, drop area and buttons of each header zone", () => {
     expect(movedByZoneResize(layout(), "header")).toEqual([
       "test",
       zoneItemId("build"),
       "lint",
       zoneDotsId("build"),
+      zoneFoldId("build"),
       groupDropId(zoneGroup("build")),
       "ios",
       "android",
@@ -264,6 +266,7 @@ describe("movedByZoneResize", () => {
       zoneItemId("ship"),
       "tail",
       zoneDotsId("ship"),
+      zoneFoldId("ship"),
       groupDropId(zoneGroup("ship")),
       "prod",
       "beta",
@@ -276,6 +279,7 @@ describe("movedByZoneResize", () => {
       zoneItemId("build"),
       "lint",
       zoneDotsId("build"),
+      zoneFoldId("build"),
       groupDropId(zoneGroup("build/mobile")),
       "ios",
       groupDropId(zoneGroup("build/web")),

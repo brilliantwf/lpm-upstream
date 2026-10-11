@@ -1,13 +1,23 @@
 import { toast } from "sonner";
 import type { ActionsLayout, ZoneInfo } from "./types";
 import { useAppStore } from "./store/app";
-import { editGlobalDoc, editProjectDoc, editRepoDoc } from "./yamlQueue";
+import {
+  type ConfigLayer,
+  editFirstLayer,
+  editGlobalDoc,
+  editProjectDoc,
+  editRepoDoc,
+  globalLayer,
+  projectLayer,
+  repoLayer,
+} from "./yamlQueue";
 import {
   type ActionsSnapshot,
   type NewZone,
   type ZoneDetails,
   addZoneAroundActionToDoc,
   addZoneToDoc,
+  setZoneCollapsedInDoc,
   setZoneDetailsInDoc,
 } from "./zoneConfig";
 import { removeZoneFromDoc } from "./zoneDoc";
@@ -68,4 +78,22 @@ export function removeZone(projectName: string, zone: ZoneInfo, layout: ActionsL
       await editProjectDoc(projectName, (doc) => removeZoneFromDoc(doc, zone.name));
     }
   }, "Could not remove the zone");
+}
+
+function zoneSourceLayer(projectName: string, source: ZoneInfo["source"]): ConfigLayer {
+  if (source === "repo") return repoLayer(projectName);
+  if (source === "global") return globalLayer;
+  return projectLayer(projectName);
+}
+
+// Unfolding also clears a fold that a project-file note may hold over a
+// shared zone, so the zone really opens. A file the fold doesn't change isn't
+// rewritten.
+export function setZoneCollapsed(projectName: string, zone: ZoneInfo, collapsed: boolean): Promise<void> {
+  const fold = (layer: ConfigLayer, to: boolean) =>
+    editFirstLayer([layer], (doc) => setZoneCollapsedInDoc(doc, zone.name, to));
+  return runZoneEdit(async () => {
+    await fold(zoneSourceLayer(projectName, zone.source), collapsed);
+    if (!collapsed && zone.source !== "project") await fold(projectLayer(projectName), false);
+  }, "Could not save the zone");
 }

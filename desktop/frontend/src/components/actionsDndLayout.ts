@@ -94,6 +94,22 @@ export function zoneOfDotsId(id: string): string {
   return id.slice(ZONE_DOTS_PREFIX.length);
 }
 
+// A folded zone's button takes drops like its dots: a release there joins the
+// zone's open layer at its end, and a rest springs the popup open.
+export const ZONE_FOLD_PREFIX = "zone-fold:";
+export function zoneFoldId(name: string): string {
+  return `${ZONE_FOLD_PREFIX}${name}`;
+}
+export function isZoneFoldId(id: string): boolean {
+  return id.startsWith(ZONE_FOLD_PREFIX);
+}
+export function isZoneAppendId(id: string): boolean {
+  return isZoneDotsId(id) || isZoneFoldId(id);
+}
+export function zoneOfAppendId(id: string): string {
+  return isZoneDotsId(id) ? zoneOfDotsId(id) : id.slice(ZONE_FOLD_PREFIX.length);
+}
+
 export const NEST_ID_PREFIX = "nest:";
 export function nestId(name: string): string {
   return `${NEST_ID_PREFIX}${name}`;
@@ -160,8 +176,8 @@ export function rowOfZone(layout: ActionsLayout, name: string): ZoneDisplay | nu
 }
 
 // What a zone growing or shrinking can move: in a right-anchored row, the
-// items before it and the dots, drop areas and buttons of the zones among
-// them; once the row wraps, any of them.
+// items before it and the dots, folded buttons, drop areas and buttons of the
+// zones among them; once the row wraps, any of them.
 export function movedByZoneResize(layout: ActionsLayout, row: ZoneDisplay): string[] {
   const items = row === "header" ? layout.header : layout.footer;
   return [
@@ -171,6 +187,7 @@ export function movedByZoneResize(layout: ActionsLayout, row: ZoneDisplay): stri
       .map(zoneNameOfItem)
       .flatMap((name) => [
         zoneDotsId(name),
+        zoneFoldId(name),
         ...listKeysInLayout(layout, name).flatMap((key) => [groupDropId(zoneGroup(key)), ...layout.zones[key]]),
       ]),
   ];

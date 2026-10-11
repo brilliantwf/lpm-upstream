@@ -639,7 +639,7 @@ export function ProjectDetail({
 
   // project.zones is a new array on every refresh and preview; keying the
   // wrap check on the zone shape keeps it from re-measuring each time.
-  const zonesKey = (project.zones ?? []).map((z) => `${z.name}:${z.rows}`).join("|");
+  const zonesKey = (project.zones ?? []).map((z) => `${z.name}:${z.rows}:${z.collapsed ? 1 : 0}`).join("|");
   // The header's items and its zones' buttons; the footer's never change its width.
   const headerKey = movedByZoneResize(actionsLayout, "header").join("\n");
   const {

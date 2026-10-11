@@ -69,3 +69,14 @@ export function overMenu({ x, y }: { x: number; y: number }): boolean {
     return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
   });
 }
+
+// A folded zone's popup is portaled over the rows, and over other folded
+// zones' buttons; under the pointer, it hides what it covers.
+export function popupAt({ x, y }: { x: number; y: number }): Element | null {
+  return (
+    [...document.querySelectorAll("[data-zone-popup]")].find((panel) => {
+      const r = panel.getBoundingClientRect();
+      return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    }) ?? null
+  );
+}

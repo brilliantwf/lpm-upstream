@@ -17,7 +17,7 @@ import {
 } from "./splitPrimary";
 
 // A row's palette, and which way its dropdowns open.
-const TONE = {
+export const SPLIT_TONE = {
   header: {
     side: "below",
     border: "border border-[var(--border)] bg-[var(--action-tint,var(--bg-secondary))]",
@@ -53,7 +53,7 @@ const ZONE_FIT = {
 
 const SIZE_CLASSES = {
   default: {
-    ...TONE.header,
+    ...SPLIT_TONE.header,
     ...ROW_FIT,
     height: "h-8",
     rounded: "rounded-lg",
@@ -63,7 +63,7 @@ const SIZE_CLASSES = {
     chevronPad: "px-1.5",
   },
   compact: {
-    ...TONE.footer,
+    ...SPLIT_TONE.footer,
     ...ROW_FIT,
     height: "",
     rounded: "rounded-md",
@@ -72,8 +72,8 @@ const SIZE_CLASSES = {
     padding: "px-2.5 py-1 text-[11px]",
     chevronPad: "px-1.5",
   },
-  zone: { ...TONE.header, ...ZONE_FIT },
-  footerZone: { ...TONE.footer, ...ZONE_FIT },
+  zone: { ...SPLIT_TONE.header, ...ZONE_FIT },
+  footerZone: { ...SPLIT_TONE.footer, ...ZONE_FIT },
 } as const;
 
 export type ActionSize = keyof typeof SIZE_CLASSES;

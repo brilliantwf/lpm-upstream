@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import type { ActionInfo, ZoneDisplay, ZoneInfo } from "../types";
 import type { ActionsModel, ZoneLayerView } from "../actionsLayoutModel";
 import { findActionByPath } from "../actionTree";
@@ -11,7 +11,10 @@ import {
   zoneOfGroup,
 } from "./actionsDndLayout";
 import { openListKey } from "../store/zoneLayers";
+import { isZoneEditable } from "../zoneEditable";
 import { ActionView } from "./ActionView";
+import { CollapsedZonePreview } from "./CollapsedZonePreview";
+import { InBar } from "./InBar";
 import { ZoneEmptyHint } from "./ZoneEmptyHint";
 import { ZoneFrame } from "./ZoneFrame";
 import { ZONE_GRID_CLASS, zoneButtonHeight, zoneButtonSize, zoneGridStyle } from "./zoneGeometry";
@@ -46,17 +49,6 @@ function zoneNamed(model: ActionsModel, name: string): FoundZone | null {
     }
   }
   return null;
-}
-
-// The overlay renders outside the terminal pane, so a footer button or zone
-// brings the pane's colours along.
-function InBar({ display, footerStyle, children }: { display: ZoneDisplay; footerStyle?: CSSProperties; children: ReactNode }) {
-  if (display !== "footer") return <>{children}</>;
-  return (
-    <div className="composer-terminal-surface" style={footerStyle}>
-      {children}
-    </div>
-  );
 }
 
 // Mirrors the destination form factor while hovering, so the user sees how
@@ -95,6 +87,9 @@ function OverlayBody({
   if (isZoneItemId(id)) {
     const found = zoneNamed(model, zoneNameOfItem(id));
     if (!found) return null;
+    if (found.zone.collapsed) {
+      return <CollapsedZonePreview zone={found.zone} display={display} editable={isZoneEditable(projectName, found.zone)} />;
+    }
     const openKey = openListKey(projectName, found.zone);
     const shown = (found.layers.find((layer) => layer.key === openKey) ?? found.layers[0])?.actions ?? [];
     const filled = shown.length > 0;

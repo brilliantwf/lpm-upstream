@@ -83,4 +83,13 @@ describe("ActionDragOverlay", () => {
     useZoneLayers.getState().setOpen("app", "tools", "a");
     expect(names()).toEqual(["ios"]);
   });
+
+  it("draws a folded zone as its folded button, not its grid", () => {
+    const from = buildActionsModel(actions, [{ ...zones[0], collapsed: true }, zones[1]]);
+    const drawn = overlay(zoneItemId("tools"), "header", from);
+    expect(drawn.hasAttribute("data-zone-frame")).toBe(false);
+    expect(drawn.querySelector("button")).toBeNull();
+    expect(drawn.textContent).toBe("Tools");
+    expect(drawn.querySelectorAll("svg")).toHaveLength(2);
+  });
 });

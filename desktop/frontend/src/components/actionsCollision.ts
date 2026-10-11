@@ -9,13 +9,13 @@ import {
   isCrumbId,
   isGroupDropId,
   isNestId,
-  isZoneDotsId,
+  isZoneAppendId,
   isZoneItemId,
   listOf,
   nestId,
   zoneGroup,
   zoneNameOfItem,
-  zoneOfDotsId,
+  zoneOfAppendId,
   zoneUnderPointer,
 } from "./actionsDndLayout";
 import { type HeldCollision, holdWhilePointerStill } from "./holdWhilePointerStill";
@@ -53,7 +53,7 @@ const OUTSIDE_SLACK = 24;
 // A menu item's row in an open dropdown: an action path, not one of the
 // prefixed ids the rows, nests, crumbs and dots register.
 function isMenuRow(id: string): boolean {
-  return isChildId(id) && !isGroupDropId(id) && !isNestId(id) && !isCrumbId(id) && !isZoneDotsId(id);
+  return isChildId(id) && !isGroupDropId(id) && !isNestId(id) && !isCrumbId(id) && !isZoneAppendId(id);
 }
 
 interface Placed {
@@ -135,6 +135,8 @@ export interface ActionsCollisionOptions {
   nestArmed?: { current: string | null };
   // True over an open menu panel, which covers whatever lies beneath it.
   overMenu?: (point: Point) => boolean;
+  // The folded zone's popup panel under the point, which covers the rows.
+  popupAt?: (point: Point) => Element | null;
   // Where the pointer picked the item up: the drag's direction is read from
   // it, not from the overlay, which a modifier can shift.
   dragStart?: { current: Point | null };
@@ -166,9 +168,20 @@ export function createActionsCollision({
   offerNest = () => {},
   nestArmed = { current: null },
   overMenu = () => false,
+  popupAt = () => null,
   dragStart = { current: null },
 }: ActionsCollisionOptions): CollisionDetection {
-  const detect = (args: CollisionArgs, offer: (target: string) => void, clamped = false): Collision[] => {
+  // Over a popup, only its own drop targets count; a menu opened from one of
+  // its buttons lies over it in turn.
+  const inPopup = (args: CollisionArgs): CollisionArgs => {
+    const point = args.pointerCoordinates;
+    const panel = point && !overMenu(point) ? popupAt(point) : null;
+    if (!panel) return args;
+    const droppableContainers = args.droppableContainers.filter((c) => !!c.node.current && panel.contains(c.node.current));
+    return { ...args, droppableContainers };
+  };
+  const detect = (fullArgs: CollisionArgs, offer: (target: string) => void, clamped = false): Collision[] => {
+    const args = inPopup(fullArgs);
     const active = String(args.active.id);
     const zoneDrag = isZoneItemId(active);
     const activeRef = splitChild(active);
@@ -191,7 +204,7 @@ export function createActionsCollision({
         const rect = c.rect.current;
         if (!rect || rect.width <= 0 || rect.height <= 0) return false;
         const id = String(c.id);
-        if (isNestId(id) || isZoneDotsId(id) || isMenuRow(id) || isCrumbId(id)) return false;
+        if (isNestId(id) || isZoneAppendId(id) || isMenuRow(id) || isCrumbId(id)) return false;
         return zoneDrag ? rowLevel(id) : !isZoneItemId(id);
       });
       // An open menu's own chrome takes no drop and hides what lies beneath.
@@ -244,12 +257,12 @@ export function createActionsCollision({
       return anchor ? [{ id: anchor }] : [{ id: groupDropId(ins.group) }];
     };
 
-    // Over a zone's dots — where a hover opens another layer — a button
-    // targets the dots themselves, whatever lies under the pill's upper half,
-    // and a release joins the open layer at its end.
-    const dots = pointer.find((c) => isZoneDotsId(String(c.id)));
+    // Over a zone's dots or its folded button — where a hover opens another
+    // layer or the popup — a button targets them, whatever lies beneath, and
+    // a release joins the open layer at its end.
+    const dots = pointer.find((c) => isZoneAppendId(String(c.id)));
     if (dots) {
-      const group = zoneGroup(openListOf(zoneOfDotsId(String(dots.id))));
+      const group = zoneGroup(openListOf(zoneOfAppendId(String(dots.id))));
       if (activeRef) return extractTo({ group, index: listOf(layout, group).length });
       updateIndicator(null);
       updateMenuDrop(null);

@@ -66,6 +66,7 @@ export function ContextMenuShell({
   return (
     <div
       ref={ref}
+      data-context-menu=""
       className={`fixed z-[80] ${MENU_PANEL_CLASS}`}
       style={{ left: pos.left, top: pos.top, minWidth }}
     >

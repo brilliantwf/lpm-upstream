@@ -1,9 +1,11 @@
 // @vitest-environment happy-dom
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { DragEndEvent, DragOverEvent, DragStartEvent } from "@dnd-kit/core";
 import type { ActionsLayout } from "../types";
-import { zoneDotsId, zoneItemId } from "../components/actionsDndLayout";
+import { zoneDotsId, zoneFoldId, zoneItemId } from "../components/actionsDndLayout";
 import { type UseActionsDndResult, useActionsDnd } from "./useActionsDnd";
 
 const layout = (): ActionsLayout => ({
@@ -147,5 +149,55 @@ describe("useActionsDnd over a zone's dots", () => {
     const next: ActionsLayout = onMove.mock.calls[0][0];
     expect(next.zones["tools/b"]).toEqual(["sim", "lint"]);
     expect(next.header).toEqual(["build", zoneItemId("tools")]);
+  });
+
+  it("treats a folded zone's button like its dots", () => {
+    const { api, onMove, onPreview } = mount(layered(), openB);
+    api.onDragStart(start("lint"));
+    api.onDragOver(over("lint", zoneFoldId("tools")));
+    expect(onPreview).not.toHaveBeenCalled();
+    api.onDragEnd(end("lint", zoneFoldId("tools")));
+    const next: ActionsLayout = onMove.mock.calls[0][0];
+    expect(next.zones["tools/b"]).toEqual(["sim", "lint"]);
+  });
+});
+
+describe("useActionsDnd settling on a folded zone", () => {
+  function live() {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    let api!: UseActionsDndResult;
+    function Probe() {
+      api = useActionsDnd({
+        layout: layout(),
+        onPreview: vi.fn(),
+        onMove: vi.fn(),
+        onStructural: vi.fn(),
+        canNest: () => false,
+        isMenu: () => false,
+        indicatorRef: { current: null },
+        menuDropRef: { current: null },
+      });
+      return null;
+    }
+    const root = createRoot(document.createElement("div"));
+    act(() => root.render(<Probe />));
+    const drop = (overId: string) => {
+      act(() => api.onDragStart(start("lint")));
+      act(() => api.onDragEnd(end("lint", overId)));
+      return api.settle;
+    };
+    return { drop, unmount: () => act(() => root.unmount()) };
+  }
+
+  it("shrinks away on the folded button, where the button has no slot to fly to", () => {
+    const { drop, unmount } = live();
+    expect(drop(zoneFoldId("tools"))).toBe("absorb");
+    unmount();
+  });
+
+  it("still flies to its slot on a zone's dots", () => {
+    const { drop, unmount } = live();
+    expect(drop(zoneDotsId("tools"))).toBe("move");
+    unmount();
   });
 });

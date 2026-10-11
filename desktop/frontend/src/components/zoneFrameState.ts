@@ -1,3 +1,4 @@
+import { isChildId, parsePath } from "../actionIds";
 import { isZoneGroup, isZoneItemId, zoneOfGroup, type ActionGroup, type ZoneGroup } from "./actionsDndLayout";
 import type { ZoneFrameState } from "./ZoneFrame";
 
@@ -43,4 +44,18 @@ export function zoneFrameState({ ids, activeId, overGroup, group, origin }: Zone
       ? "filled"
       : "empty";
   return { state, holdsButtons };
+}
+
+// A drag the zone began: a button from one of its lists, or a menu item dragged
+// out of the menu of one of its buttons, which has no origin list of its own.
+export function zoneOwnsDrag(
+  zone: string,
+  layers: { ids: string[] }[],
+  activeId: string | null,
+  origin: ActionGroup | null,
+): boolean {
+  if (origin !== null) return isZoneGroup(origin) && zoneOfGroup(origin) === zone;
+  if (activeId === null || !isChildId(activeId)) return false;
+  const top = parsePath(activeId)[0];
+  return layers.some((layer) => layer.ids.includes(top));
 }

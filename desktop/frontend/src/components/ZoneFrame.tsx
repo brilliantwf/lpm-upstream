@@ -52,7 +52,7 @@ export function ZoneFrame({ label, rows, display = "header", state, onContextMen
       aria-label={label}
       onContextMenu={onContextMenu}
       style={style}
-      className={`relative box-border shrink-0 rounded-[10px] border transition-colors duration-150 ${FRAME_STATE[display][state]}`}
+      className={`group/zone relative box-border shrink-0 rounded-[10px] border transition-colors duration-150 ${FRAME_STATE[display][state]}`}
     >
       {children}
     </div>

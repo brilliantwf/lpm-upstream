@@ -84,3 +84,5 @@ export function MoreHorizontalIcon() { return <svg {...iconProps} fill="currentC
 export function CornerUpLeftIcon() { return <svg {...iconProps}><polyline points="9 14 4 9 9 4" /><path d="M20 20v-7a4 4 0 0 0-4-4H4" /></svg>; }
 export function UserIcon() { return <svg {...iconProps}><circle cx="12" cy="8" r="4" /><path d="M20 21a8 8 0 0 0-16 0" /></svg>; }
 export function DetachIcon({ size = 12 }: { size?: number } = {}) { return <svg {...iconProps} width={size} height={size}><path d="M14 3h7v7" /><path d="M10 14 21 3" /><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" /></svg>; }
+export function CollapseIcon() { return <svg {...iconProps} viewBox="0 0 10 10" width={10} height={10} strokeWidth={1.2}><path d="M1 5h3M2.5 3.5 4 5 2.5 6.5M9 5H6M7.5 3.5 6 5l1.5 1.5" /></svg>; }
+export function ExpandIcon() { return <svg {...iconProps} viewBox="0 0 10 10" width={10} height={10} strokeWidth={1.2}><path d="M4 5H1M2.5 3.5 1 5l1.5 1.5M6 5h3M7.5 3.5 9 5 7.5 6.5" /></svg>; }

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActionInfo, ZoneInfo } from "../types";
 import { buildActionsModel } from "../actionsLayoutModel";
 
+vi.mock("../zoneActions", () => ({ setZoneCollapsed: vi.fn() }));
 vi.mock("../hooks/useGitStatus", () => ({ useGitStatus: () => ({ status: null }) }));
 vi.mock("../hooks/useBranchPullRequest", () => ({ useBranchPullRequest: () => null }));
 vi.mock("./BranchSwitcher", () => ({ BranchSwitcher: () => null }));

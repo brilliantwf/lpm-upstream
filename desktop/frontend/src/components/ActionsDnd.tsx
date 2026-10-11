@@ -24,6 +24,7 @@ import {
   fitContent,
   modifiers,
   overMenu,
+  popupAt,
   reducedMotionDropAnimation,
 } from "./actionsDragMotion";
 import { RowsRemeasure } from "./RowsRemeasure";
@@ -274,6 +275,7 @@ export function ActionsDnd({
         offerNest,
         nestArmed: nestArmedRef,
         overMenu,
+        popupAt,
         dragStart: dragStartRef,
       }),
     [canNest, layout, updateIndicator, updateMenuDrop, openListOf, offerNest],

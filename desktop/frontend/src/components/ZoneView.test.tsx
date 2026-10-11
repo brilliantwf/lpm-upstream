@@ -6,7 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ZoneLayerView } from "../actionsLayoutModel";
 import type { ActionInfo, LayerInfo, ZoneDisplay, ZoneInfo } from "../types";
 import { useZoneLayers } from "../store/zoneLayers";
+import { OPEN_DELAY_MS } from "../hooks/useHoverPopup";
 import { ZoneView } from "./ZoneView";
+
+const h = vi.hoisted(() => ({ setZoneCollapsed: vi.fn(), onRun: vi.fn() }));
+vi.mock("../zoneActions", () => ({ setZoneCollapsed: h.setZoneCollapsed }));
 
 const action = (name: string): ActionInfo =>
   ({ name, label: name, cmd: `run ${name}`, confirm: false, display: "ship" }) as ActionInfo;
@@ -18,6 +22,8 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   useZoneLayers.setState({ open: {} });
   onZoneContextMenu.mockReset();
+  h.setZoneCollapsed.mockReset();
+  h.onRun.mockReset();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -31,7 +37,7 @@ afterEach(() => {
 
 const onZoneContextMenu = vi.fn();
 
-function mount(zone: ZoneInfo, display: ZoneDisplay, layers: ZoneLayerView[]) {
+function mount(zone: ZoneInfo, display: ZoneDisplay, layers: ZoneLayerView[], projectName = "app") {
   act(() =>
     root.render(
       <DndContext>
@@ -39,9 +45,9 @@ function mount(zone: ZoneInfo, display: ZoneDisplay, layers: ZoneLayerView[]) {
           zone={zone}
           display={display}
           layers={layers}
-          projectName="app"
+          projectName={projectName}
           disabled={false}
-          onRun={() => {}}
+          onRun={h.onRun}
           onZoneContextMenu={onZoneContextMenu}
         />
       </DndContext>,
@@ -106,6 +112,203 @@ describe("ZoneView", () => {
   it("tells the footer's empty hint apart", () => {
     expect(render("footer", []).frame.textContent).toBe("Drop buttons here");
     expect(render("footer", []).frame.querySelector("span")?.className).toContain("--composer-fg-muted");
+  });
+});
+
+describe("collapsing a zone", () => {
+  it("collapses from the corner button", () => {
+    const zone: ZoneInfo = { name: "ship", label: "Ship", rows: 1, source: "project" };
+    const frame = mount(zone, "header", [{ key: "ship", layer: null, ids: ["prod"], actions: [action("prod")] }]);
+    act(() => frame.querySelector<HTMLButtonElement>('[aria-label="Collapse zone"]')!.click());
+    expect(h.setZoneCollapsed).toHaveBeenCalledWith("app", zone, true);
+  });
+
+  it("offers no corner button on a peer project's shared zone", () => {
+    const zone: ZoneInfo = { name: "ship", label: "Ship", rows: 1, source: "repo" };
+    const frame = mount(zone, "header", [{ key: "ship", layer: null, ids: ["prod"], actions: [action("prod")] }], "peer-0123abcd-web");
+    expect(frame.querySelector('[aria-label="Collapse zone"]')).toBeNull();
+  });
+});
+
+describe("a folded zone", () => {
+  const folded = (over: Partial<ZoneInfo> = {}): ZoneInfo => ({
+    name: "ship",
+    label: "Ship",
+    rows: 1,
+    source: "project",
+    collapsed: true,
+    ...over,
+  });
+  const foldedLayers = (): ZoneLayerView[] => [{ key: "ship", layer: null, ids: ["prod"], actions: [action("prod")] }];
+  const popupEl = () => document.querySelector<HTMLElement>("[data-zone-popup]");
+
+  it("shows a folded zone as one button instead of the frame", () => {
+    mount(folded(), "header", foldedLayers());
+    expect(container.querySelector("[data-zone-frame]")).toBeNull();
+    expect(container.querySelector("[data-collapsed-zone]")?.textContent).toContain("Ship");
+  });
+
+  it("expands from the ⤢ half", () => {
+    const zone = folded();
+    mount(zone, "header", foldedLayers());
+    act(() => container.querySelector<HTMLButtonElement>('[aria-label="Expand zone"]')!.click());
+    expect(h.setZoneCollapsed).toHaveBeenCalledWith("app", zone, false);
+  });
+
+  it("opens the zone's grid from the label and keeps it open after a run", () => {
+    mount(folded(), "header", foldedLayers());
+    act(() => container.querySelector<HTMLButtonElement>("[data-collapsed-zone] button[aria-haspopup]")!.click());
+    const run = [...popupEl()!.querySelectorAll("button")].find((b) => b.textContent === "prod")!;
+    act(() => run.click());
+    expect(h.onRun).toHaveBeenCalledWith(expect.objectContaining({ name: "prod" }));
+    expect(popupEl()).not.toBeNull();
+  });
+
+  it("lays the popup out as the zone's own drop group", () => {
+    mount(folded(), "header", foldedLayers());
+    act(() => container.querySelector<HTMLButtonElement>("[data-collapsed-zone] button[aria-haspopup]")!.click());
+    expect(popupEl()!.querySelector('[data-actions-group="zone:ship"]')).not.toBeNull();
+  });
+
+  it("closes the popup on Escape", () => {
+    mount(folded(), "header", foldedLayers());
+    act(() => container.querySelector<HTMLButtonElement>("[data-collapsed-zone] button[aria-haspopup]")!.click());
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(popupEl()).toBeNull();
+  });
+
+  it("keeps a press inside the popup from reaching the row's drag handler", () => {
+    const spy = vi.fn();
+    act(() =>
+      root.render(
+        <DndContext>
+          <div onPointerDown={spy}>
+            <ZoneView
+              zone={folded()}
+              display="header"
+              layers={foldedLayers()}
+              projectName="app"
+              disabled={false}
+              onRun={h.onRun}
+              onZoneContextMenu={onZoneContextMenu}
+            />
+          </div>
+        </DndContext>,
+      ),
+    );
+    act(() => container.querySelector<HTMLButtonElement>("[data-collapsed-zone] button[aria-haspopup]")!.click());
+    const run = [...popupEl()!.querySelectorAll("button")].find((b) => b.textContent === "prod")!;
+    act(() => {
+      run.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("brings the terminal's colours to a footer popup, not a header one", () => {
+    const openPopup = (display: ZoneDisplay) => {
+      mount(folded(), display, foldedLayers());
+      act(() => container.querySelector<HTMLButtonElement>("[data-collapsed-zone] button[aria-haspopup]")!.click());
+      return popupEl()!.closest<HTMLElement>(".composer-terminal-surface");
+    };
+    expect(openPopup("footer")?.style.getPropertyValue("--terminal-bg")).toBeTruthy();
+    act(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
+    expect(openPopup("header")).toBeNull();
+  });
+
+  it("closes on a press outside without taking focus from where it went", () => {
+    mount(folded(), "header", foldedLayers());
+    act(() => container.querySelector<HTMLButtonElement>("[data-collapsed-zone] button[aria-haspopup]")!.click());
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+    act(() => {
+      input.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    });
+    expect(popupEl()).toBeNull();
+    expect(document.activeElement).toBe(input);
+    input.remove();
+  });
+
+  it("leaves focus where it is on Escape when it isn't in the popup", () => {
+    mount(folded(), "header", foldedLayers());
+    act(() => container.querySelector<HTMLButtonElement>("[data-collapsed-zone] button[aria-haspopup]")!.click());
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(popupEl()).toBeNull();
+    expect(document.activeElement).toBe(input);
+    input.remove();
+  });
+
+  it("returns focus to the label on Escape from inside the popup", () => {
+    mount(folded(), "header", foldedLayers());
+    const label = container.querySelector<HTMLButtonElement>("[data-collapsed-zone] button[aria-haspopup]")!;
+    act(() => label.focus());
+    act(() => {
+      label.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+    });
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(popupEl()).toBeNull();
+    expect(document.activeElement).toBe(label);
+  });
+
+  it("ignores a rest on the label until the pointer has been off it, as after a fold", () => {
+    vi.useFakeTimers();
+    mount(folded(), "header", foldedLayers());
+    const label = container.querySelector<HTMLButtonElement>("[data-collapsed-zone] button[aria-haspopup]")!;
+    const rest = () => {
+      act(() => {
+        label.dispatchEvent(new MouseEvent("pointerover", { bubbles: true }));
+      });
+      act(() => vi.advanceTimersByTime(OPEN_DELAY_MS));
+    };
+    rest();
+    expect(popupEl()).toBeNull();
+    act(() => {
+      label.dispatchEvent(new MouseEvent("pointerout", { bubbles: true, relatedTarget: document.body }));
+    });
+    act(() => {
+      document.body.dispatchEvent(new MouseEvent("pointermove", { bubbles: true }));
+    });
+    rest();
+    expect(popupEl()).not.toBeNull();
+  });
+
+  it("moves focus into the popup when ArrowDown opens it", () => {
+    mount(folded(), "header", foldedLayers());
+    const label = container.querySelector<HTMLButtonElement>("[data-collapsed-zone] button[aria-haspopup]")!;
+    act(() => label.focus());
+    act(() => {
+      label.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+    });
+    expect(popupEl()!.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement?.tagName).toBe("BUTTON");
+  });
+
+  it("leaves focus on the label when a click opens the popup", () => {
+    mount(folded(), "header", foldedLayers());
+    const label = container.querySelector<HTMLButtonElement>("[data-collapsed-zone] button[aria-haspopup]")!;
+    act(() => label.focus());
+    act(() => label.click());
+    expect(document.activeElement).toBe(label);
+  });
+
+  it("opens the zone menu on a right-click of the folded button", () => {
+    mount(folded(), "header", foldedLayers());
+    rightClick(container.querySelector("[data-collapsed-zone] button[aria-haspopup]")!);
+    expect(onZoneContextMenu).toHaveBeenCalledTimes(1);
+  });
+
+  it("has no ⤢ half on a peer project's shared zone", () => {
+    mount(folded({ source: "global" }), "header", foldedLayers(), "peer-0123abcd-web");
+    expect(container.querySelector('[aria-label="Expand zone"]')).toBeNull();
   });
 });
 

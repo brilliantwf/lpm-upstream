@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({
   editProjectDoc: vi.fn(),
   editRepoDoc: vi.fn(),
   editGlobalDoc: vi.fn(),
+  editFirstLayer: vi.fn(),
   toastError: vi.fn(),
 }));
 
@@ -21,12 +22,16 @@ vi.mock("./yamlQueue", () => ({
   editProjectDoc: h.editProjectDoc,
   editRepoDoc: h.editRepoDoc,
   editGlobalDoc: h.editGlobalDoc,
+  projectLayer: () => "project",
+  repoLayer: () => "repo",
+  globalLayer: "global",
+  editFirstLayer: h.editFirstLayer,
 }));
 
 import { type ActionsModel, buildActionsModel } from "./actionsLayoutModel";
 import { layoutWithoutZone, zoneItemId } from "./components/actionsDndLayout";
 import type { ActionInfo, ActionsLayout, ZoneInfo } from "./types";
-import { createZone, editZone, removeZone } from "./zoneActions";
+import { createZone, editZone, removeZone, setZoneCollapsed } from "./zoneActions";
 import type { ActionsSnapshot } from "./zoneConfig";
 
 const NAME = "app";
@@ -44,6 +49,19 @@ const editFile = (layer: Layer) => async (mutate: (doc: Doc) => void) => {
   const doc = YAML.parseDocument(files[layer] || "{}");
   mutate(doc);
   files[layer] = String(doc);
+};
+
+// editFirstLayer's round trip: a layer is saved only when the edit changed it.
+let firstLayerSaves: Layer[];
+const editFirstFile = async (layers: Layer[], attempt: (doc: Doc) => boolean) => {
+  for (const layer of layers) {
+    const doc = YAML.parseDocument(files[layer] || "{}");
+    if (!attempt(doc)) continue;
+    files[layer] = String(doc);
+    firstLayerSaves.push(layer);
+    return true;
+  }
+  return false;
 };
 
 const saved = (layer: Layer) => YAML.parse(files[layer]);
@@ -104,6 +122,8 @@ beforeEach(() => {
   h.editProjectDoc.mockReset().mockImplementation((_name, mutate) => editFile("project")(mutate));
   h.editRepoDoc.mockReset().mockImplementation((_name, mutate) => editFile("repo")(mutate));
   h.editGlobalDoc.mockReset().mockImplementation(editFile("global"));
+  firstLayerSaves = [];
+  h.editFirstLayer.mockReset().mockImplementation(editFirstFile);
 });
 
 describe("createZone", () => {
@@ -256,5 +276,32 @@ describe("removeZone", () => {
     await removeZone(NAME, zone(), layout);
     expect(h.toastError).toHaveBeenCalledWith("Could not remove the zone: disk full");
     expect(h.refreshProjects).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("setZoneCollapsed", () => {
+  it.each(LAYERS)("folds a zone in the %s file that declares it", async (source) => {
+    files[source] = "zones:\n  build:\n    rows: 1\n";
+    await setZoneCollapsed(NAME, zone({ source }), true);
+    expect(firstLayerSaves).toEqual([source]);
+    expect(saved(source).zones.build).toEqual({ rows: 1, collapsed: true });
+  });
+
+  it("clears a project note when it unfolds a shared zone", async () => {
+    files.repo = "zones:\n  build:\n    rows: 1\n    collapsed: true\n";
+    files.project = "zones:\n  build:\n    collapsed: true\n";
+    await setZoneCollapsed(NAME, zone({ source: "repo" }), false);
+    expect(firstLayerSaves).toEqual(["repo", "project"]);
+    expect(saved("repo").zones.build).toEqual({ rows: 1 });
+    expect(saved("project").zones.build).toEqual({});
+  });
+
+  it("leaves a project file with no note untouched when it unfolds a shared zone", async () => {
+    files.global = "zones:\n  build:\n    rows: 1\n    collapsed: true\n";
+    files.project = "root:   /tmp   # kept as is\n";
+    await setZoneCollapsed(NAME, zone({ source: "global" }), false);
+    expect(firstLayerSaves).toEqual(["global"]);
+    expect(files.project).toBe("root:   /tmp   # kept as is\n");
+    expect(h.toastError).not.toHaveBeenCalled();
   });
 });

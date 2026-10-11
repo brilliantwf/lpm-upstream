@@ -11,8 +11,9 @@ const h = vi.hoisted(() => ({
   addLayer: vi.fn(),
   removeLayer: vi.fn(),
   saveLayers: vi.fn(),
+  setZoneCollapsed: vi.fn(),
 }));
-vi.mock("../../zoneActions", () => ({ editZone: h.editZone, removeZone: h.removeZone }));
+vi.mock("../../zoneActions", () => ({ editZone: h.editZone, removeZone: h.removeZone, setZoneCollapsed: h.setZoneCollapsed }));
 // The real zoneLayerActions pulls in the app store, which needs the Tauri window.
 vi.mock("../../store/app", () => ({ useAppStore: {} }));
 vi.mock("../../yamlQueue", () => ({}));
@@ -200,7 +201,26 @@ describe("ZoneMenus", () => {
   it("orders the zone menu", () => {
     open("web", layered());
     const labels = [...document.querySelectorAll("button")].map((b) => b.textContent?.trim());
-    expect(labels).toEqual(["New layer", "Edit zone…", "Remove layer “Dev”", "Remove zone"]);
+    expect(labels).toEqual(["New layer", "Edit zone…", "Collapse zone", "Remove layer “Dev”", "Remove zone"]);
+  });
+
+  it("collapses an expanded zone", () => {
+    const z = zone();
+    open("web", z);
+    act(() => button("Collapse zone")!.click());
+    expect(h.setZoneCollapsed).toHaveBeenCalledWith("web", z, true);
+  });
+
+  it("expands a collapsed zone", () => {
+    const z = zone({ collapsed: true });
+    open("web", z);
+    act(() => button("Expand zone")!.click());
+    expect(h.setZoneCollapsed).toHaveBeenCalledWith("web", z, false);
+  });
+
+  it.each(["repo", "global"] as const)("keeps Collapse zone off a peer project's %s zone", (source) => {
+    open(PEER_PROJECT, zone({ source }));
+    expect(button("Collapse zone")?.disabled).toBe(true);
   });
 
   it("names the open layer in Remove layer when it has a label", () => {

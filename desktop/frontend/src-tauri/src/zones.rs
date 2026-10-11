@@ -35,6 +35,7 @@ struct ZoneEntry {
     label: Option<String>,
     position: Option<f64>,
     display: Option<ZoneDisplay>,
+    collapsed: Option<bool>,
     layers: BTreeMap<String, LayerEntry>,
 }
 
@@ -48,6 +49,8 @@ pub struct ZoneInfo {
     pub position: Option<f64>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub layers: Vec<LayerInfo>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub collapsed: bool,
     pub source: ZoneSource,
 }
 
@@ -80,6 +83,7 @@ fn entries_from_yaml(doc: &Yaml) -> BTreeMap<String, ZoneEntry> {
                     .map(str::to_string),
                 position: value.get("position").and_then(Yaml::as_f64),
                 display: display_of(value),
+                collapsed: value.get("collapsed").and_then(Yaml::as_bool),
                 layers: layers_of(value),
             };
             Some((name.to_string(), entry))
@@ -131,6 +135,10 @@ fn merge_files(files: &[(ZoneSource, BTreeMap<String, ZoneEntry>)]) -> Vec<ZoneI
                     .map(|(_, entry)| &entry.layers)
                     .collect::<Vec<_>>(),
             ),
+            collapsed: found
+                .iter()
+                .find_map(|(_, entry)| entry.collapsed)
+                .unwrap_or(false),
             source: *source,
         };
         zones.insert(name.clone(), zone);
@@ -228,6 +236,7 @@ mod tests {
                 display: ZoneDisplay::Header,
                 position: Some(4.0),
                 layers: vec![],
+                collapsed: false,
                 source: ZoneSource::Global,
             }]
         );
@@ -286,6 +295,7 @@ mod tests {
             display: ZoneDisplay::Footer,
             position: None,
             layers: vec![],
+            collapsed: false,
             source: ZoneSource::Repo,
         };
         assert_eq!(
@@ -430,5 +440,50 @@ mod tests {
     fn slash_in_a_zone_name_is_ignored() {
         let zones = merge_files(&[(ZoneSource::Project, file("zones:\n  a/b:\n    rows: 1\n"))]);
         assert!(zones.is_empty());
+    }
+
+    #[test]
+    fn collapsed_falls_back_file_by_file() {
+        let zones = merge_files(&[
+            (
+                ZoneSource::Project,
+                file("zones:\n  build:\n    position: 1\n"),
+            ),
+            (
+                ZoneSource::Global,
+                file("zones:\n  build:\n    rows: 1\n    collapsed: true\n"),
+            ),
+        ]);
+        assert!(zones[0].collapsed);
+    }
+
+    #[test]
+    fn a_zone_is_expanded_unless_a_file_says_collapsed_true() {
+        let zones = merge_files(&[(
+            ZoneSource::Project,
+            file("zones:\n  a:\n    rows: 1\n  b:\n    rows: 1\n    collapsed: yes\n"),
+        )]);
+        assert_eq!(
+            zones.iter().map(|z| z.collapsed).collect::<Vec<_>>(),
+            vec![false, false]
+        );
+    }
+
+    #[test]
+    fn serializes_collapsed_only_when_set() {
+        let zone = ZoneInfo {
+            name: "build".into(),
+            label: "Build".into(),
+            rows: 1,
+            display: ZoneDisplay::Header,
+            position: None,
+            layers: vec![],
+            collapsed: true,
+            source: ZoneSource::Project,
+        };
+        assert_eq!(
+            serde_json::to_value(&zone).unwrap()["collapsed"],
+            serde_json::json!(true)
+        );
     }
 }
