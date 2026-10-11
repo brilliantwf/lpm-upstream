@@ -1,6 +1,6 @@
 use super::{
-    string_at, string_keys, validate_choice, validate_keys, validate_string_field, ConfigKind,
-    Mapping, Report, Value,
+    string_at, string_keys, validate_bool_field, validate_choice, validate_keys,
+    validate_string_field, ConfigKind, Mapping, Report, Value,
 };
 
 // Mirrors the app's job rules (jobs.rs, jobcal.rs). Whether `run.action`
@@ -250,14 +250,6 @@ fn validate_send_to(value: &Value, path: &str, report: &mut Report) {
         });
         if !known {
             report.error(path, "expected lpm, telegram or telegram:<target>");
-        }
-    }
-}
-
-fn validate_bool_field(map: &Mapping, key: &str, path: &str, report: &mut Report) {
-    if let Some(value) = map.get(Value::String(key.into())) {
-        if value.as_bool().is_none() {
-            report.error(&format!("{path}.{key}"), "expected true or false");
         }
     }
 }

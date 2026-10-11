@@ -23,6 +23,7 @@ zones:
     label: Build       # optional; shown in menus, defaults to the key
     display: header    # header (default) or footer
     position: 3        # optional; order among the items of its bar
+    collapsed: true    # optional; folds the zone into one button in the app
     layers:            # optional
       mobile:
         label: Mobile  # optional; shown left of the dots, otherwise dots only
@@ -37,7 +38,7 @@ actions:
     position: 1        # order inside the zone (or layer)
 ```
 
-- A zone entry holds only `rows`, `label`, `display`, `position` and `layers`. A layer entry holds only `label` and `position`.
+- A zone entry holds only `rows`, `label`, `display`, `position`, `collapsed` and `layers`. A layer entry holds only `label` and `position`.
 - Zone and layer keys can't be empty and can't contain `:` or `/`. Zone keys can't be `header`, `footer`, `menu` or `button`.
 - A zone's `position` shares one numbering with the buttons of its bar: header zones with header buttons, footer zones with footer buttons. Items with a `position` come first, lowest first; the rest follow by key.
 - A button's `position` inside a zone counts from 1 within that zone (or layer).
@@ -97,6 +98,17 @@ actions:
   ios:
     display: build
     position: 1
+```
+
+### Fold a zone
+
+`collapsed: true` shows the zone as one button, `Label ▾ | ⤢`. Hovering the label shows the zone's buttons in a popup; `⤢` unfolds it. Write it in the zone's source file, the one whose entry has `rows`. To unfold, delete the key instead of writing `false`.
+
+```yaml
+zones:
+  release:
+    rows: 1
+    collapsed: true
 ```
 
 ### Add layers
@@ -170,3 +182,4 @@ A zone declared in `.lpm.yml` or `global.yml` is shared: removing it moves every
 - Labels are optional for zones and layers. A layer without a label shows dots only.
 - Sparse overrides can't clear a lower file's value: an empty `display` or `layer` inherits it. Write the value you want.
 - Only top-level actions sit in a zone; nested child actions stay menu items.
+- `collapsed` must be `true` or `false`; `yes` and `1` are errors. The app writes it only as `true` and deletes it to unfold.

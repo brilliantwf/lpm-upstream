@@ -1,6 +1,6 @@
 use super::{
-    string_at, string_keys, validate_keys, validate_number_field, validate_string_field, Mapping,
-    Report, Value,
+    string_at, string_keys, validate_bool_field, validate_keys, validate_number_field,
+    validate_string_field, Mapping, Report, Value,
 };
 
 // Any name can be a zone: the CLI checks one file at a time and can't see
@@ -46,7 +46,14 @@ pub(super) fn validate_zones(root: &Mapping, report: &mut Report) {
         };
         validate_keys(
             map,
-            &["rows", "label", "position", "display", "layers"],
+            &[
+                "rows",
+                "label",
+                "position",
+                "display",
+                "layers",
+                "collapsed",
+            ],
             &path,
             report,
         );
@@ -57,6 +64,7 @@ pub(super) fn validate_zones(root: &Mapping, report: &mut Report) {
         }
         validate_string_field(map, "label", &format!("{path}.label"), report);
         validate_number_field(map, "position", &format!("{path}.position"), report);
+        validate_bool_field(map, "collapsed", &path, report);
         if let Some(display) = map.get(Value::String("display".into())) {
             if !matches!(display.as_str(), Some("header" | "footer")) {
                 report.error(&format!("{path}.display"), "expected header or footer");
@@ -187,6 +195,21 @@ mod tests {
                 "display: {display}"
             );
         }
+    }
+
+    #[test]
+    fn collapsed_takes_true_or_false() {
+        for value in ["true", "false"] {
+            let report = zone_report(&format!(
+                "zones:\n  build:\n    rows: 1\n    collapsed: {value}\n"
+            ));
+            assert!(report.errors.is_empty(), "{value}: {:?}", report.errors);
+        }
+        let report = zone_report("zones:\n  build:\n    rows: 1\n    collapsed: yes\n");
+        assert_eq!(
+            report.errors,
+            vec!["config.zones.build.collapsed: expected true or false"]
+        );
     }
 
     #[test]

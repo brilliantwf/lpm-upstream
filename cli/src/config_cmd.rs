@@ -1467,6 +1467,14 @@ fn validate_number_field(map: &Mapping, key: &str, path: &str, report: &mut Repo
     }
 }
 
+fn validate_bool_field(map: &Mapping, key: &str, path: &str, report: &mut Report) {
+    if let Some(value) = map.get(Value::String(key.into())) {
+        if value.as_bool().is_none() {
+            report.error(&format!("{path}.{key}"), "expected true or false");
+        }
+    }
+}
+
 fn validate_string_list(value: Option<&Value>, path: &str, report: &mut Report) -> Vec<String> {
     let Some(value) = value else {
         return Vec::new();

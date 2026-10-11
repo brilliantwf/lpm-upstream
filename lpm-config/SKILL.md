@@ -53,6 +53,7 @@ When `lpm config resolve` is unavailable, inspect the YAML project files read-on
 | Menu with no default | nested `actions` without parent `cmd` |
 | Framed group of buttons in the header or footer | `zones` entry with `rows`, plus `display: <zone>` on each button |
 | Several button sets in one zone, switched with dots | zone `layers`, plus `layer: <key>` on each button |
+| Fold a zone into one button with a hover popup | `collapsed: true` on the zone's entry in its source file |
 | Put a button declared elsewhere into a zone or layer | sparse override with `display`, `layer`, and `position` only |
 | Colored button or terminal tab | action `color` |
 | Agent terminal that starts with a task | `type: terminal` with an agent `cmd` plus `prompt` |
