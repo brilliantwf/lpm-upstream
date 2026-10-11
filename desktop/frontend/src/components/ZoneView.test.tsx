@@ -305,8 +305,22 @@ describe("a folded zone", () => {
     mount(folded(), "header", foldedLayers());
     const label = container.querySelector<HTMLButtonElement>("[data-collapsed-zone] button[aria-haspopup]")!;
     act(() => label.focus());
-    act(() => label.click());
+    act(() => {
+      label.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+    });
+    expect(popupEl()).not.toBeNull();
     expect(document.activeElement).toBe(label);
+  });
+
+  it("moves focus into the popup when a keyboard activation opens it", () => {
+    mount(folded(), "header", foldedLayers());
+    const label = container.querySelector<HTMLButtonElement>("[data-collapsed-zone] button[aria-haspopup]")!;
+    act(() => label.focus());
+    act(() => {
+      label.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 }));
+    });
+    expect(popupEl()!.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement?.tagName).toBe("BUTTON");
   });
 
   it("opens the zone menu on a right-click of the folded button", () => {

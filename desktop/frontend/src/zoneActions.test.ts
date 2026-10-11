@@ -9,6 +9,7 @@ const h = vi.hoisted(() => ({
   editRepoDoc: vi.fn(),
   editGlobalDoc: vi.fn(),
   editFirstLayer: vi.fn(),
+  editAllLayers: vi.fn(),
   toastError: vi.fn(),
 }));
 
@@ -26,6 +27,7 @@ vi.mock("./yamlQueue", () => ({
   repoLayer: () => "repo",
   globalLayer: "global",
   editFirstLayer: h.editFirstLayer,
+  editAllLayers: h.editAllLayers,
 }));
 
 import { type ActionsModel, buildActionsModel } from "./actionsLayoutModel";
@@ -52,16 +54,26 @@ const editFile = (layer: Layer) => async (mutate: (doc: Doc) => void) => {
 };
 
 // editFirstLayer's round trip: a layer is saved only when the edit changed it.
-let firstLayerSaves: Layer[];
+let layerSaves: Layer[];
 const editFirstFile = async (layers: Layer[], attempt: (doc: Doc) => boolean) => {
   for (const layer of layers) {
     const doc = YAML.parseDocument(files[layer] || "{}");
     if (!attempt(doc)) continue;
     files[layer] = String(doc);
-    firstLayerSaves.push(layer);
+    layerSaves.push(layer);
     return true;
   }
   return false;
+};
+
+// editAllLayers' round trip: every layer the edit changed is saved.
+const editAllFiles = async (layers: Layer[], attempt: (doc: Doc) => boolean) => {
+  for (const layer of layers) {
+    const doc = YAML.parseDocument(files[layer] || "{}");
+    if (!attempt(doc)) continue;
+    files[layer] = String(doc);
+    layerSaves.push(layer);
+  }
 };
 
 const saved = (layer: Layer) => YAML.parse(files[layer]);
@@ -122,8 +134,9 @@ beforeEach(() => {
   h.editProjectDoc.mockReset().mockImplementation((_name, mutate) => editFile("project")(mutate));
   h.editRepoDoc.mockReset().mockImplementation((_name, mutate) => editFile("repo")(mutate));
   h.editGlobalDoc.mockReset().mockImplementation(editFile("global"));
-  firstLayerSaves = [];
+  layerSaves = [];
   h.editFirstLayer.mockReset().mockImplementation(editFirstFile);
+  h.editAllLayers.mockReset().mockImplementation(editAllFiles);
 });
 
 describe("createZone", () => {
@@ -283,7 +296,7 @@ describe("setZoneCollapsed", () => {
   it.each(LAYERS)("folds a zone in the %s file that declares it", async (source) => {
     files[source] = "zones:\n  build:\n    rows: 1\n";
     await setZoneCollapsed(NAME, zone({ source }), true);
-    expect(firstLayerSaves).toEqual([source]);
+    expect(layerSaves).toEqual([source]);
     expect(saved(source).zones.build).toEqual({ rows: 1, collapsed: true });
   });
 
@@ -291,7 +304,7 @@ describe("setZoneCollapsed", () => {
     files.repo = "zones:\n  build:\n    rows: 1\n    collapsed: true\n";
     files.project = "zones:\n  build:\n    collapsed: true\n";
     await setZoneCollapsed(NAME, zone({ source: "repo" }), false);
-    expect(firstLayerSaves).toEqual(["repo", "project"]);
+    expect(layerSaves).toEqual(["project", "repo"]);
     expect(saved("repo").zones.build).toEqual({ rows: 1 });
     expect(saved("project").zones.build).toEqual({});
   });
@@ -300,8 +313,43 @@ describe("setZoneCollapsed", () => {
     files.global = "zones:\n  build:\n    rows: 1\n    collapsed: true\n";
     files.project = "root:   /tmp   # kept as is\n";
     await setZoneCollapsed(NAME, zone({ source: "global" }), false);
-    expect(firstLayerSaves).toEqual(["global"]);
+    expect(layerSaves).toEqual(["global"]);
     expect(files.project).toBe("root:   /tmp   # kept as is\n");
     expect(h.toastError).not.toHaveBeenCalled();
+  });
+
+  it("clears a repo note over a global zone when it unfolds", async () => {
+    files.global = "zones:\n  build:\n    rows: 1\n    collapsed: true\n";
+    files.repo = "zones:\n  build:\n    collapsed: true\n";
+    await setZoneCollapsed(NAME, zone({ source: "global" }), false);
+    expect(layerSaves).toEqual(["repo", "global"]);
+    expect(saved("repo").zones.build).toEqual({});
+    expect(saved("global").zones.build).toEqual({ rows: 1 });
+  });
+
+  it("folds only the file that declares the zone", async () => {
+    files.global = "zones:\n  build:\n    rows: 1\n";
+    await setZoneCollapsed(NAME, zone({ source: "global" }), true);
+    expect(h.editAllLayers).not.toHaveBeenCalled();
+    expect(layerSaves).toEqual(["global"]);
+  });
+
+  it("leaves a peer project's repo and global files alone when it unfolds", async () => {
+    const note = "zones:\n  build:\n    collapsed: true\n";
+    files.global = note;
+    files.repo = note;
+    files.project = note;
+    await setZoneCollapsed("peer-0123abcd-web", zone({ source: "global" }), false);
+    expect(layerSaves).toEqual(["project"]);
+    expect(files.repo).toBe(note);
+    expect(files.global).toBe(note);
+  });
+
+  it("clears a peer project's own zone when it unfolds", async () => {
+    files.project = "zones:\n  build:\n    rows: 1\n    collapsed: true\n";
+    files.repo = "zones:\n  build:\n    collapsed: true\n";
+    await setZoneCollapsed("peer-0123abcd-web", zone({ source: "project" }), false);
+    expect(layerSaves).toEqual(["project"]);
+    expect(saved("project").zones.build).toEqual({ rows: 1 });
   });
 });

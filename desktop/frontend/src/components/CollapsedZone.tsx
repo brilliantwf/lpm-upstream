@@ -110,7 +110,10 @@ export function CollapsedZone({ zone, display, editable, dragging, buttonDrag, o
         type="button"
         aria-haspopup="true"
         aria-expanded={popup.open}
-        onClick={popup.show}
+        onClick={(e) => {
+          if (e.detail === 0) openedByKey.current = true;
+          popup.show();
+        }}
         onKeyDown={onKeyDown}
         onPointerEnter={() => {
           popup.trigger.onPointerEnter();

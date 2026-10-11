@@ -3,6 +3,7 @@ import type { ActionsLayout, ZoneInfo } from "./types";
 import { useAppStore } from "./store/app";
 import {
   type ConfigLayer,
+  editAllLayers,
   editFirstLayer,
   editGlobalDoc,
   editProjectDoc,
@@ -20,6 +21,7 @@ import {
   setZoneCollapsedInDoc,
   setZoneDetailsInDoc,
 } from "./zoneConfig";
+import { isPeerName } from "./peer/markers";
 import { removeZoneFromDoc } from "./zoneDoc";
 import { layoutWithoutZone } from "./components/actionsDndLayout";
 
@@ -86,14 +88,20 @@ function zoneSourceLayer(projectName: string, source: ZoneInfo["source"]): Confi
   return projectLayer(projectName);
 }
 
-// Unfolding also clears a fold that a project-file note may hold over a
-// shared zone, so the zone really opens. A file the fold doesn't change isn't
-// rewritten.
+// Unfolding clears a fold from every file the user may edit (project, repo and
+// global; a peer project's repo and global files are out of reach, so only its
+// own), so a hand-written note in any of them can't keep the zone shut. A file
+// the fold doesn't change isn't rewritten.
 export function setZoneCollapsed(projectName: string, zone: ZoneInfo, collapsed: boolean): Promise<void> {
-  const fold = (layer: ConfigLayer, to: boolean) =>
-    editFirstLayer([layer], (doc) => setZoneCollapsedInDoc(doc, zone.name, to));
+  const setCollapsed = (to: boolean) => (doc: Parameters<Mutate>[0]) => setZoneCollapsedInDoc(doc, zone.name, to);
   return runZoneEdit(async () => {
-    await fold(zoneSourceLayer(projectName, zone.source), collapsed);
-    if (!collapsed && zone.source !== "project") await fold(projectLayer(projectName), false);
+    if (collapsed) {
+      await editFirstLayer([zoneSourceLayer(projectName, zone.source)], setCollapsed(true));
+      return;
+    }
+    const layers = isPeerName(projectName)
+      ? [projectLayer(projectName)]
+      : [projectLayer(projectName), repoLayer(projectName), globalLayer];
+    await editAllLayers(layers, setCollapsed(false));
   }, "Could not save the zone");
 }
