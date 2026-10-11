@@ -62,6 +62,8 @@ interface JobEditorModalProps {
   // null = create a new job; otherwise edit that project's job (its body is
   // read from the layer that defines it on open).
   editing: { project: string; job: JobInfo } | null;
+  // The project a new job starts scoped to; absent = no project picked yet.
+  newProject?: string;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -83,6 +85,7 @@ export function JobEditorModal({
   actionsFor,
   knownIds,
   editing,
+  newProject,
   onClose,
   onSaved,
 }: JobEditorModalProps) {
@@ -154,7 +157,7 @@ export function JobEditorModal({
     setTouched(false);
     setComposerSession((n) => n + 1);
     if (!editing) {
-      setDraft(defaultJobDraft());
+      setDraft(newProject ? { ...defaultJobDraft(), targets: [newProject] } : defaultJobDraft());
       setLoading(false);
       setTimeout(() => nameRef.current?.focus(), 50);
       return;
@@ -182,7 +185,7 @@ export function JobEditorModal({
     return () => {
       cancelled = true;
     };
-  }, [open, editing]);
+  }, [open, editing, newProject]);
 
   const patch = (values: Partial<JobDraft>) => {
     setTouched(true);

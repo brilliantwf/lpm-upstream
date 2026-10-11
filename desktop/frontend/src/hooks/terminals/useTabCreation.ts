@@ -26,6 +26,7 @@ import {
   makeMemory,
   makeToolkit,
   makeFiles,
+  makeAutomations,
   isTerminalTab,
   collectPanes,
   collectTerminals,
@@ -417,6 +418,15 @@ export function useTabCreation({
     [addTerminal, forward],
   );
 
+  // Automations tabs have no PTY either — they render the project's scheduled jobs.
+  const addAutomationsToPane = useCallback(
+    (paneId?: string) => {
+      if (IS_MIRROR_WINDOW) return forward("addAutomationsToPane", paneId);
+      addTerminal(makeAutomations(nextId("automations")), paneId);
+    },
+    [addTerminal, forward],
+  );
+
   return {
     createTerminal,
     adoptTerminal,
@@ -429,5 +439,6 @@ export function useTabCreation({
     addMemoryToPane,
     addToolkitToPane,
     addFilesToPane,
+    addAutomationsToPane,
   };
 }

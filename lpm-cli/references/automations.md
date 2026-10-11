@@ -82,7 +82,7 @@ The command validates the entry before saving it and exits 2 if anything is wron
 
 Exactly one of these:
 
-- `--cmd COMMAND`: a shell command, run in the project root, or in the copy when `--duplicate` is set.
+- `--cmd COMMAND`: a shell command, run in the project root, or in the copy when `--duplicate` is set. Put anything longer than a line in a script: in the repo when it belongs to the project (`--cmd ./scripts/nightly.sh`), otherwise in `~/.lpm/scripts/` (`--cmd ~/.lpm/scripts/disk-cleanup.sh`), the folder lpm syncs between paired Macs. A script saved anywhere else is missing when the automation runs on another Mac.
 - `--action NAME`: an action from the project's config. Add `--prompt` only when the action opens an agent terminal; the agent gets the prompt once it is ready.
 - `--prompt TEXT`: a headless AI agent run, with these options:
   - `--agent claude|codex|gemini|opencode`. Leave it out to use the app's default agent.

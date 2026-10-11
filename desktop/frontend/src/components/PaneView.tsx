@@ -8,6 +8,7 @@ import { IS_MIRROR_WINDOW } from "../mirror";
 import { MemoryView } from "./MemoryView";
 import { ToolkitView } from "./toolkit/ToolkitView";
 import { FilesPane } from "./files/FilesPane";
+import { ScheduledView } from "./ScheduledView";
 import { ErrorBoundary } from "./ui/ErrorBoundary";
 import { ScrollFadeEdges } from "./ui/ScrollFadeEdges";
 import { Pane, type PaneHandle } from "./Pane";
@@ -29,7 +30,7 @@ import { usePaneToolbar } from "../hooks/usePaneToolbar";
 import type { PaneActionId } from "../paneActions";
 import type { UtilityTabKind } from "./terminal/utilityTabToggle";
 import { TerminalSearchBar } from "./terminal/TerminalSearchBar";
-import { XIcon, GlobeIcon, TerminalIcon, ZapIcon, BrainIcon, LayersIcon, FolderIcon, SourceControlIcon } from "./icons";
+import { XIcon, GlobeIcon, TerminalIcon, ZapIcon, BrainIcon, LayersIcon, FolderIcon, SourceControlIcon, ClockIcon } from "./icons";
 import { Columns2 } from "lucide-react";
 import { Tooltip } from "./ui/Tooltip";
 import { SortableTab, TabStrip } from "./TerminalTabDnd";
@@ -106,6 +107,7 @@ function TabIcon({ tab }: { tab: TerminalInstance }) {
   if (tab.kind === "memory") return <BrainIcon />;
   if (tab.kind === "toolkit") return <LayersIcon />;
   if (tab.kind === "files") return <FilesTabIcon id={tab.id} />;
+  if (tab.kind === "automations") return <ClockIcon size={14} />;
   if (tab.emoji)
     return (
       <span
@@ -157,6 +159,8 @@ export interface PaneViewProps {
   onReviewChanges: (paneId: string) => void;
   onAddToolkit: (paneId: string) => void;
   onAddFiles: (paneId: string) => void;
+  // Absent outside a local project, which takes the action off the header.
+  onAddAutomations?: (paneId: string) => void;
   onResumeSession?: () => void;
   onCloseTerminal: (paneId: string, tabIdx: number) => void;
   onCloseOtherTerminals: (paneId: string, tabIdx: number) => void;
@@ -235,6 +239,7 @@ function PaneViewImpl(props: PaneViewProps) {
     onReviewChanges,
     onAddToolkit,
     onAddFiles,
+    onAddAutomations,
     onResumeSession,
     onCloseTerminal,
     onCloseOtherTerminals,
@@ -299,10 +304,14 @@ function PaneViewImpl(props: PaneViewProps) {
     activeServiceName === null &&
     (activeTerm?.kind === "memory" ||
       activeTerm?.kind === "toolkit" ||
-      activeTerm?.kind === "files")
+      activeTerm?.kind === "files" ||
+      activeTerm?.kind === "automations")
       ? activeTerm.kind
       : null;
-  const paneActions = usePaneToolbar(!!onResumeSession);
+  const paneActions = usePaneToolbar({
+    resume: !!onResumeSession,
+    automations: !!onAddAutomations,
+  });
   // From the menu an action opens its tab; from a toolbar button it toggles,
   // so the button both shows and dismisses the tab.
   const runPaneAction = useCallback(
@@ -314,13 +323,15 @@ function PaneViewImpl(props: PaneViewProps) {
           return fromToolbar ? onToggleUtility(pane.id, "files") : onAddFiles(pane.id);
         case "toolkit":
           return fromToolbar ? onToggleUtility(pane.id, "toolkit") : onAddToolkit(pane.id);
+        case "automations":
+          return fromToolbar ? onToggleUtility(pane.id, "automations") : onAddAutomations?.(pane.id);
         case "browser":
           return onAddBrowser(pane.id);
         case "resume":
           return onResumeSession?.();
       }
     },
-    [pane.id, onToggleUtility, onReviewChanges, onAddFiles, onAddToolkit, onAddBrowser, onResumeSession],
+    [pane.id, onToggleUtility, onReviewChanges, onAddFiles, onAddToolkit, onAddAutomations, onAddBrowser, onResumeSession],
   );
   const composerTab =
     activeServiceName === null && activeTerm && isTerminalTab(activeTerm)
@@ -659,6 +670,16 @@ function PaneViewImpl(props: PaneViewProps) {
                     active={visible && isActive}
                     focused={focused}
                   />
+                </ErrorBoundary>
+              ) : t.kind === "automations" ? (
+                <ErrorBoundary resetKey={t.id} scope="automations">
+                  <div className="flex min-h-0 flex-1 flex-col bg-[var(--bg-primary)] px-6">
+                    <ScheduledView
+                      project={projectName}
+                      visible={visible && isActive}
+                      focused={focused}
+                    />
+                  </div>
                 </ErrorBoundary>
               ) : (
                 <InteractiveTab

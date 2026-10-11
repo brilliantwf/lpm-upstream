@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { PaneActionId } from "../../paneActions";
-import { FolderIcon, GlobeIcon, HistoryIcon, LayersIcon, SourceControlIcon } from "../icons";
+import { ClockIcon, FolderIcon, GlobeIcon, HistoryIcon, LayersIcon, SourceControlIcon } from "../icons";
 import type { UtilityTabKind } from "./utilityTabToggle";
 import { chordLabel } from "../../keys";
 
@@ -17,6 +17,7 @@ export const PANE_ACTION_META: Record<PaneActionId, PaneActionMeta> = {
   review: { label: "Review changes", icon: <SourceControlIcon />, shortcut: chordLabel({ key: "r", meta: true, shift: true }) },
   files: { label: "Files", icon: <FolderIcon />, shortcut: chordLabel({ key: "e", meta: true, shift: true }), tab: "files" },
   toolkit: { label: "Skills & tools", icon: <LayersIcon />, shortcut: chordLabel({ key: "k", meta: true, shift: true }), tab: "toolkit" },
+  automations: { label: "Automations", icon: <ClockIcon size={14} />, tab: "automations" },
   browser: { label: "Open browser", icon: <GlobeIcon /> },
   resume: { label: "Resume session", icon: <HistoryIcon /> },
 };

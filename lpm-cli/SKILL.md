@@ -1,6 +1,6 @@
 ---
 name: lpm-cli
-version: 1.4.1
+version: 1.4.2
 description: "Operate lpm-managed projects through the `lpm` CLI: start or stop projects and services, inspect logs and agent status, wait for readiness, run actions, create, edit, run, pause, and read scheduled automations, and duplicate projects into standalone copies or create linked Git worktrees. Use when the user asks to operate or inspect lpm runtime state or manage lpm automations. `LPM_PROJECT_NAME` selects the default project after the skill triggers; it is not a trigger by itself. For editing YAML configuration, use `lpm-config`."
 ---
 

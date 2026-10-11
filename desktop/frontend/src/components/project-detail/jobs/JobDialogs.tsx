@@ -6,7 +6,7 @@ import { RemoveJobDialog } from "./RemoveJobDialog";
 import { RunProjectsDialog } from "./RunProjectsDialog";
 
 export type JobEditing =
-  | { mode: "new" }
+  | { mode: "new"; project?: string }
   | { mode: "edit"; project: string; job: JobInfo }
   | null;
 
@@ -56,6 +56,7 @@ export function JobDialogs({
             ? { project: editing.project, job: editing.job }
             : null
         }
+        newProject={editing?.mode === "new" ? editing.project : undefined}
         onClose={onCloseEditor}
         onSaved={onSaved}
       />

@@ -8,9 +8,13 @@ import {
 } from "../paneActions";
 import { useSettingsStore } from "../store/settings";
 
+// Actions a pane can lack: no Resume without a session history to open, no
+// Automations outside a local project.
+type OptionalPaneActions = Record<"resume" | "automations", boolean>;
+
 // The split of pane actions between the header's toolbar and its menu, and the
 // moves between them, persisted in settings and shared by every pane.
-export function usePaneToolbar(hasResume: boolean) {
+export function usePaneToolbar(optional: OptionalPaneActions) {
   const onToolbar = useSettingsStore((s) => s.paneToolbar ?? DEFAULT_PANE_TOOLBAR);
   const update = useSettingsStore((s) => s.update);
 
@@ -26,7 +30,8 @@ export function usePaneToolbar(hasResume: boolean) {
   );
   const reset = useCallback(() => void update({ paneToolbar: undefined }), [update]);
 
-  const available = (id: PaneActionId) => id !== "resume" || hasResume;
+  const available = (id: PaneActionId) =>
+    id === "resume" || id === "automations" ? optional[id] : true;
   return {
     toolbar: onToolbar.filter(available),
     menu: paneMenuActions(onToolbar).filter(available),

@@ -118,6 +118,9 @@ export function TerminalView({ projectName, projectRoot, services, terminalTheme
   // transcripts and duplicates live on the other machine.
   const localSessions =
     !isPeerName(projectName) && !(duplicateProject?.isRemote ?? false);
+  // The scheduler runs jobs for projects on this Mac only — not for the global
+  // terminals, a peer's projects or an SSH project.
+  const hasAutomations = localSessions && duplicateProject !== null;
   const [outputs, setOutputs] = useState<string[]>([]);
   const [fullscreenPaneId, setFullscreenPaneId] = useState<string | null>(null);
   const [searchPaneId, setSearchPaneId] = useState<string | null>(null);
@@ -182,6 +185,7 @@ export function TerminalView({ projectName, projectRoot, services, terminalTheme
     addMemoryToPane,
     addToolkitToPane,
     addFilesToPane,
+    addAutomationsToPane,
     closeTerminal,
     closeOtherTerminals,
     focusTerminal,
@@ -494,6 +498,10 @@ export function TerminalView({ projectName, projectRoot, services, terminalTheme
     (paneId: string) => focusOrAddUtility(paneId, "files", addFilesToPane),
     [focusOrAddUtility, addFilesToPane],
   );
+  const openAutomationsInPane = useCallback(
+    (paneId: string) => focusOrAddUtility(paneId, "automations", addAutomationsToPane),
+    [focusOrAddUtility, addAutomationsToPane],
+  );
   // The Files tab has two views; ⌘⇧E asks for the tree and ⌘⇧R for the changes.
   const showFilesView = useCallback(
     (paneId: string, view: FilesView) => {
@@ -610,10 +618,14 @@ export function TerminalView({ projectName, projectRoot, services, terminalTheme
   const toggleUtilityInPane = useCallback(
     (paneId: string, kind: UtilityTabKind) => {
       if (kind === "files") return toggleFilesView("files", paneId);
-      const open = { memory: openMemoryInPane, toolkit: openToolkitInPane }[kind];
+      const open = {
+        memory: openMemoryInPane,
+        toolkit: openToolkitInPane,
+        automations: openAutomationsInPane,
+      }[kind];
       toggleUtilityTab(kind, open, paneId);
     },
-    [toggleUtilityTab, toggleFilesView, openMemoryInPane, openToolkitInPane],
+    [toggleUtilityTab, toggleFilesView, openMemoryInPane, openToolkitInPane, openAutomationsInPane],
   );
 
   const findInPane = useCallback(
@@ -1086,6 +1098,7 @@ export function TerminalView({ projectName, projectRoot, services, terminalTheme
             onAddBrowser={addBrowserToPane}
             onReviewChanges={(paneId) => showFilesView(paneId, "changes")}
             onAddToolkit={openToolkitInPane}
+            onAddAutomations={hasAutomations ? openAutomationsInPane : undefined}
             onAddFiles={(paneId) => showFilesView(paneId, "files")}
             onResumeSession={onResumeSession}
             onCloseTerminal={closeTerminal}

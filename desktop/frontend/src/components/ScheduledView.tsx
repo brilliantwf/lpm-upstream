@@ -7,17 +7,14 @@ import {
   ListAllJobs,
   MarkAllJobsSeen,
   MarkJobSeen,
-  RunJobNow,
-  SetJobEnabled,
   StopJobRun,
 } from "../../bridge/commands";
 import { useAppStore } from "../store/app";
 import { useContentZoom } from "../hooks/useContentZoom";
+import { useJobCommands } from "../hooks/useJobCommands";
 import { ClockIcon, PlusIcon } from "./icons";
-import { CountBadge } from "./ui/CountBadge";
 import { EmptyState } from "./ui/EmptyState";
-import { SegmentedControl } from "./ui/SegmentedControl";
-import { ZoomControl } from "./ui/ZoomControl";
+import { AutomationsHeader, type AutomationsViewMode } from "./AutomationsHeader";
 import { deleteJob, deleteJobGlobal } from "../jobsConfig";
 import type { JobInfo } from "../jobsFormat";
 import { isUnread, jobScopeLabel, sortJobsForList } from "../jobsList";
@@ -26,25 +23,15 @@ import { displayNameForProjectName } from "./ProjectNameDisplay";
 import { JobListSections } from "./project-detail/jobs/JobListSections";
 import { JobMessages } from "./project-detail/jobs/JobMessages";
 import { JobTaskView } from "./project-detail/jobs/JobTaskView";
-import { JobDialogs } from "./project-detail/jobs/JobDialogs";
+import { JobDialogs, type JobEditing } from "./project-detail/jobs/JobDialogs";
 import { ScheduleWeekView } from "./project-detail/jobs/schedule/ScheduleWeekView";
-
-
-type Editing = { mode: "new" } | { mode: "edit"; project: string; job: JobInfo } | null;
-
-type ViewMode = "list" | "week";
-
-const VIEW_OPTIONS = [
-  { value: "list" as const, label: "List", tooltip: "Every job as a feed, newest activity first" },
-  { value: "week" as const, label: "Week", tooltip: "When each job fires, across the week" },
-];
 
 // One reader zoom for the whole section — the list, a job's runs, and a run's
 // conversation all read at the level the user last picked.
 const ZOOM_KEY = "lpm.automations-zoom";
 const VIEW_KEY = "lpm.automations-view";
 
-function storedView(): ViewMode {
+function storedView(): AutomationsViewMode {
   return localStorage.getItem(VIEW_KEY) === "week" ? "week" : "list";
 }
 
@@ -61,12 +48,22 @@ function rowProject(job: ScheduledJob): string {
   return job.standalone ? "" : job.targets?.[0] ?? job.project ?? "";
 }
 
-export function ScheduledView() {
+interface ScheduledViewProps {
+  // A project's Automations tab: only the jobs that run in it, and a new job
+  // starts scoped to it. Absent = the app-wide page, every job.
+  project?: string;
+  // A hidden tab stops refetching on every run, and only the focused pane's
+  // tab takes ⌘+ / ⌘−.
+  visible?: boolean;
+  focused?: boolean;
+}
+
+export function ScheduledView({ project, visible = true, focused = true }: ScheduledViewProps) {
   const projects = useAppStore((s) => s.projects);
   const selectProject = useAppStore((s) => s.selectProject);
   const [rows, setRows] = useState<ScheduledJob[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState<Editing>(null);
+  const [editing, setEditing] = useState<JobEditing>(null);
   const [open, setOpen] = useState<{ project: string; id: string } | null>(null);
   // The run page open inside the job page — a run entry's `at`.
   const [openTask, setOpenTask] = useState<number | null>(null);
@@ -74,13 +71,13 @@ export function ScheduledView() {
   // A multi-project job awaiting the "which projects?" pick before a manual run.
   const [runPick, setRunPick] = useState<ScheduledJob | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [view, setView] = useState<ViewMode>(storedView);
-  const selectView = (next: ViewMode) => {
+  const [view, setView] = useState<AutomationsViewMode>(storedView);
+  const selectView = (next: AutomationsViewMode) => {
     setView(next);
     localStorage.setItem(VIEW_KEY, next);
   };
   // The job editor has its own text surfaces, so it takes ⌘+/⌘− back while open.
-  const zoom = useContentZoom(editing === null, ZOOM_KEY);
+  const zoom = useContentZoom(visible && focused && editing === null, ZOOM_KEY);
 
   const refetch = useCallback(async () => {
     try {
@@ -96,42 +93,22 @@ export function ScheduledView() {
     }
   }, []);
 
-  // Row buttons fire-and-forget; a rejection (invalid job, gone project) must
-  // still reach the user instead of dying in a void promise.
-  const runNow = useCallback((project: string, id: string) => {
-    RunJobNow(project, id).catch((err) => {
-      toast.error(
-        err instanceof Error ? err.message : String(err),
-      );
-    });
-  }, []);
-  const stopRun = useCallback((project: string, id: string) => {
-    StopJobRun(project, id).catch((err) => {
-      toast.error(
-        err instanceof Error ? err.message : String(err),
-      );
-    });
-  }, []);
-  const toggleEnabled = useCallback(
-    (project: string, id: string, enabled: boolean) => {
-      SetJobEnabled(project, id, enabled)
-        .catch((err) => {
-          toast.error(
-            err instanceof Error ? err.message : String(err),
-          );
-        })
-        .finally(() => void refetch());
-    },
-    [refetch],
-  );
+  const { runNow, stopRun, toggleEnabled } = useJobCommands(refetch);
 
   useEffect(() => {
+    if (!visible) return;
     void refetch();
     const cancel = EventsOn("job-status", () => void refetch());
     return () => {
       if (typeof cancel === "function") cancel();
     };
-  }, [refetch]);
+  }, [visible, refetch]);
+
+  // In a project's tab a shared job opens on this project's own runs.
+  const rowProjectOf = useCallback(
+    (job: ScheduledJob) => project ?? rowProject(job),
+    [project],
+  );
 
   // Row buttons act on every folder the job runs in, so a shared job's Stop /
   // pause reach all of its projects at once.
@@ -161,7 +138,10 @@ export function ScheduledView() {
 
   // One flat feed: everything unread first, newest activity first inside each
   // half — the project each job runs in rides on the row itself.
-  const sorted = sortJobsForList(rows ?? []);
+  const shown = project
+    ? (rows ?? []).filter((row) => targetsOfRow(row).includes(project))
+    : rows ?? [];
+  const sorted = sortJobsForList(shown);
   const unreadRows = sorted.filter(isUnread);
   const readRows = sorted.filter((row) => !isUnread(row));
   const unreadCount = unreadRows.length;
@@ -182,7 +162,13 @@ export function ScheduledView() {
 
   const markAllSeen = async () => {
     try {
-      await MarkAllJobsSeen();
+      if (project) {
+        await Promise.all(
+          unreadRows.flatMap((job) => targetsOfRow(job).map((p) => MarkJobSeen(p, job.id))),
+        );
+      } else {
+        await MarkAllJobsSeen();
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
     } finally {
@@ -201,11 +187,12 @@ export function ScheduledView() {
       .map((r) => r.id);
 
   const openJobPage = (job: ScheduledJob) =>
-    setOpen({ project: rowProject(job), id: job.id });
+    setOpen({ project: rowProjectOf(job), id: job.id });
   const editJob = (job: ScheduledJob) =>
-    setEditing({ mode: "edit", project: rowProject(job), job });
+    setEditing({ mode: "edit", project: rowProjectOf(job), job });
   const removeJobRow = (job: ScheduledJob) =>
-    setRemoving({ project: rowProject(job), job });
+    setRemoving({ project: rowProjectOf(job), job });
+  const newJob = () => setEditing({ mode: "new", project });
 
   const removeJob = async (deleteCopies: boolean) => {
     if (!removing) return;
@@ -232,16 +219,16 @@ export function ScheduledView() {
   // job rows under every project, and a copy can't be deleted under a live
   // run (the backend refuses too; this keeps the dialog honest up front).
   const removingRunning = removing
-    ? (rows ?? []).some(
+    ? shown.some(
         (r) =>
           r.id === removing.job.id &&
           r.running === true &&
-          rowProject(r) === rowProject(removing.job),
+          rowProjectOf(r) === rowProjectOf(removing.job),
       )
     : false;
 
   const openJob = open
-    ? (rows ?? []).find((r) => r.id === open.id && rowProject(r) === open.project)
+    ? shown.find((r) => r.id === open.id && rowProjectOf(r) === open.project)
     : undefined;
   useEffect(() => {
     if (open && rows !== null && !openJob) {
@@ -249,6 +236,29 @@ export function ScheduledView() {
       setOpenTask(null);
     }
   }, [open, rows, openJob]);
+
+  // The list and a job's own page raise the same dialogs.
+  const dialogs = (
+    <JobDialogs
+      projects={projects}
+      editing={editing}
+      onCloseEditor={() => setEditing(null)}
+      onSaved={() => void refetch()}
+      actionsFor={actionsFor}
+      knownIds={knownIds}
+      removing={removing}
+      removingRunning={removingRunning}
+      onCancelRemove={() => setRemoving(null)}
+      onConfirmRemove={(deleteCopies) => void removeJob(deleteCopies)}
+      runPick={runPick}
+      onCancelRunPick={() => setRunPick(null)}
+      onRunPicked={(selected) => {
+        const job = runPick;
+        setRunPick(null);
+        if (job) selected.forEach((p) => runNow(p, job.id));
+      }}
+    />
+  );
 
   if (open && openJob && openTask !== null) {
     return (
@@ -287,86 +297,29 @@ export function ScheduledView() {
           onOpenTask={(at) => setOpenTask(at)}
           onSeenUpTo={(at) => void markSeenJob(openJob, at)}
         />
-      <JobDialogs
-          projects={projects}
-          editing={editing}
-          onCloseEditor={() => setEditing(null)}
-          onSaved={() => void refetch()}
-          actionsFor={actionsFor}
-          knownIds={knownIds}
-          removing={removing}
-          removingRunning={removingRunning}
-          onCancelRemove={() => setRemoving(null)}
-          onConfirmRemove={(deleteCopies) => void removeJob(deleteCopies)}
-          runPick={runPick}
-          onCancelRunPick={() => setRunPick(null)}
-          onRunPicked={(selected) => {
-            const job = runPick;
-            setRunPick(null);
-            if (job) selected.forEach((p) => runNow(p, job.id));
-          }}
-        />
+        {dialogs}
       </>
     );
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex items-center gap-3 pt-6">
-        <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-          Automations
-          <CountBadge count={unreadCount} label="unread automations" size="md" />
-        </h1>
-        <div className="flex-1" />
-        {rows !== null && rows.length > 0 && (
-          <SegmentedControl
-            value={view}
-            options={VIEW_OPTIONS}
-            onChange={selectView}
-            ariaLabel="Automations view"
-          />
-        )}
-        {rows !== null && rows.length > 0 && (
-          <ZoomControl
-            percent={zoom.percent}
-            onZoomIn={zoom.zoomIn}
-            onZoomOut={zoom.zoomOut}
-            onReset={zoom.zoomReset}
-            canZoomIn={zoom.canZoomIn}
-            canZoomOut={zoom.canZoomOut}
-          />
-        )}
-        {unreadCount > 0 && (
-          <button
-            type="button"
-            onClick={() => void markAllSeen()}
-            className="rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-          >
-            Mark all read
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => setEditing({ mode: "new" })}
-          className="flex items-center gap-1.5 rounded-lg bg-[var(--text-primary)] px-3 py-1.5 text-[13px] font-medium text-[var(--bg-primary)] shadow-sm transition hover:opacity-90"
-        >
-          <PlusIcon />
-          New job
-        </button>
-      </div>
-      <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-        {unreadCount > 0
-          ? `${unreadCount} ${unreadCount === 1 ? "job has" : "jobs have"} new messages since you last looked.`
-          : view === "week"
-            ? "When every scheduled job fires, across the week."
-            : "Every scheduled job across your projects, in one place."}
-      </p>
+      <AutomationsHeader
+        scoped={project !== undefined}
+        hasJobs={shown.length > 0}
+        unreadCount={unreadCount}
+        view={view}
+        onViewChange={selectView}
+        zoom={zoom}
+        onMarkAllSeen={() => void markAllSeen()}
+        onNewJob={newJob}
+      />
 
       <div
         ref={zoom.surfaceRef}
         className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pb-6 pt-4"
       >
-        {error && !rows?.length ? (
+        {error && !shown.length ? (
           <EmptyState title="Couldn't load scheduled jobs" body={error}>
             <button
               type="button"
@@ -380,15 +333,19 @@ export function ScheduledView() {
           <p className="py-8 text-center text-[12px] text-[var(--text-muted)]">
             Loading…
           </p>
-        ) : rows.length === 0 ? (
+        ) : shown.length === 0 ? (
           <EmptyState
             icon={<ClockIcon />}
             title="Nothing scheduled yet"
-            body="Create a job to run an AI prompt, a command, or an action on a schedule — for one project or all of them."
+            body={
+              project
+                ? "Create a job to run an AI prompt, a command, or an action in this project on a schedule."
+                : "Create a job to run an AI prompt, a command, or an action on a schedule — for one project or all of them."
+            }
           >
             <button
               type="button"
-              onClick={() => setEditing({ mode: "new" })}
+              onClick={newJob}
               className="mt-4 flex items-center gap-1.5 rounded-lg bg-[var(--text-primary)] px-3.5 py-2 text-[13px] font-medium text-[var(--bg-primary)] shadow-sm transition hover:opacity-90"
             >
               <PlusIcon />
@@ -433,25 +390,7 @@ export function ScheduledView() {
         )}
       </div>
 
-      <JobDialogs
-        projects={projects}
-        editing={editing}
-        onCloseEditor={() => setEditing(null)}
-        onSaved={() => void refetch()}
-        actionsFor={actionsFor}
-        knownIds={knownIds}
-        removing={removing}
-        removingRunning={removingRunning}
-        onCancelRemove={() => setRemoving(null)}
-        onConfirmRemove={(deleteCopies) => void removeJob(deleteCopies)}
-        runPick={runPick}
-        onCancelRunPick={() => setRunPick(null)}
-        onRunPicked={(selected) => {
-          const job = runPick;
-          setRunPick(null);
-          if (job) selected.forEach((p) => runNow(p, job.id));
-        }}
-      />
+      {dialogs}
     </div>
   );
 }

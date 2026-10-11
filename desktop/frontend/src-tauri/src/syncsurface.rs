@@ -16,6 +16,8 @@
 //            accounts.json are exported/imported through their own merge paths, so
 //            they are deliberately NOT export items here.
 
+use std::path::Path;
+
 struct GlobalFile {
     name: &'static str,
     sync: bool,
@@ -95,6 +97,9 @@ const GLOBAL_FILES: &[GlobalFile] = &[
 // archive is a config handoff, while session memory is work-in-progress notes. The
 // pre-apply backup is unaffected — `transfer::snapshot_sync_backup` copies the sync
 // surface rather than the export list, so a conflict loser is still recoverable.
+// `scripts/` holds the files actions and automations call (`cmd:
+// ~/.lpm/scripts/cleanup.sh`): the command syncs in its config, so the script it
+// runs has to cross and export with it.
 const GLOBAL_DIRS: &[GlobalDir] = &[
     GlobalDir {
         name: "generator-icons",
@@ -110,6 +115,11 @@ const GLOBAL_DIRS: &[GlobalDir] = &[
         name: "memory",
         sync: true,
         export: false,
+    },
+    GlobalDir {
+        name: "scripts",
+        sync: true,
+        export: true,
     },
 ];
 
@@ -171,6 +181,17 @@ pub(crate) fn is_sync_global_dir(dir: &str) -> bool {
     GLOBAL_DIRS.iter().any(|d| d.sync && d.name == dir)
 }
 
+/// The mode a synced global file is created at when it lands on a Mac that doesn't
+/// have it yet (an existing file keeps its own). Scripts arrive executable, since
+/// an action runs them by path; the wire carries content only, not mode bits.
+pub(crate) fn new_global_file_mode(rel: &str) -> u32 {
+    if Path::new(rel).starts_with("scripts") {
+        0o755
+    } else {
+        0o644
+    }
+}
+
 /// Folder metadata a file browser drops into any directory it opens (Finder's
 /// .DS_Store, Explorer's Thumbs.db and desktop.ini). It describes that machine's
 /// window, not config, so it never syncs and never counts as a config edit.
@@ -178,8 +199,8 @@ pub(crate) fn is_os_junk(file_name: &str) -> bool {
     matches!(file_name, ".DS_Store" | "Thumbs.db" | "desktop.ini")
 }
 
-/// Global config directories carried in the export archive (zdotdir today;
-/// generator-icons is sync-only).
+/// Global config directories carried in the export archive (zdotdir and scripts;
+/// generator-icons and memory are sync-only).
 pub(crate) fn export_global_dirs() -> impl Iterator<Item = &'static str> {
     GLOBAL_DIRS.iter().filter(|d| d.export).map(|d| d.name)
 }
@@ -280,13 +301,24 @@ mod tests {
     #[test]
     fn dir_sets_unchanged() {
         let sync: Vec<&str> = sync_global_dirs().collect();
-        assert_eq!(sync, vec!["generator-icons", "zdotdir", "memory"]);
+        assert_eq!(sync, vec!["generator-icons", "zdotdir", "memory", "scripts"]);
         let export: Vec<&str> = export_global_dirs().collect();
-        assert_eq!(export, vec!["zdotdir"]);
+        assert_eq!(export, vec!["zdotdir", "scripts"]);
         assert!(is_sync_global_dir("generator-icons"));
         assert!(is_sync_global_dir("zdotdir"));
         assert!(is_sync_global_dir("memory"));
+        assert!(is_sync_global_dir("scripts"));
         assert!(!is_sync_global_dir("notes"));
+    }
+
+    #[test]
+    fn synced_scripts_land_executable() {
+        assert_eq!(new_global_file_mode("scripts/disk-cleanup.sh"), 0o755);
+        assert_eq!(new_global_file_mode("scripts/deploy/prod.sh"), 0o755);
+        assert_eq!(new_global_file_mode("global.yml"), 0o644);
+        assert_eq!(new_global_file_mode("memory/web/scripts.md"), 0o644);
+        assert_eq!(new_global_file_mode("scripts-old.txt"), 0o644);
+        assert!(!is_sync_global_file("scripts"));
     }
 
     #[test]

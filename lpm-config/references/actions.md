@@ -4,6 +4,7 @@ Read this reference for actions, buttons, terminals, input prompts, ports, short
 
 - [Shapes](#shapes)
 - [Command quoting](#command-quoting)
+- [Scripts](#scripts)
 - [Fields](#fields)
 - [Zones](#zones)
 - [Action types](#action-types)
@@ -77,6 +78,15 @@ actions:
 ```
 
 Shell quotes inside an otherwise plain YAML value do not quote the value for YAML. Validate the finished file before continuing.
+
+## Scripts
+
+When a command outgrows one line, move it into a script and run the script from `cmd`. Where the script lives decides whether it reaches the user's other Macs:
+
+- Part of the project: commit it to the repo and run it by relative path (`cmd: ./scripts/deploy.sh`). It travels with Git.
+- Not part of a repo (an action in `global.yml`, a template, an automation, a personal helper): save it in `~/.lpm/scripts/` and run it by full path (`cmd: ~/.lpm/scripts/disk-cleanup.sh`). lpm syncs that folder between paired Macs, includes it in config export, and a synced script arrives executable.
+
+A script anywhere else stays on this Mac, so the synced action fails on the others. Start the script with a shebang and `chmod +x` it. Writing the script file directly is fine; the config that calls it still goes through `lpm config apply`.
 
 ## Fields
 

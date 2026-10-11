@@ -46,7 +46,7 @@ export interface TerminalInstance {
   // of relaunching it, and a close arriving from the peer can still find the tab.
   peerAdopted?: boolean;
   // Absent == terminal; the other kinds render in-pane views without a PTY.
-  kind?: "terminal" | "browser" | "memory" | "toolkit" | "files";
+  kind?: "terminal" | "browser" | "memory" | "toolkit" | "files" | "automations";
 }
 
 // True for real PTY-backed terminal tabs (the default kind). Browser and review
@@ -188,6 +188,10 @@ export function makeToolkit(id: string, label = "Skills & tools"): TerminalInsta
 
 export function makeFiles(id: string, label = "Files"): TerminalInstance {
   return { id, label, kind: "files" };
+}
+
+export function makeAutomations(id: string, label = "Automations"): TerminalInstance {
+  return { id, label, kind: "automations" };
 }
 
 // A Files tab is named after its view unless the user named it themselves.

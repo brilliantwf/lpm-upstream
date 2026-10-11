@@ -898,7 +898,8 @@ fn apply_global(name: &str, incoming: &[u8]) -> Result<String, String> {
     } else {
         incoming.to_vec()
     };
-    crate::fsatomic::write(&path, &bytes, crate::fsatomic::Mode::Preserve(0o644))
+    let mode = crate::syncsurface::new_global_file_mode(name);
+    crate::fsatomic::write(&path, &bytes, crate::fsatomic::Mode::Preserve(mode))
         .map_err(|e| e.to_string())?;
     global_digest(name, &bytes)
 }
@@ -1326,6 +1327,16 @@ mod tests {
         remote.globals.insert("memory/.DS_Store".into(), id("x", 9));
         assert!(compute_plan(&local, &remote).is_empty());
         assert!(compute_plan_v2(&local, &remote, &BTreeMap::new()).is_empty());
+    }
+
+    #[test]
+    fn action_scripts_sync_and_their_deletions_cross() {
+        assert!(safe_global_rel("scripts/disk-cleanup.sh").is_ok());
+        assert!(safe_global_rel("scripts/deploy/prod.sh").is_ok());
+        assert!(safe_global_rel("scripts/../peer.json").is_err());
+        assert!(safe_global_rel("scripts").is_err());
+        assert!(is_deletable_global("scripts/disk-cleanup.sh"));
+        assert!(!is_deletable_global("scripts/.DS_Store"));
     }
 
     #[test]
