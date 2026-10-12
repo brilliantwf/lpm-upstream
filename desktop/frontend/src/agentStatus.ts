@@ -115,7 +115,18 @@ export function agentAmbient(projects: Pick<ProjectInfo, "statusEntries">[]): Ag
   return { needsYou, hasError };
 }
 
-export type StatusProvider = "claude" | "codex" | "gemini" | "cursor" | "unknown";
+// The agents whose hooks report status. Status entries carry no provider
+// field; each agent's hooks encode it in the key prefix
+// (src-tauri/src/agentkind.rs).
+const STATUS_AGENTS = [
+  { provider: "claude", keyPrefix: "claude_code_", label: "Claude Code", short: "Claude", color: "#D97757" },
+  { provider: "codex", keyPrefix: "codex_", label: "Codex", short: "Codex", color: "#10A37F" },
+  { provider: "gemini", keyPrefix: "gemini_", label: "Gemini CLI", short: "Gemini", color: "#4796E3" },
+  { provider: "cursor", keyPrefix: "cursor_", label: "Cursor", short: "Cursor", color: "var(--text-primary)" },
+  { provider: "opencode", keyPrefix: "opencode_", label: "OpenCode", short: "OpenCode", color: "#FAB283" },
+] as const;
+
+export type StatusProvider = (typeof STATUS_AGENTS)[number]["provider"] | "unknown";
 
 export interface ProviderMeta {
   label: string;
@@ -124,10 +135,7 @@ export interface ProviderMeta {
 }
 
 const PROVIDER_META: Record<string, ProviderMeta> = {
-  claude: { label: "Claude Code", short: "Claude", color: "#D97757" },
-  codex: { label: "Codex", short: "Codex", color: "#10A37F" },
-  gemini: { label: "Gemini CLI", short: "Gemini", color: "#4796E3" },
-  cursor: { label: "Cursor", short: "Cursor", color: "var(--text-primary)" },
+  ...Object.fromEntries(STATUS_AGENTS.map(({ provider, label, short, color }) => [provider, { label, short, color }])),
   unknown: { label: "Agent", short: "Agent", color: "var(--text-muted)" },
 };
 
@@ -135,15 +143,6 @@ export function providerMeta(key: string): ProviderMeta {
   return PROVIDER_META[key] ?? { label: key, short: key, color: "var(--text-muted)" };
 }
 
-// Status entries carry no provider field; each agent's hooks encode it in the
-// key prefix (src-tauri/src/agentkind.rs).
-const STATUS_KEY_PREFIXES: [string, StatusProvider][] = [
-  ["claude_code_", "claude"],
-  ["codex_", "codex"],
-  ["gemini_", "gemini"],
-  ["cursor_", "cursor"],
-];
-
 export function statusProvider(key: string): StatusProvider {
-  return STATUS_KEY_PREFIXES.find(([prefix]) => key.startsWith(prefix))?.[1] ?? "unknown";
+  return STATUS_AGENTS.find(({ keyPrefix }) => key.startsWith(keyPrefix))?.provider ?? "unknown";
 }

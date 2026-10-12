@@ -7,7 +7,7 @@ use serde_json::{json, Map, Value};
 use std::path::{Path, PathBuf};
 
 pub(super) const AGENT: Agent = Agent {
-    name: "codex",
+    kind: crate::agentkind::AgentKind::Codex,
     install: install_codex_hooks,
     install_remote: install_remote_codex_hooks,
     uninstall,

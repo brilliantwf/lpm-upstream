@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 const NOT_UNDER_CURSOR: &str = r#"[ -n "$CURSOR_VERSION" ] && exit 0;"#;
 
 pub(super) const AGENT: Agent = Agent {
-    name: "claude",
+    kind: crate::agentkind::AgentKind::Claude,
     install,
     install_remote: install_remote_claude_hooks,
     uninstall,

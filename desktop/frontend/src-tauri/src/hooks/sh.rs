@@ -1,6 +1,7 @@
 // The POSIX-sh form of an lpm hook: one line an agent runs on each event, which
 // stages a socket frame and hands it to a backgrounded delivery.
 use super::MARKER;
+use crate::agentkind::AgentKind;
 
 /// Who is reporting, in the only terms the socket can check: the pid the hook
 /// ran under. A pane's whole process tree inherits its LPM_* identity and the
@@ -116,4 +117,59 @@ pub(super) fn send_cmd(frame: &str) -> String {
 /// backgrounded reader must never re-read the already-drained stdin.
 pub(super) fn sid_prep() -> String {
     format!("sid=$({SID_SED} | head -n1);")
+}
+
+/// The frames for lpm's usual states under the key `kind` reports by:
+/// `<prefix>${sid:-$LPM_PANE_ID}` for an agent keyed by its session (the hook
+/// runs `sid_prep` first), `<prefix>$LPM_PANE_ID` for one keyed by its pane.
+pub(super) struct Frames {
+    kind: AgentKind,
+    key: String,
+}
+
+impl Frames {
+    pub(super) fn of(kind: AgentKind) -> Self {
+        let id = if kind.keyed_by_session() {
+            "${sid:-$LPM_PANE_ID}"
+        } else {
+            "$LPM_PANE_ID"
+        };
+        Frames {
+            kind,
+            key: format!("{}{id}", kind.key_prefix()),
+        }
+    }
+
+    pub(super) fn running(&self) -> String {
+        let (icon, color) = self.kind.running_look();
+        self.set(&format!("Running --icon={icon} --color={color}"))
+    }
+
+    pub(super) fn waiting(&self) -> String {
+        self.set("Waiting --icon=bell --color=#f59e0b")
+    }
+
+    /// A Waiting only the agent's own hooks end: keys typed into the pane are
+    /// left alone (StatusEntry::held).
+    pub(super) fn held_waiting(&self) -> String {
+        format!("{} --hold", self.waiting())
+    }
+
+    pub(super) fn done(&self) -> String {
+        self.set("Done --icon=checkmark --color=#4ade80")
+    }
+
+    pub(super) fn error(&self) -> String {
+        self.set("Error --icon=warning --color=#ef4444")
+    }
+
+    /// Takes back a Running or Waiting the agent can no longer end, leaving a
+    /// finish the user hasn't seen.
+    pub(super) fn clear_live(&self) -> String {
+        format!("clear_status '$pq' {} --live", self.key)
+    }
+
+    fn set(&self, state: &str) -> String {
+        format!("set_status '$pq' {} {state} --pane=$LPM_PANE_ID", self.key)
+    }
 }

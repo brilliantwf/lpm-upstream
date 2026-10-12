@@ -8,17 +8,24 @@
 // (serde_json::Value round-trips losslessly; key ordering alphabetizes exactly
 // as Go's map+MarshalIndent did).
 //
-// Adding an agent: a module here with its settings location, events and hook
-// commands (sh.rs builds the sh form, hookform.rs the Windows form that
-// `lpm hook <agent> <event>` in cli/src/hook answers), an entry in AGENTS, and
-// its status-key prefix in agentkind.rs.
-use serde_json::{Map, Value};
+// Adding an agent:
+// 1. agentkind.rs: an AgentKind and its Spec — id, status-key prefix, Running
+//    look, and whether its keys name a session or the pane.
+// 2. A module here with where its hooks go, the events it reports and the hook
+//    for each (sh.rs builds the sh form, `Frames` the usual states; hookform.rs
+//    the Windows form, `lpm hook <id> <event>`), and its entry in AGENTS.
+// 3. cli/src/hook: a module mapping the same events to the same frames.
+// 4. The names people see, read from the key prefix: the frontend's
+//    agentStatus.ts and the phone's ActivityModel.swift.
+use crate::agentkind::AgentKind;
+use serde_json::{json, Map, Value};
 use std::path::Path;
 
 mod claude;
 mod codex;
 mod cursor;
 mod gemini;
+mod opencode;
 mod sh;
 
 pub use claude::*;
@@ -27,7 +34,7 @@ const MARKER: &str = "# lpm-hook";
 
 /// An agent CLI lpm installs status hooks for.
 struct Agent {
-    name: &'static str,
+    kind: AgentKind,
     /// Writes lpm's hooks into this machine's settings, when the agent is here.
     install: fn(),
     /// The same on an SSH host. False leaves the host to be tried again: it was
@@ -37,7 +44,13 @@ struct Agent {
     uninstall: fn() -> Result<(), String>,
 }
 
-static AGENTS: [Agent; 4] = [claude::AGENT, codex::AGENT, gemini::AGENT, cursor::AGENT];
+static AGENTS: [Agent; 5] = [
+    claude::AGENT,
+    codex::AGENT,
+    gemini::AGENT,
+    cursor::AGENT,
+    opencode::AGENT,
+];
 
 /// Fired async at startup (app.go: `go a.installAgentHooks()`), and again from
 /// [`refresh_agent_hooks`]. Writes only what changed.
@@ -157,6 +170,36 @@ fn append_hook(hooks: &mut Map<String, Value>, event: &str, entry: Value) {
     }
 }
 
+/// Pure: a `{"hooks": {event: [entries]}}` document with lpm's entry for each of
+/// `events` in place of any earlier ones, or None when unchanged. Empty input
+/// starts the document, which `prepare` can add the agent's own keys to;
+/// anything that isn't a JSON object (agents that also read comments, which
+/// serde can't keep) is left alone.
+fn merge_hooks_json(
+    data: &[u8],
+    events: &[&str],
+    prepare: impl FnOnce(&mut Map<String, Value>),
+    entry: impl Fn(&str) -> Value,
+) -> Option<Vec<u8>> {
+    let mut settings = if data.iter().all(u8::is_ascii_whitespace) {
+        json!({})
+    } else {
+        serde_json::from_slice::<Value>(data).ok()?
+    };
+    let original = serde_json::from_slice::<Value>(data).unwrap_or(Value::Null);
+    let obj = settings.as_object_mut()?;
+    prepare(obj);
+    if !obj.get("hooks").is_some_and(Value::is_object) {
+        obj.insert("hooks".into(), json!({}));
+    }
+    let hooks = obj.get_mut("hooks")?.as_object_mut()?;
+    strip_lpm_hooks(hooks);
+    for event in events {
+        append_hook(hooks, event, entry(event));
+    }
+    changed_json(&settings, &original)
+}
+
 /// Merge lpm's hooks into a JSON settings file with `merge`, writing only on
 /// change. A missing file is started from nothing when its folder exists — the
 /// agent is installed but hasn't written it yet; without the folder the agent
@@ -187,19 +230,56 @@ fn install_remote_json(
     file_expr: &str,
     merge: fn(&[u8]) -> Option<Vec<u8>>,
 ) -> bool {
-    let script = format!("[ -d {dir_expr} ] || exit 3; if [ -e {file_expr} ]; then cat {file_expr}; fi");
-    let Ok(out) = crate::sshexec::remote_login_script(ssh, &script).output() else {
+    let Some(data) = read_remote_agent_file(ssh, dir_expr, file_expr) else {
         return false;
     };
-    let data = out.stdout;
-    if !out.status.success()
-        || (!data.iter().all(u8::is_ascii_whitespace) && serde_json::from_slice::<Value>(&data).is_err())
-    {
+    if !data.iter().all(u8::is_ascii_whitespace) && serde_json::from_slice::<Value>(&data).is_err() {
         return false;
     }
     match merge(&data) {
         Some(merged) => write_remote_file(ssh, file_expr, &merged),
         None => true,
+    }
+}
+
+/// A host's copy of an agent file (empty when there is none yet), or None when
+/// the host is unreachable or the agent's folder isn't there.
+fn read_remote_agent_file(ssh: &crate::config::SshSettings, dir_expr: &str, file_expr: &str) -> Option<Vec<u8>> {
+    let script = format!("[ -d {dir_expr} ] || exit 3; if [ -e {file_expr} ]; then cat {file_expr}; fi");
+    let out = crate::sshexec::remote_login_script(ssh, &script).output().ok()?;
+    out.status.success().then_some(out.stdout)
+}
+
+/// Write a file lpm owns outright (its `content` carries MARKER) once the
+/// agent's folder exists, creating the folders between. Writes only on change.
+fn install_owned_file(agent_dir: &Path, path: &Path, content: &str) -> Result<(), String> {
+    if !agent_dir.is_dir() || std::fs::read(path).is_ok_and(|old| old == content.as_bytes()) {
+        return Ok(());
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("cannot create {}: {e}", parent.display()))?;
+    }
+    crate::fsatomic::write(path, content.as_bytes(), crate::fsatomic::Mode::Preserve(0o644))
+        .map_err(|e| format!("cannot write {}: {e}", path.display()))
+}
+
+/// Delete a file `install_owned_file` wrote, never one without the marker.
+fn remove_owned_file(path: &Path) -> Result<(), String> {
+    match std::fs::read_to_string(path) {
+        Ok(text) if text.contains(MARKER) => {
+            std::fs::remove_file(path).map_err(|e| format!("cannot remove {}: {e}", path.display()))
+        }
+        _ => Ok(()),
+    }
+}
+
+/// `install_owned_file` on an SSH host. Whether the host now has the file: not
+/// when it is unreachable or the agent's folder isn't there yet.
+fn install_remote_owned_file(ssh: &crate::config::SshSettings, dir_expr: &str, file_expr: &str, content: &str) -> bool {
+    match read_remote_agent_file(ssh, dir_expr, file_expr) {
+        Some(current) if current == content.as_bytes() => true,
+        Some(_) => write_remote_file(ssh, file_expr, content.as_bytes()),
+        None => false,
     }
 }
 
@@ -245,7 +325,7 @@ fn hook_install_state() -> &'static std::sync::Mutex<HookInstallState> {
 }
 
 fn done_key(agent: &Agent, host: &str) -> String {
-    format!("{}:{host}", agent.name)
+    format!("{}:{host}", agent.kind.id())
 }
 
 /// Install the remote agent hooks per host per app run (best-effort,

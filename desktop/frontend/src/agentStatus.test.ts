@@ -197,6 +197,7 @@ describe("providerMeta", () => {
     expect(providerMeta("codex").label).toBe("Codex");
     expect(providerMeta("gemini").label).toBe("Gemini CLI");
     expect(providerMeta("cursor").label).toBe("Cursor");
+    expect(providerMeta("opencode").label).toBe("OpenCode");
   });
 
   it("falls back to a generic name for an unrecognised agent", () => {
@@ -214,9 +215,10 @@ describe("statusProvider", () => {
     expect(statusProvider("codex_%3")).toBe("codex");
   });
 
-  it("reads Gemini and Cursor from their prefixes", () => {
+  it("reads Gemini, Cursor and OpenCode from their prefixes", () => {
     expect(statusProvider("gemini_0199f1e2")).toBe("gemini");
     expect(statusProvider("cursor_%3")).toBe("cursor");
+    expect(statusProvider("opencode_ses_ed1270e5fffe")).toBe("opencode");
   });
 
   it("falls back to unknown for a non-agent key", () => {

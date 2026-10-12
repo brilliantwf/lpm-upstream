@@ -147,3 +147,10 @@ fn capture_resume_cmd_shape() {
     assert!(recover < stage, "recovery must precede staging: {s}");
     assert!(s.ends_with(MARKER));
 }
+
+#[test]
+fn every_agent_kind_installs_its_hooks_once() {
+    for kind in AgentKind::ALL {
+        assert_eq!(AGENTS.iter().filter(|agent| agent.kind == kind).count(), 1, "{kind:?}");
+    }
+}

@@ -11,11 +11,15 @@
 //! A hook must never get in the agent's way, so this prints nothing and the
 //! caller exits 0 whatever happens: Claude Code reads exit 2 as "block this tool
 //! call" and adds SessionStart stdout to the model's context.
+//!
+//! Adding an agent: a module mapping its events to the frames its sh hooks send,
+//! and its arm in `frames` (the full list is in desktop src-tauri/src/hooks).
 
 mod claude;
 mod codex;
 mod cursor;
 mod gemini;
+mod opencode;
 mod transport;
 
 use crate::statussock::quote_arg;
@@ -153,6 +157,7 @@ pub fn frames(agent: &str, event: &str, payload: &[u8], env: &HookEnv) -> Vec<St
         "codex" => codex::frames(event, &payload, env),
         "gemini" => gemini::frames(event, &payload, env),
         "cursor" => cursor::frames(event, &payload, env),
+        "opencode" => opencode::frames(event, &payload, env),
         _ => Vec::new(),
     }
 }
@@ -281,3 +286,6 @@ mod cursor_tests;
 
 #[cfg(test)]
 mod gemini_tests;
+
+#[cfg(test)]
+mod opencode_tests;

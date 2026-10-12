@@ -8,16 +8,14 @@
 // used: Cursor reads empty output from a permission hook as no opinion, but lpm
 // has no business near those decisions. Its CLI asks for approvals without
 // firing any hook, so a Cursor tab never shows Waiting.
-use super::sh::{send_cmd, Hook};
-use super::{
-    append_hook, changed_json, install_json_at, install_remote_json, strip_hooks_json_at,
-    strip_lpm_hooks, Agent, MARKER,
-};
+use super::sh::{send_cmd, Frames, Hook};
+use super::{install_json_at, install_remote_json, merge_hooks_json, strip_hooks_json_at, Agent, MARKER};
+use crate::agentkind::AgentKind;
 use crate::hookform::HookForm;
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 pub(super) const AGENT: Agent = Agent {
-    name: "cursor",
+    kind: AgentKind::Cursor,
     install,
     install_remote,
     uninstall,
@@ -63,27 +61,16 @@ pub(super) fn merge_cursor_hooks(data: &[u8]) -> Option<Vec<u8>> {
 /// unchanged. Empty input starts the file; anything that isn't a JSON object
 /// (Cursor also reads comments, which serde can't keep) is left alone.
 pub(super) fn merge_cursor_hooks_in(data: &[u8], form: &HookForm) -> Option<Vec<u8>> {
-    let mut config = if data.iter().all(u8::is_ascii_whitespace) {
-        json!({})
-    } else {
-        serde_json::from_slice::<Value>(data).ok()?
+    let version = |config: &mut Map<String, Value>| {
+        config.entry("version").or_insert(json!(1));
     };
-    let original = serde_json::from_slice::<Value>(data).unwrap_or(Value::Null);
-    let obj = config.as_object_mut()?;
-    obj.entry("version").or_insert(json!(1));
-    if !obj.get("hooks").is_some_and(Value::is_object) {
-        obj.insert("hooks".into(), json!({}));
-    }
-    let hooks = obj.get_mut("hooks")?.as_object_mut()?;
-    strip_lpm_hooks(hooks);
-    for event in CURSOR_EVENTS {
+    merge_hooks_json(data, &CURSOR_EVENTS, version, |event| {
         let command = match form {
             HookForm::Shell => sh_c(&cursor_cmd(event)),
-            HookForm::Cli(cli) => crate::hookform::powershell_command(cli, "cursor", event, MARKER),
+            HookForm::Cli(cli) => crate::hookform::powershell_command(cli, AGENT.kind.id(), event, MARKER),
         };
-        append_hook(hooks, event, json!({ "command": command }));
-    }
-    changed_json(&config, &original)
+        json!({ "command": command })
+    })
 }
 
 /// `script` as one `sh -c` command, single-quoted for whichever shell Cursor
@@ -97,12 +84,14 @@ fn sh_c(script: &str) -> String {
 /// `stop` says how the turn ended: done, failed, or interrupted — which takes
 /// back the Running it left.
 fn cursor_cmd(event: &str) -> String {
-    let key = "cursor_$LPM_PANE_ID";
-    let (icon, color) = crate::agentkind::AgentKind::Cursor.running_look();
+    let frames = Frames::of(AGENT.kind);
     match event {
         "stop" => {
             let prep = format!(
-                r#"f="set_status '$pq' {key} Done --icon=checkmark --color=#4ade80 --pane=$LPM_PANE_ID"; case "$p" in *\"status\":\"error\"*) f="set_status '$pq' {key} Error --icon=warning --color=#ef4444 --pane=$LPM_PANE_ID";; *\"status\":\"aborted\"*) f="clear_status '$pq' {key} --live";; esac;"#
+                r#"f="{}"; case "$p" in *\"status\":\"error\"*) f="{}";; *\"status\":\"aborted\"*) f="{}";; esac;"#,
+                frames.done(),
+                frames.error(),
+                frames.clear_live()
             );
             Hook {
                 read: "[ -t 0 ] || p=$(cat);",
@@ -112,10 +101,8 @@ fn cursor_cmd(event: &str) -> String {
             }
             .line()
         }
-        "sessionEnd" => send_cmd(&format!("clear_status '$pq' {key} --live")),
-        _ => send_cmd(&format!(
-            "set_status '$pq' {key} Running --icon={icon} --color={color} --pane=$LPM_PANE_ID"
-        )),
+        "sessionEnd" => send_cmd(&frames.clear_live()),
+        _ => send_cmd(&frames.running()),
     }
 }
 

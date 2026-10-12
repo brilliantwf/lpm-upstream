@@ -1,9 +1,10 @@
-// Where Claude Code, Codex and Gemini CLI read their configuration on this
-// machine.
+// Where Claude Code, Codex, Gemini CLI and OpenCode read their configuration on
+// this machine.
 //
 // Each honors an environment variable over its default folder: CLAUDE_CONFIG_DIR
 // over ~/.claude, CODEX_HOME over ~/.codex, GEMINI_CLI_HOME over the home folder
-// ~/.gemini sits in. lpm's terminals are login shells, so
+// ~/.gemini sits in, XDG_CONFIG_HOME over the ~/.config that holds OpenCode's
+// folder. lpm's terminals are login shells, so
 // the value that counts is the one the login profile exports; the app's own
 // environment stands in when the profile exports none. Resolved once per run:
 // reading the profile starts a login shell.
@@ -36,6 +37,17 @@ pub fn gemini_dir() -> Option<&'static Path> {
         exported("GEMINI_CLI_HOME")
             .or_else(dirs::home_dir)
             .map(|home| home.join(".gemini"))
+    })
+    .as_deref()
+}
+
+/// `$XDG_CONFIG_HOME/opencode`, else `~/.config/opencode` — on every platform.
+pub fn opencode_dir() -> Option<&'static Path> {
+    static DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
+    DIR.get_or_init(|| {
+        exported("XDG_CONFIG_HOME")
+            .or_else(|| dirs::home_dir().map(|home| home.join(".config")))
+            .map(|config| config.join("opencode"))
     })
     .as_deref()
 }

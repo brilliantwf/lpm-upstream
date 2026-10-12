@@ -63,12 +63,16 @@ func agentAmbient(_ projects: [Project]) -> AgentAmbient {
 
 /// Status entries carry no provider field; each agent's hooks encode it in the key
 /// prefix (desktop src-tauri/src/agentkind.rs).
+private let statusKeyAgents: [(prefix: String, label: String)] = [
+    ("claude_code_", "Claude Code"),
+    ("codex_", "Codex"),
+    ("gemini_", "Gemini CLI"),
+    ("cursor_", "Cursor"),
+    ("opencode_", "OpenCode"),
+]
+
 func agentProviderLabel(forStatusKey key: String) -> String {
-    if key.hasPrefix("claude_code_") { return "Claude Code" }
-    if key.hasPrefix("codex_") { return "Codex" }
-    if key.hasPrefix("gemini_") { return "Gemini CLI" }
-    if key.hasPrefix("cursor_") { return "Cursor" }
-    return "Agent"
+    statusKeyAgents.first { key.hasPrefix($0.prefix) }?.label ?? "Agent"
 }
 
 /// `name` is the routing key every request takes, `label` the only thing safe to

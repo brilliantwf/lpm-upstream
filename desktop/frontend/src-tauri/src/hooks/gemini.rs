@@ -1,15 +1,13 @@
 // Gemini CLI: lpm's hooks in its settings.json, which it runs through `bash -c`
 // (PowerShell on Windows) with the event's JSON on stdin, `session_id` first.
-use super::sh::{sid_prep, Hook};
-use super::{
-    append_hook, changed_json, install_json_at, install_remote_json, strip_hooks_json_at,
-    strip_lpm_hooks, Agent, MARKER,
-};
+use super::sh::{sid_prep, Frames, Hook};
+use super::{install_json_at, install_remote_json, merge_hooks_json, strip_hooks_json_at, Agent, MARKER};
+use crate::agentkind::AgentKind;
 use crate::hookform::HookForm;
 use serde_json::{json, Value};
 
 pub(super) const AGENT: Agent = Agent {
-    name: "gemini",
+    kind: AgentKind::Gemini,
     install,
     install_remote,
     uninstall,
@@ -58,26 +56,13 @@ pub(super) fn merge_gemini_hooks(data: &[u8]) -> Option<Vec<u8>> {
 /// when unchanged. Empty input starts the file; anything that isn't a JSON
 /// object (Gemini also reads comments, which serde can't keep) is left alone.
 pub(super) fn merge_gemini_hooks_in(data: &[u8], form: &HookForm) -> Option<Vec<u8>> {
-    let mut settings = if data.iter().all(u8::is_ascii_whitespace) {
-        json!({})
-    } else {
-        serde_json::from_slice::<Value>(data).ok()?
-    };
-    let original = serde_json::from_slice::<Value>(data).unwrap_or(Value::Null);
-    let obj = settings.as_object_mut()?;
-    if !obj.get("hooks").is_some_and(Value::is_object) {
-        obj.insert("hooks".into(), json!({}));
-    }
-    let hooks = obj.get_mut("hooks")?.as_object_mut()?;
-    strip_lpm_hooks(hooks);
-    for event in GEMINI_EVENTS {
+    merge_hooks_json(data, &GEMINI_EVENTS, |_| {}, |event| {
         let command = match form {
             HookForm::Shell => gemini_cmd(event),
-            HookForm::Cli(cli) => crate::hookform::powershell_command(cli, "gemini", event, MARKER),
+            HookForm::Cli(cli) => crate::hookform::powershell_command(cli, AGENT.kind.id(), event, MARKER),
         };
-        append_hook(hooks, event, gemini_entry(&command));
-    }
-    changed_json(&settings, &original)
+        gemini_entry(&command)
+    })
 }
 
 fn gemini_entry(command: &str) -> Value {
@@ -88,15 +73,12 @@ fn gemini_entry(command: &str) -> Value {
 /// as its output when stdout is empty and shows it to the user, so the hook
 /// silences it first.
 fn gemini_cmd(event: &str) -> String {
-    let key = "gemini_${sid:-$LPM_PANE_ID}";
-    let (running_icon, running_color) = crate::agentkind::AgentKind::Gemini.running_look();
+    let frames = Frames::of(AGENT.kind);
     let frame = match event {
-        "Notification" => format!("set_status '$pq' {key} Waiting --icon=bell --color=#f59e0b --pane=$LPM_PANE_ID"),
-        "AfterAgent" => format!("set_status '$pq' {key} Done --icon=checkmark --color=#4ade80 --pane=$LPM_PANE_ID"),
-        "SessionEnd" => format!("clear_status '$pq' {key} --live"),
-        _ => format!(
-            "set_status '$pq' {key} Running --icon={running_icon} --color={running_color} --pane=$LPM_PANE_ID"
-        ),
+        "Notification" => frames.waiting(),
+        "AfterAgent" => frames.done(),
+        "SessionEnd" => frames.clear_live(),
+        _ => frames.running(),
     };
     let prep = sid_prep();
     Hook {
