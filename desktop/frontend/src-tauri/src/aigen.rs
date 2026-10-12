@@ -586,6 +586,10 @@ pub(crate) struct RunOptions {
 /// from there when the argument is left out (codex wants an explicit `-`).
 const PROMPT_ON_STDIN: bool = cfg!(windows);
 
+/// Claude Code tells the model to sign commits and PR descriptions it writes,
+/// which leaks a "Generated with Claude Code" footer into generated text.
+const CLAUDE_NO_ATTRIBUTION: &str = r#"{"attribution":{"commit":"","pr":""}}"#;
+
 /// The CLI's argv: with `prompt` in it, or without it when `None` and the
 /// prompt arrives on stdin.
 fn build_args(cli: &str, prompt: Option<&str>, o: &RunOptions) -> Vec<String> {
@@ -599,6 +603,8 @@ fn build_args(cli: &str, prompt: Option<&str>, o: &RunOptions) -> Vec<String> {
                 s("stream-json"),
                 s("--permission-mode"),
                 s("bypassPermissions"),
+                s("--settings"),
+                s(CLAUDE_NO_ATTRIBUTION),
             ];
             if !o.writes {
                 a.push(s("--disallowedTools=Edit,Write,NotebookEdit"));
@@ -1592,13 +1598,15 @@ mod build_args_tests {
         ropts(None, "m".into(), String::new(), false, false)
     }
 
-    const CLAUDE_FLAGS: [&str; 9] = [
+    const CLAUDE_FLAGS: [&str; 11] = [
         "-p",
         "--verbose",
         "--output-format",
         "stream-json",
         "--permission-mode",
         "bypassPermissions",
+        "--settings",
+        CLAUDE_NO_ATTRIBUTION,
         "--disallowedTools=Edit,Write,NotebookEdit",
         "--model",
         "m",
