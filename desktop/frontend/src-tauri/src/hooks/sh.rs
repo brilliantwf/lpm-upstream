@@ -1,5 +1,6 @@
 // The POSIX-sh form of an lpm hook: one line an agent runs on each event, which
-// stages a socket frame and hands it to a backgrounded delivery.
+// stages a socket frame and hands it to a delivery — backgrounded, unless the
+// caller waits for it.
 use super::MARKER;
 use crate::agentkind::AgentKind;
 
@@ -48,10 +49,14 @@ pub(super) struct Hook<'a> {
     pub only_if: &'a str,
     /// A test delivery also needs, checked after the socket's.
     pub and_if: &'a str,
+    /// Deliver before the line returns, for a caller that runs its hooks one at
+    /// a time: the app takes each connection on a thread of its own, so frames
+    /// sent a moment apart can otherwise land in either order.
+    pub waits: bool,
 }
 
 impl Hook<'_> {
-    /// Backgrounded socket write; only runs when the socket exists. Ends with the
+    /// The socket write; only runs when the socket exists. Ends with the
     /// `# lpm-hook` marker so installs are idempotent. A recovery preamble first
     /// restores LPM_* from the tmux global env / a socket glob (agents in a
     /// pre-existing tmux server otherwise see none), then the message is staged in
@@ -66,8 +71,9 @@ impl Hook<'_> {
         let frame = self.frame;
         let only_if = gated(self.only_if);
         let and_if = gated(self.and_if);
+        let end = if self.waits { ";" } else { " &" };
         format!(
-            "{read}{recover} {PROJECT_ARG} {prep}m=\"{frame}{REPORTER_PID_OPT}\"; {{ {only_if}[ -n \"$LPM_SOCKET_PATH\" ] && [ -S \"$LPM_SOCKET_PATH\" ] && [ -n \"$LPM_PROJECT_NAME\" ] && [ -n \"$LPM_PANE_ID\" ] && {and_if}{deliver} & }} >/dev/null 2>&1; {MARKER}"
+            "{read}{recover} {PROJECT_ARG} {prep}m=\"{frame}{REPORTER_PID_OPT}\"; {{ {only_if}[ -n \"$LPM_SOCKET_PATH\" ] && [ -S \"$LPM_SOCKET_PATH\" ] && [ -n \"$LPM_PROJECT_NAME\" ] && [ -n \"$LPM_PANE_ID\" ] && {and_if}{deliver}{end} }} >/dev/null 2>&1; {MARKER}"
         )
     }
 }

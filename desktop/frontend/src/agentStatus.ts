@@ -124,6 +124,7 @@ const STATUS_AGENTS = [
   { provider: "gemini", keyPrefix: "gemini_", label: "Gemini CLI", short: "Gemini", color: "#4796E3" },
   { provider: "cursor", keyPrefix: "cursor_", label: "Cursor", short: "Cursor", color: "var(--text-primary)" },
   { provider: "opencode", keyPrefix: "opencode_", label: "OpenCode", short: "OpenCode", color: "#FAB283" },
+  { provider: "omp", keyPrefix: "omp_", label: "omp", short: "omp", color: "#F97316" },
 ] as const;
 
 export type StatusProvider = (typeof STATUS_AGENTS)[number]["provider"] | "unknown";

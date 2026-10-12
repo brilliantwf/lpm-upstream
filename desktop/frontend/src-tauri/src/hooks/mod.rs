@@ -13,7 +13,9 @@
 //    look, and whether its keys name a session or the pane.
 // 2. A module here with where its hooks go, the events it reports and the hook
 //    for each (sh.rs builds the sh form, `Frames` the usual states; hookform.rs
-//    the Windows form, `lpm hook <id> <event>`), and its entry in AGENTS.
+//    the Windows form, `lpm hook <id> <event>`), and its entry in AGENTS. An
+//    agent that runs no hook commands but loads scripts of its own gets lpm's
+//    plugin instead (plugin.rs): only its half, following its turns, is new.
 // 3. cli/src/hook: a module mapping the same events to the same frames.
 // 4. The names people see, read from the key prefix: the frontend's
 //    agentStatus.ts and the phone's ActivityModel.swift.
@@ -25,7 +27,9 @@ mod claude;
 mod codex;
 mod cursor;
 mod gemini;
+mod omp;
 mod opencode;
+mod plugin;
 mod sh;
 
 pub use claude::*;
@@ -44,12 +48,13 @@ struct Agent {
     uninstall: fn() -> Result<(), String>,
 }
 
-static AGENTS: [Agent; 5] = [
+static AGENTS: [Agent; 6] = [
     claude::AGENT,
     codex::AGENT,
     gemini::AGENT,
     cursor::AGENT,
     opencode::AGENT,
+    omp::AGENT,
 ];
 
 /// Fired async at startup (app.go: `go a.installAgentHooks()`), and again from

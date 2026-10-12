@@ -13,6 +13,7 @@ pub enum AgentKind {
     Gemini,
     Cursor,
     OpenCode,
+    Omp,
 }
 
 struct Spec {
@@ -27,12 +28,13 @@ struct Spec {
 }
 
 impl AgentKind {
-    pub const ALL: [AgentKind; 5] = [
+    pub const ALL: [AgentKind; 6] = [
         Self::Claude,
         Self::Codex,
         Self::Gemini,
         Self::Cursor,
         Self::OpenCode,
+        Self::Omp,
     ];
 
     fn spec(self) -> Spec {
@@ -65,6 +67,12 @@ impl AgentKind {
                 id: "opencode",
                 key_prefix: "opencode_",
                 running_look: ("bolt", "#FAB283"),
+                keyed_by_session: true,
+            },
+            Self::Omp => Spec {
+                id: "omp",
+                key_prefix: "omp_",
+                running_look: ("bolt", "#F97316"),
                 keyed_by_session: true,
             },
         }
@@ -104,6 +112,7 @@ mod tests {
         assert_eq!(AgentKind::of_key("gemini_s1"), Some(AgentKind::Gemini));
         assert_eq!(AgentKind::of_key("cursor_p-1"), Some(AgentKind::Cursor));
         assert_eq!(AgentKind::of_key("opencode_ses_ed12"), Some(AgentKind::OpenCode));
+        assert_eq!(AgentKind::of_key("omp_01a12f00-9f7b"), Some(AgentKind::Omp));
         assert_eq!(AgentKind::of_key("build"), None);
         assert_eq!(AgentKind::of_key("claude"), None);
     }
@@ -116,6 +125,7 @@ mod tests {
             AgentKind::Gemini => 2,
             AgentKind::Cursor => 3,
             AgentKind::OpenCode => 4,
+            AgentKind::Omp => 5,
         };
         let positions: Vec<usize> = AgentKind::ALL.into_iter().map(position).collect();
         assert_eq!(positions, (0..AgentKind::ALL.len()).collect::<Vec<_>>());

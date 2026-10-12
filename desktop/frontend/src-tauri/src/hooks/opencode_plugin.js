@@ -1,52 +1,37 @@
 // lpm status plugin: shows this OpenCode's sessions as the status of the lpm
 // terminal tab it runs in. lpm writes this file and rewrites it when it
 // changes. # lpm-hook
-import { spawn } from "node:child_process"
-
-// What each state runs: [program, args], with {"session_id": …} on its stdin.
-const HOOKS = __LPM_HOOKS__
 
 // A top-level session's turn, from OpenCode's events. A sub-agent's session
 // works inside its parent's turn, so its questions and approvals are the
 // parent's and its own start and finish are not reported. A turn's error comes
 // just before its idle, which is where the turn is reported as ended.
 export const LpmStatus = async () => {
+  const turns = lpmTurns()
   const parents = new Map()
-  const live = new Map()
   const asks = new Map()
   const endings = new Map()
-  let reported = Promise.resolve()
 
   const top = (id) => {
     while (parents.has(id)) id = parents.get(id)
     return id
   }
-  const report = (id, state) => {
-    reported = reported.then(() => run(HOOKS[state], id))
-  }
-  const enter = (id, state) => {
-    if (live.get(id) === state) return
-    live.set(id, state)
-    report(id, state)
-  }
   const end = (id, state) => {
-    if (!live.has(id)) return
-    live.delete(id)
     asks.delete(id)
     endings.delete(id)
-    report(id, state)
+    turns.end(id, state)
   }
   const asked = (sessionID, requestID) => {
     const id = top(sessionID)
     asks.set(id, (asks.get(id) ?? new Set()).add(requestID))
-    enter(id, "waiting")
+    turns.enter(id, "waiting")
   }
   const answered = (sessionID, requestID, rejected) => {
     const id = top(sessionID)
     asks.get(id)?.delete(requestID)
     // Turned down, the session stops: a turn the user ended, not one that finished.
     if (rejected && id === sessionID) endings.set(id, "clear")
-    else if (!asks.get(id)?.size && live.get(id) === "waiting") enter(id, "running")
+    else if (!asks.get(id)?.size && turns.state(id) === "waiting") turns.enter(id, "running")
   }
 
   return {
@@ -60,9 +45,9 @@ export const LpmStatus = async () => {
         case "session.status":
           if (parents.has(p.sessionID)) break
           if (p.status?.type === "idle") end(p.sessionID, endings.get(p.sessionID) ?? "done")
-          else if (live.get(p.sessionID) !== "waiting") {
+          else if (turns.state(p.sessionID) !== "waiting") {
             endings.delete(p.sessionID)
-            enter(p.sessionID, "running")
+            turns.enter(p.sessionID, "running")
           }
           break
         case "session.error":
@@ -88,22 +73,6 @@ export const LpmStatus = async () => {
           break
       }
     },
-    dispose: () => reported,
+    dispose: () => turns.settled(),
   }
-}
-
-// One state at a time, in order: each hook stages its report before the next
-// starts. A hook that hangs is given up on rather than holding the rest back.
-function run([program, args], sessionID) {
-  return new Promise((done) => {
-    setTimeout(done, 3000).unref?.()
-    try {
-      const child = spawn(program, args, { stdio: ["pipe", "ignore", "ignore"], windowsHide: true })
-      child.on("error", done).on("exit", done)
-      child.stdin.on("error", () => {})
-      child.stdin.end(JSON.stringify({ session_id: sessionID }))
-    } catch {
-      done()
-    }
-  })
 }

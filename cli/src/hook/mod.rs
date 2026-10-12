@@ -13,13 +13,14 @@
 //! call" and adds SessionStart stdout to the model's context.
 //!
 //! Adding an agent: a module mapping its events to the frames its sh hooks send,
-//! and its arm in `frames` (the full list is in desktop src-tauri/src/hooks).
+//! and its arm in `frames` (the full list is in desktop src-tauri/src/hooks). An
+//! agent lpm writes a plugin for needs only its row in plugin.rs.
 
 mod claude;
 mod codex;
 mod cursor;
 mod gemini;
-mod opencode;
+mod plugin;
 mod transport;
 
 use crate::statussock::quote_arg;
@@ -157,7 +158,7 @@ pub fn frames(agent: &str, event: &str, payload: &[u8], env: &HookEnv) -> Vec<St
         "codex" => codex::frames(event, &payload, env),
         "gemini" => gemini::frames(event, &payload, env),
         "cursor" => cursor::frames(event, &payload, env),
-        "opencode" => opencode::frames(event, &payload, env),
+        "opencode" | "omp" => plugin::frames(agent, event, &payload, env),
         _ => Vec::new(),
     }
 }
@@ -288,4 +289,4 @@ mod cursor_tests;
 mod gemini_tests;
 
 #[cfg(test)]
-mod opencode_tests;
+mod plugin_tests;

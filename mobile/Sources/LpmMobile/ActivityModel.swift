@@ -69,6 +69,7 @@ private let statusKeyAgents: [(prefix: String, label: String)] = [
     ("gemini_", "Gemini CLI"),
     ("cursor_", "Cursor"),
     ("opencode_", "OpenCode"),
+    ("omp_", "omp"),
 ]
 
 func agentProviderLabel(forStatusKey key: String) -> String {
