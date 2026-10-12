@@ -367,7 +367,7 @@ export default function LpmVsIterm2Page() {
             href: MOBILE_PATH,
             title: "Your Mac's terminals on an iPhone",
             description:
-              "The lpm Link app mirrors a tab running on the Mac, takes typing, and pings you when Claude Code or Codex needs an answer.",
+              "The lpm Link app mirrors a tab running on the Mac, takes typing, and pings you when Claude Code, Codex or Gemini CLI needs an answer.",
           },
         ]}
       />

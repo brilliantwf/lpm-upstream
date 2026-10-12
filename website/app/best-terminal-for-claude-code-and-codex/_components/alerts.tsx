@@ -76,9 +76,10 @@ export default function Alerts() {
           </ul>
         </div>
         <p className="mt-10 text-center text-xs text-gray-500 dark:text-gray-400 max-w-xl mx-auto leading-relaxed">
-          Live status, sounds, and banners cover Claude Code and Codex. Gemini
-          CLI and OpenCode run fine in lpm terminals but don&apos;t report their
-          state on their own.
+          Live status, sounds, and banners cover Claude Code, Codex, Gemini CLI,
+          and Cursor CLI, which asks for approval without telling lpm and so
+          never shows Needs you. OpenCode runs fine in lpm terminals but
+          doesn&apos;t report its state on its own.
         </p>
       </div>
     </section>

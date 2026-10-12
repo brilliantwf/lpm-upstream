@@ -40,7 +40,7 @@ const FAQS: QA[] = [
   {
     question: "Which AI coding agents does lpm support?",
     answer:
-      "Claude Code and Codex get one-click buttons from the first launch and the deepest integration: live working, done and needs-you status, sounds and system notifications, resume and fork, and a model and effort picker. Gemini CLI and OpenCode can be added as one-click buttons too, and any other command-line agent or script runs in the built-in terminal. lpm doesn't install the agents; you use your own CLI and account.",
+      "Claude Code and Codex get one-click buttons from the first launch and the deepest integration: live working, done and needs-you status, sounds and system notifications, resume and fork, and a model and effort picker. Gemini CLI and Cursor CLI report live status with sounds and notifications too. Gemini CLI and OpenCode can be added as one-click buttons, and any other command-line agent or script runs in the built-in terminal. lpm doesn't install the agents; you use your own CLI and account.",
   },
   {
     question: "Does lpm replace my terminal or editor?",

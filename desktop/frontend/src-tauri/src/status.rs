@@ -110,10 +110,9 @@ fn same_report(current: &StatusEntry, seen: &StatusEntry) -> bool {
     current.value == seen.value && current.timestamp == seen.timestamp
 }
 
-/// The keys the agent hooks report under (hooks.rs). A key outside these is a
-/// caller's own — `lpm set-status` — and speaks for whatever it likes.
+/// Whether an agent's hooks report under `key` (agentkind.rs).
 pub fn is_agent_key(key: &str) -> bool {
-    key.starts_with("claude_code_") || key.starts_with("codex_")
+    crate::agentkind::AgentKind::of_key(key).is_some()
 }
 
 /// A state an agent holds only while something is happening right now.
@@ -210,24 +209,26 @@ impl StatusStore {
     }
 
     /// Retire what other sessions of the same agent left on `pane` when `key`
-    /// reports there. A terminal runs one Claude in its foreground at a time, so
-    /// an older session still marked working there stopped without saying so —
-    /// and, outranking the live one, it hid what that one reported. Codex keys
-    /// name their pane, so another one on it was carried over from the pane id
-    /// the tab had before it reconnected, and the agent reporting now replaces it.
+    /// reports there. A terminal runs one agent session in its foreground at a
+    /// time, so an older session still marked working there stopped without
+    /// saying so — and, outranking the live one, it hid what that one reported.
+    /// Keys that name their pane instead (Codex's) mean another one on it was
+    /// carried over from the pane id the tab had before it reconnected, and the
+    /// agent reporting now replaces it.
     pub fn retire_other_sessions(&self, project: &str, key: &str, pane: &str) -> bool {
         if pane.is_empty() {
             return false;
         }
-        let other = |e: &StatusEntry, prefix: &str| {
-            e.key != key && e.pane_id == pane && e.key.starts_with(prefix)
+        let Some(agent) = crate::agentkind::AgentKind::of_key(key) else {
+            return false;
         };
-        if key.starts_with("claude_code_") {
-            self.retain_where(project, |e| other(e, "claude_code_") && is_live(&e.value))
-        } else if key.starts_with("codex_") {
-            self.retain_where(project, |e| other(e, "codex_"))
+        let other = |e: &StatusEntry| {
+            e.key != key && e.pane_id == pane && e.key.starts_with(agent.key_prefix())
+        };
+        if agent.keyed_by_session() {
+            self.retain_where(project, |e| other(e) && is_live(&e.value))
         } else {
-            false
+            self.retain_where(project, other)
         }
     }
 

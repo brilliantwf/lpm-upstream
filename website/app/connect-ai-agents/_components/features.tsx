@@ -62,8 +62,8 @@ const FEATURES: Feature[] = [
     title: "Report and read live status",
     body: (
       <>
-        Claude Code and Codex report working, needs you, done, or problem on
-        their own. Any other agent can post the same states with{" "}
+        Claude Code, Codex, Gemini CLI and Cursor CLI report working, needs
+        you, done, or problem on their own. Any other agent can post the same states with{" "}
         <code className="font-mono text-xs">lpm set-status</code>
         {", "}and scripts read them back with{" "}
         <code className="font-mono text-xs">lpm status</code>.

@@ -979,13 +979,13 @@ fn opt_or_positional(
 }
 
 /// A key naming the pane rather than a session is one the tab's own agent
-/// reports under too: every codex hook keys that way, and the claude hooks fall
-/// back to it for a payload carrying no session id. Retiring such an entry
+/// reports under too: some agents' hooks always key that way, and the others
+/// fall back to it for a payload carrying no session id. Retiring such an entry
 /// because a launched agent reported under it would take the tab's own row.
 fn key_names_the_pane(key: &str, pane_id: &str) -> bool {
     !pane_id.is_empty()
-        && (key.strip_prefix("codex_") == Some(pane_id)
-            || key.strip_prefix("claude_code_") == Some(pane_id))
+        && crate::agentkind::AgentKind::of_key(key)
+            .is_some_and(|agent| key.strip_prefix(agent.key_prefix()) == Some(pane_id))
 }
 
 /// Whether this frame came from an agent that the pane's own agent launched.
@@ -1072,7 +1072,9 @@ fn cmd_set_status(args: &[String], store: &StatusStore, app: &AppHandle) -> Stri
         return "OK".into();
     }
     if value == crate::status::STATUS_DONE
-        && (store.take_queued_prompt(project, &entry.key) || entry.key.starts_with("codex_"))
+        && (store.take_queued_prompt(project, &entry.key)
+            || crate::agentkind::AgentKind::of_key(&entry.key)
+                == Some(crate::agentkind::AgentKind::Codex))
     {
         crate::agentturn::finish_unless_still_working(app, project, entry);
         return "OK".into();

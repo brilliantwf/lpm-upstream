@@ -1158,8 +1158,8 @@ pub fn generate_claude_statusline(
     if description.trim().is_empty() {
         return Err("Describe the change you want first.".into());
     }
-    let base = crate::hooks::ai_base_for_selection(&selection);
-    let prompt = crate::hooks::ai_statusline_prompt(&description, base.as_deref());
+    let base = crate::claude_statusline::ai_base_for_selection(&selection);
+    let prompt = crate::claude_statusline::ai_statusline_prompt(&description, base.as_deref());
     let cwd = dirs::home_dir()
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_else(|| ".".into());
@@ -1172,7 +1172,7 @@ pub fn generate_claude_statusline(
         "statusline-gen-progress",
         &gen_id,
     )?;
-    crate::hooks::finalize_ai_statusline(&raw, &description, &selection)
+    crate::claude_statusline::finalize_ai_statusline(&raw, &description, &selection)
 }
 
 #[tauri::command(async)]

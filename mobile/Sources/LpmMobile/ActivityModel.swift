@@ -61,11 +61,13 @@ func agentAmbient(_ projects: [Project]) -> AgentAmbient {
     return ambient
 }
 
-/// Status entries carry no provider field; the agents encode it in the key prefix
-/// (`claude_code_<sessionId>`, `codex_<paneId>`).
+/// Status entries carry no provider field; each agent's hooks encode it in the key
+/// prefix (desktop src-tauri/src/agentkind.rs).
 func agentProviderLabel(forStatusKey key: String) -> String {
     if key.hasPrefix("claude_code_") { return "Claude Code" }
     if key.hasPrefix("codex_") { return "Codex" }
+    if key.hasPrefix("gemini_") { return "Gemini CLI" }
+    if key.hasPrefix("cursor_") { return "Cursor" }
     return "Agent"
 }
 

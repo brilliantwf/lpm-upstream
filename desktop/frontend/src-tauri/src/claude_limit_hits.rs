@@ -25,7 +25,7 @@ enum Stop {
 /// and only while switching is on: with it off nothing is recorded, so turning
 /// it on later never starts from an old event.
 pub fn on_error_status(project: &str, key: &str) {
-    let Some(sid) = key.strip_prefix("claude_code_") else {
+    let Some(sid) = key.strip_prefix(crate::agentkind::AgentKind::Claude.key_prefix()) else {
         return;
     };
     if !crate::socketsrv::valid_session_id(sid) || !crate::claude_pool::active(&store::load()) {

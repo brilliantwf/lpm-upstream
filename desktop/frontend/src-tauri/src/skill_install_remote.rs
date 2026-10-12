@@ -8,7 +8,7 @@
 // the host row's "Reinstall skills there" could not help: it installs on a
 // *paired host*, which an ssh remote is not.
 //
-// Modelled on the remote status hooks next door in hooks.rs — same trigger (a
+// Modelled on the remote status hooks next door in hooks/ — same trigger (a
 // remote terminal spawning), same best-effort once-per-host-per-run guard, same
 // remote write primitive — because it is the same problem: a machine that runs
 // lpm's agents but does not run lpm.

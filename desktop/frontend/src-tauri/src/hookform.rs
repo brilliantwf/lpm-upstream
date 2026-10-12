@@ -1,6 +1,6 @@
 // How the agent hooks lpm installs get run on this machine.
 //
-// macOS and Linux (and every SSH host) get the POSIX-sh one-liners hooks.rs
+// macOS and Linux (and every SSH host) get the POSIX-sh one-liners hooks/sh.rs
 // builds. On Windows those cannot reach the app: Git Bash has no `nc -U`,
 // CPython no AF_UNIX, and `$PPID` is an MSYS pid. There the hooks call the lpm
 // CLI shipped beside the app (`lpm hook <agent> <event>`), which sends the same
@@ -61,6 +61,14 @@ pub(crate) fn claude_entry(cli: &Path, event: &str, matcher: &str, marker: &str)
 /// is a comment in PowerShell and an ignored argument in cmd.exe.
 pub(crate) fn codex_command(cli: &Path, event: &str, marker: &str) -> String {
     format!("{} hook codex {event} {marker}", program_word(cli))
+}
+
+/// A hook command line for an agent that runs it through PowerShell and adds to
+/// the line — Gemini appends an exit-code check, Cursor wraps the line in a
+/// script block — so a trailing `#` comment would swallow what it adds. The
+/// marker rides as a quoted argument the CLI ignores instead.
+pub(crate) fn powershell_command(cli: &Path, agent: &str, event: &str, marker: &str) -> String {
+    format!("{} hook {agent} {event} '{marker}'", program_word(cli))
 }
 
 fn program_word(program: &Path) -> String {
@@ -195,6 +203,14 @@ mod tests {
                 "# lpm-hook"
             ),
             r"& 'C:\Users\O''Neil Smith\lpm-cli.exe' hook codex Stop # lpm-hook"
+        );
+    }
+
+    #[test]
+    fn powershell_command_quotes_the_marker_instead_of_commenting_it() {
+        assert_eq!(
+            powershell_command(Path::new(r"C:\lpm\lpm-cli.exe"), "cursor", "stop", "# lpm-hook"),
+            r"C:\lpm\lpm-cli.exe hook cursor stop '# lpm-hook'"
         );
     }
 

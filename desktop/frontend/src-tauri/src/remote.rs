@@ -4876,15 +4876,14 @@ fn clear_recipients(devices: &[Device]) -> Vec<PushDevice> {
 /// How long a Codex Waiting alert is held back before sending, when Codex is
 /// configured to route approvals to an auto reviewer. Second line of defense:
 /// the PermissionRequest hook itself now skips Waiting for guardian-routed
-/// requests (see hooks.rs), but sessions started under older hooks still send
+/// requests (see hooks/codex.rs), but sessions started under older hooks still send
 /// them unconditionally.
 const CODEX_WAITING_PUSH_GRACE: Duration = Duration::from_secs(30);
 
-/// Whether a status delta is a Codex approval request. Codex's status keys are
-/// `codex_<pane>`; Claude's are `claude_code_<session>`, so the prefix scopes
-/// this to Codex panes only.
+/// Whether a status delta is a Codex approval request.
 fn is_codex_waiting(key: &str, value: &str) -> bool {
-    value == STATUS_WAITING && key.starts_with("codex_")
+    value == STATUS_WAITING
+        && crate::agentkind::AgentKind::of_key(key) == Some(crate::agentkind::AgentKind::Codex)
 }
 
 /// Pure: whether `~/.codex/config.toml` content routes approvals to an auto

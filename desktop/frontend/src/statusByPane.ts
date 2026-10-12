@@ -31,7 +31,7 @@ export function byUrgency(a: StatusEntry, b: StatusEntry): number {
  * sorted so a tab's most urgent agent comes first — is the one whose state the
  * tab should read as.
  *
- * Agents are keyed per session, not per tab (see hooks.rs), because a tab can
+ * Agents are keyed per session, not per tab (see src-tauri/src/hooks/), because a tab can
  * genuinely hold more than one: a split, or an agent that shelled out to another
  * one, which borrows the tab's pane id and reports under it. Listing those as
  * separate lines names the same tab twice over, so a reader counts agents that,

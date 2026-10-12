@@ -164,7 +164,7 @@ export const FEATURE_INDEX: IndexGroup[] = [
         href: STATUSLINE_PATH,
       },
     ],
-    note: "Live status, alerts, slash commands, resume, fork and model switching are for Claude Code and Codex only.",
+    note: "Slash commands, resume, fork and model switching are for Claude Code and Codex only; live status and alerts also cover Gemini CLI and Cursor CLI.",
   },
   {
     id: "ship",
@@ -202,7 +202,7 @@ export const FEATURE_INDEX: IndexGroup[] = [
       {
         icon: Activity,
         title: "Activity view",
-        body: "Claude Code and Codex agents, services and automations, with what needs you on top.",
+        body: "Claude Code, Codex, Gemini CLI and Cursor CLI agents, services and automations, with what needs you on top.",
         href: `${FEATURES_PATH}#agents`,
         keys: "⌘⇧A",
       },

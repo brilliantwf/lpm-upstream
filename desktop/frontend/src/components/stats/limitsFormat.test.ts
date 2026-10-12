@@ -370,6 +370,6 @@ describe("providerMeta", () => {
   });
 
   it("falls back for an unknown provider", () => {
-    expect(providerMeta("gemini")).toEqual({ label: "gemini", dot: "var(--text-muted)" });
+    expect(providerMeta("aider")).toEqual({ label: "aider", dot: "var(--text-muted)" });
   });
 });

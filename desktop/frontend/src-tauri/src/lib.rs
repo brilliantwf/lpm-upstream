@@ -14,6 +14,7 @@ mod agent_caps;
 mod agentnest;
 mod agentchildren;
 mod agentdirs;
+mod agentkind;
 mod codexfeature;
 mod fwdspool;
 mod agentturn;
@@ -37,6 +38,8 @@ mod cli_install_linux;
 #[cfg(any(windows, test))]
 mod cli_install_windows;
 mod claude_session_state;
+mod claude_statusline;
+mod claude_transcripts;
 mod clipboard;
 mod codex_statusline;
 mod codextrust;
@@ -255,6 +258,8 @@ use browser::*;
 use claude_account_pin::*;
 use claude_pool::{accept_claude_pool_pick, claude_pool_state, resume_claude_pool, set_claude_pool};
 use claude_session_state::*;
+use claude_statusline::*;
+use claude_transcripts::*;
 use cli_install::*;
 use clipboard::*;
 use codex_statusline::*;
@@ -574,8 +579,8 @@ pub fn run() {
                     hooks::install_agent_hooks();
                     skill_install::refresh_at_startup();
                     cli_install::repair_symlink_quietly();
-                    hooks::reapply_claude_limits_if_enabled();
-                    hooks::refresh_active_claude_statusline_template();
+                    claude_statusline::reapply_claude_limits_if_enabled();
+                    claude_statusline::refresh_active_claude_statusline_template();
                 }
                 session_memory::cleanup_at_startup();
                 session_memory_scope::adopt_duplicate_memory_at_startup();

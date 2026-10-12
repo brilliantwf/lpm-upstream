@@ -50,7 +50,7 @@ const ROWS: MatrixRow[] = [
   },
   {
     label: "Which agent needs you, shown on its own tab",
-    lpm: "working, needs you, done or error, from Claude Code and Codex",
+    lpm: "working, needs you, done or error, from Claude Code, Codex, Gemini CLI and Cursor CLI",
     competitor: false,
   },
   {

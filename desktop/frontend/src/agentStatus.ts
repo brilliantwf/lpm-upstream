@@ -115,7 +115,7 @@ export function agentAmbient(projects: Pick<ProjectInfo, "statusEntries">[]): Ag
   return { needsYou, hasError };
 }
 
-export type StatusProvider = "claude" | "codex" | "unknown";
+export type StatusProvider = "claude" | "codex" | "gemini" | "cursor" | "unknown";
 
 export interface ProviderMeta {
   label: string;
@@ -126,6 +126,8 @@ export interface ProviderMeta {
 const PROVIDER_META: Record<string, ProviderMeta> = {
   claude: { label: "Claude Code", short: "Claude", color: "#D97757" },
   codex: { label: "Codex", short: "Codex", color: "#10A37F" },
+  gemini: { label: "Gemini CLI", short: "Gemini", color: "#4796E3" },
+  cursor: { label: "Cursor", short: "Cursor", color: "var(--text-primary)" },
   unknown: { label: "Agent", short: "Agent", color: "var(--text-muted)" },
 };
 
@@ -133,13 +135,15 @@ export function providerMeta(key: string): ProviderMeta {
   return PROVIDER_META[key] ?? { label: key, short: key, color: "var(--text-muted)" };
 }
 
-const CLAUDE_PREFIX = "claude_code_";
-const CODEX_PREFIX = "codex_";
+// Status entries carry no provider field; each agent's hooks encode it in the
+// key prefix (src-tauri/src/agentkind.rs).
+const STATUS_KEY_PREFIXES: [string, StatusProvider][] = [
+  ["claude_code_", "claude"],
+  ["codex_", "codex"],
+  ["gemini_", "gemini"],
+  ["cursor_", "cursor"],
+];
 
-// Status entries carry no provider field; the agents encode it in the key
-// prefix (`claude_code_<sessionId>`, `codex_<paneId>`).
 export function statusProvider(key: string): StatusProvider {
-  if (key.startsWith(CLAUDE_PREFIX)) return "claude";
-  if (key.startsWith(CODEX_PREFIX)) return "codex";
-  return "unknown";
+  return STATUS_KEY_PREFIXES.find(([prefix]) => key.startsWith(prefix))?.[1] ?? "unknown";
 }

@@ -76,7 +76,7 @@ const ROWS: MatrixRow[] = [
   },
   {
     label: "Your coding agent gets a tab next to the service panes",
-    lpm: "Claude Code and Codex report Working, Needs you or Done",
+    lpm: "Claude Code, Codex, Gemini CLI and Cursor CLI report Working, Needs you or Done",
     competitor: "the agent runs in a terminal you open yourself",
   },
   {

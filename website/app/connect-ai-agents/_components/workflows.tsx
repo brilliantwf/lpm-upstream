@@ -38,8 +38,8 @@ const WORKFLOWS: Workflow[] = [
     title: "You always know what it is doing",
     body: (
       <>
-        Claude Code and Codex report their state to lpm on their own: working,
-        needs you, done, or problem. When one needs your permission or input,
+        Claude Code, Codex, Gemini CLI and Cursor CLI report their state to lpm
+        on their own: working, needs you, done, or problem. When one needs your permission or input,
         its tab and sidebar row stay amber until the agent moves on, so nothing gets lost in
         a wall of terminals. Any other agent can post its own progress with{" "}
         <code className="font-mono text-xs">lpm set-status</code>

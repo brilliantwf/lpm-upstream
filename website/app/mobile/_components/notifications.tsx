@@ -6,7 +6,7 @@ const CARDS: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: BellRing,
     title: "Know the second an agent needs you",
-    body: "When Claude Code or Codex stops to ask a question, finishes a task, or hits an error, a notification lands on your phone, even with the app closed. Automations can alert you too when they start, finish, or fail. Turn each kind on or off.",
+    body: "When Claude Code, Codex, Gemini CLI or Cursor CLI stops to ask a question, finishes a task, or hits an error, a notification lands on your phone, even with the app closed. Automations can alert you too when they start, finish, or fail. Turn each kind on or off.",
   },
   {
     icon: Lock,

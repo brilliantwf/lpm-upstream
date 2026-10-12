@@ -20,6 +20,7 @@
 //
 // Either way an entry changes only if it still holds the report that was
 // observed: a hook that reported in the meantime always wins.
+use crate::agentkind::AgentKind;
 use crate::pty::{PtySession, PtyState};
 use crate::status::{now_millis, StatusEntry, StatusStore, STATUS_RUNNING, STATUS_WAITING};
 use std::collections::{BTreeSet, HashMap};
@@ -69,7 +70,9 @@ fn concerns(key: Key, entry: &StatusEntry) -> bool {
     match key {
         Key::Interrupt => true,
         Key::Answer => entry.value == STATUS_WAITING,
-        Key::CodexAnswer => entry.value == STATUS_WAITING && entry.key.starts_with("codex_"),
+        Key::CodexAnswer => {
+            entry.value == STATUS_WAITING && AgentKind::of_key(&entry.key) == Some(AgentKind::Codex)
+        }
     }
 }
 
@@ -178,11 +181,9 @@ fn settle(app: &AppHandle, watch: &Watch, outcome: Outcome) {
 
 /// The Running report the agent's own hooks would have sent.
 fn running(waiting: &StatusEntry) -> StatusEntry {
-    let (icon, color) = if waiting.key.starts_with("codex_") {
-        ("sparkle", "#10A37F")
-    } else {
-        ("bolt", "#4C8DFF")
-    };
+    let (icon, color) = AgentKind::of_key(&waiting.key)
+        .unwrap_or(AgentKind::Claude)
+        .running_look();
     StatusEntry {
         key: waiting.key.clone(),
         value: STATUS_RUNNING.into(),

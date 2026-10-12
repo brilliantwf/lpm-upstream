@@ -19,7 +19,7 @@ const CARDS: { icon: LucideIcon; title: string; body: React.ReactNode }[] = [
   {
     icon: Activity,
     title: "Activity across every project",
-    body: "One list of every Claude Code and Codex agent, sorted by what needs you first, plus running automations and services you can start or stop. Filter, search, or group it by project.",
+    body: "One list of every Claude Code, Codex, Gemini CLI and Cursor CLI agent, sorted by what needs you first, plus running automations and services you can start or stop. Filter, search, or group it by project.",
   },
   {
     icon: CalendarClock,

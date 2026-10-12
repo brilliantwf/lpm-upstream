@@ -48,7 +48,7 @@ const ROWS: MatrixRow[] = [
   },
   {
     label: "Reports agent status back to the app",
-    lpm: "Claude Code and Codex, via hooks lpm installs",
+    lpm: "Claude Code, Codex, Gemini CLI and Cursor CLI, via hooks lpm installs",
     competitor: "agent hooks, cmux notify, notification panel",
   },
   {

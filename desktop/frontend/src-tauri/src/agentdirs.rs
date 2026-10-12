@@ -1,7 +1,9 @@
-// Where Claude Code and Codex read their configuration on this machine.
+// Where Claude Code, Codex and Gemini CLI read their configuration on this
+// machine.
 //
 // Each honors an environment variable over its default folder: CLAUDE_CONFIG_DIR
-// over ~/.claude, CODEX_HOME over ~/.codex. lpm's terminals are login shells, so
+// over ~/.claude, CODEX_HOME over ~/.codex, GEMINI_CLI_HOME over the home folder
+// ~/.gemini sits in. lpm's terminals are login shells, so
 // the value that counts is the one the login profile exports; the app's own
 // environment stands in when the profile exports none. Resolved once per run:
 // reading the profile starts a login shell.
@@ -23,6 +25,17 @@ pub fn codex_home() -> Option<&'static Path> {
     static DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
     DIR.get_or_init(|| {
         exported("CODEX_HOME").or_else(|| dirs::home_dir().map(|home| home.join(".codex")))
+    })
+    .as_deref()
+}
+
+/// `$GEMINI_CLI_HOME/.gemini`, else `~/.gemini`.
+pub fn gemini_dir() -> Option<&'static Path> {
+    static DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
+    DIR.get_or_init(|| {
+        exported("GEMINI_CLI_HOME")
+            .or_else(dirs::home_dir)
+            .map(|home| home.join(".gemini"))
     })
     .as_deref()
 }

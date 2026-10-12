@@ -11,7 +11,7 @@ const CAPABILITIES: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: Activity,
     title: "Activity",
-    body: "Claude Code and Codex sessions across your projects, needs-you first.",
+    body: "Claude Code, Codex, Gemini CLI and Cursor CLI sessions across your projects, needs-you first.",
   },
   {
     icon: CalendarClock,
@@ -26,7 +26,7 @@ const CAPABILITIES: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: BellRing,
     title: "Push notifications",
-    body: "When Claude Code or Codex needs you or finishes, and when automations end.",
+    body: "When Claude Code, Codex, Gemini CLI or Cursor CLI needs you or finishes, and when automations end.",
   },
   {
     icon: Gauge,

@@ -4,7 +4,7 @@
 // process tree, and the agent hooks live in the user's global settings — so a
 // `claude` the agent shells out to (a test, a script, a nested run) fires the
 // same hooks, under its own session id but the host tab's pane id. Keyed per
-// session (hooks.rs), that lands in the status store as a SECOND agent on the
+// session (hooks/), that lands in the status store as a SECOND agent on the
 // tab: an extra sidebar row wearing the tab's name, an extra chime, and a
 // "done" banner for an agent the user never started.
 //

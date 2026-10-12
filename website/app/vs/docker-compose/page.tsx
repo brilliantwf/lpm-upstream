@@ -313,7 +313,7 @@ export default function LpmVsDockerComposePage() {
             "You do most of your dev natively on macOS, and the file share into the VM still sits between your watcher and your disk.",
             "You want your Rails server, Next.js frontend, worker, and a Redis process each in their own live pane.",
             "You juggle several repos and would rather see which stack is up than remember which compose file you left running where.",
-            "You run Claude Code, Codex, Gemini CLI, or OpenCode in parallel on the same or adjacent codebases and want their output beside your services — with Claude Code and Codex also reporting Working, Needs you or Done on the tab.",
+            "You run Claude Code, Codex, Gemini CLI, or OpenCode in parallel on the same or adjacent codebases and want their output beside your services — with Claude Code, Codex and Gemini CLI also reporting Working, Needs you or Done on the tab.",
             "You already have a docker-compose.yml — lpm can drive it as one service while you move the rest native.",
             "Your production is not containers at all — a managed platform, a VPS, or serverless — so the parity compose buys you was never real.",
           ],

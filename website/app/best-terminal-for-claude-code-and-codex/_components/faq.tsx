@@ -69,13 +69,15 @@ const FAQS: QA[] = [
       "Yes. Each agent works in its own copy of the repo, so they never edit the same files. Duplicate clones the project folder (dependencies, .env files, and uncommitted work included), and New Worktree checks out a real Git worktree on its own branch. Either way you can create up to 50 at once and queue the same prompt in each. See lpm.cx/run-claude-code-in-parallel for the walkthrough and lpm.cx/git-worktree-for-ai-agents for which of the two to reach for.",
   },
   {
-    question: "Does lpm support Gemini CLI and OpenCode?",
+    question: "Does lpm support Gemini CLI, Cursor CLI, and OpenCode?",
     answer: (
       <>
         They run in lpm terminals like any other command, and lpm suggests
-        launch buttons for them when their CLIs are installed. The deeper
-        integration (live status, alerts, resume, fork, and the model switcher)
-        is built for Claude Code and Codex. Any agent can still drive lpm
+        launch buttons for Gemini CLI and OpenCode when their CLIs are
+        installed. Gemini CLI and Cursor CLI also get live status and alerts,
+        though Cursor CLI asks for approval without telling lpm, so it never
+        shows Needs you. Resume, fork, and the model switcher are built for
+        Claude Code and Codex. Any agent can still drive lpm
         through the{" "}
         <Link href={CONNECT_AGENTS_PATH} className={LINK}>
           lpm CLI and agent skills
@@ -85,7 +87,7 @@ const FAQS: QA[] = [
       </>
     ),
     answerText:
-      "They run in lpm terminals like any other command, and lpm suggests launch buttons for them when their CLIs are installed. The deeper integration (live status, alerts, resume, fork, and the model switcher) is built for Claude Code and Codex. Any agent can still drive lpm through the lpm CLI and agent skills, and post its own status badge with lpm set-status.",
+      "They run in lpm terminals like any other command, and lpm suggests launch buttons for Gemini CLI and OpenCode when their CLIs are installed. Gemini CLI and Cursor CLI also get live status and alerts, though Cursor CLI asks for approval without telling lpm, so it never shows Needs you. Resume, fork, and the model switcher are built for Claude Code and Codex. Any agent can still drive lpm through the lpm CLI and agent skills, and post its own status badge with lpm set-status.",
   },
   {
     question: "Do I need Docker to use lpm?",

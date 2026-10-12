@@ -65,8 +65,8 @@ const FEATURES: Feature[] = [
   },
   {
     icon: Bot,
-    title: "Claude Code and Codex report home",
-    body: "Open a terminal on the remote box and lpm sets up its agent status and skills there. Claude Code and Codex running on the server light up your Mac sidebar and send the same alerts as local agents.",
+    title: "Your agents report home",
+    body: "Open a terminal on the remote box and lpm sets up its agent status and skills there. Claude Code, Codex, Gemini CLI and Cursor CLI running on the server light up your Mac sidebar and send the same alerts as local agents.",
   },
   {
     icon: FolderTree,

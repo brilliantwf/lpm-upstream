@@ -364,6 +364,12 @@ fn main() -> ExitCode {
         hook::run(&args[2..]);
         return ExitCode::SUCCESS;
     }
+    // Cursor runs the hooks in Claude's settings without their `args`, so the
+    // Windows ones start this with none — and a usage error's exit 2 is Cursor's
+    // "block this action" too.
+    if args.len() == 1 && std::env::var_os("CURSOR_VERSION").is_some() {
+        return ExitCode::SUCCESS;
+    }
     let cli = Cli::parse();
     let ctx = config::Ctx::from_home();
 

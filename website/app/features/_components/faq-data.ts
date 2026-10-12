@@ -7,7 +7,7 @@ export const FEATURE_FAQS = [
   {
     question: "Which features need Claude Code or Codex?",
     answer:
-      "Live status, alerts, session resume, fork, copy last answer, slash-command autocomplete, and model switching work only with Claude Code and Codex, and pinning an account per project is Claude Code only. The launchers also cover Gemini CLI and OpenCode, and any other CLI runs in a terminal or behind a button. You install and sign in to each agent yourself.",
+      "Session resume, fork, copy last answer, slash-command autocomplete, and model switching work only with Claude Code and Codex, and pinning an account per project is Claude Code only. Live status and alerts extend to Gemini CLI and Cursor CLI, though Cursor CLI never shows Needs you. The launchers also cover Gemini CLI and OpenCode, and any other CLI runs in a terminal or behind a button. You install and sign in to each agent yourself.",
   },
   {
     question: "Do duplicates or worktrees get their own ports?",

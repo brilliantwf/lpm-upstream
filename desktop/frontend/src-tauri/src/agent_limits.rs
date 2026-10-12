@@ -6,7 +6,7 @@
 //     on change (no setup required).
 //   - Claude Code forwards its statusline JSON (which carries rate_limits for
 //     Pro/Max logins) into the status socket, tagged with an account id. The
-//     forwarder is consent-gated (hooks.rs), so this only populates once enabled.
+//     forwarder is consent-gated (claude_statusline/), so this only populates once enabled.
 //
 // A change to any provider emits `agent-limits-changed` with the full snapshot,
 // suppressing no-op re-emits like status.rs's should_replace.

@@ -31,7 +31,7 @@ export const DEVICES_AREA: FeatureArea = {
     {
       icon: SquareTerminal,
       title: "SSH projects",
-      body: "Add a project on any machine you can SSH into, picked from your SSH config or typed in. Its terminals, services, and actions run there, and Claude Code and Codex report their status back.",
+      body: "Add a project on any machine you can SSH into, picked from your SSH config or typed in. Its terminals, services, and actions run there, and Claude Code, Codex, Gemini CLI, and Cursor CLI report their status back.",
       note: "lpm itself isn't installed on the server. SSH projects can't be duplicated.",
       href: SSH_TERMINAL_MAC_PATH,
       linkLabel: "The SSH terminal",
@@ -108,7 +108,7 @@ export const IPHONE_AREA: FeatureArea = {
       icon: BellRing,
       title: "Push notifications",
       body: "Get a push when an agent waits for you, finishes, or errors, and optionally when automations run. Content is encrypted on your computer and only your phone can read it.",
-      note: "Agent alerts come from Claude Code and Codex.",
+      note: "Agent alerts come from Claude Code, Codex, Gemini CLI, and Cursor CLI.",
     },
     {
       icon: MessageSquareText,

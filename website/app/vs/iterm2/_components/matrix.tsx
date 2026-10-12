@@ -35,7 +35,7 @@ const ROWS: MatrixRow[] = [
   },
   {
     label: "Seeing what an agent is doing without switching to it",
-    lpm: "working, needs you, done or error on the terminal tab — Claude Code and Codex",
+    lpm: "working, needs you, done or error on the terminal tab — Claude Code, Codex, Gemini CLI and Cursor CLI",
     competitor:
       "working, waiting or idle in the Session Status panel — Claude Code only, since 3.7",
   },

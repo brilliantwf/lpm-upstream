@@ -195,6 +195,8 @@ describe("providerMeta", () => {
   it("names each agent", () => {
     expect(providerMeta("claude").label).toBe("Claude Code");
     expect(providerMeta("codex").label).toBe("Codex");
+    expect(providerMeta("gemini").label).toBe("Gemini CLI");
+    expect(providerMeta("cursor").label).toBe("Cursor");
   });
 
   it("falls back to a generic name for an unrecognised agent", () => {
@@ -210,6 +212,11 @@ describe("statusProvider", () => {
 
   it("reads Codex from the pane-keyed prefix", () => {
     expect(statusProvider("codex_%3")).toBe("codex");
+  });
+
+  it("reads Gemini and Cursor from their prefixes", () => {
+    expect(statusProvider("gemini_0199f1e2")).toBe("gemini");
+    expect(statusProvider("cursor_%3")).toBe("cursor");
   });
 
   it("falls back to unknown for a non-agent key", () => {

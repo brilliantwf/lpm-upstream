@@ -54,7 +54,7 @@ export const CLI_AREA: FeatureArea = {
     },
     {
       title: "lpm logs · lpm status",
-      body: "Print a service's recent output, or each Claude Code and Codex session's state and how long it has lasted, plus any status posted with lpm set-status.",
+      body: "Print a service's recent output, or each Claude Code, Codex, Gemini CLI, and Cursor CLI session's state and how long it has lasted, plus any status posted with lpm set-status.",
       mono: true,
     },
     {

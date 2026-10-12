@@ -2,9 +2,9 @@
 //!
 //! A plugin bundles skills, commands, subagents, hooks and MCP servers behind
 //! one enable flag, so a disabled plugin silently takes all of them with it.
-//! Hooks are read-only on purpose: `src-tauri/src/hooks.rs` already owns three
-//! marked regions in `~/.claude/settings.json`, and a second writer would fight
-//! lpm's own features.
+//! Hooks are read-only on purpose: `src-tauri/src/hooks/` and
+//! `claude_statusline/` already own three marked regions in
+//! `~/.claude/settings.json`, and a second writer would fight lpm's own features.
 
 use super::mcp::{from_plugin_json, read_json, str_array};
 use super::{AgentCapabilities, AgentCapability};
@@ -85,8 +85,9 @@ fn claude_plugins(home: &Path, out: &mut AgentCapabilities) {
     }
 }
 
-/// Hooks are listed, never edited: `src-tauri/src/hooks.rs` already owns three
-/// marked regions in this same file, and a second writer would fight it.
+/// Hooks are listed, never edited: `src-tauri/src/hooks/` and `claude_statusline/`
+/// already own three marked regions in this same file, and a second writer would
+/// fight them.
 fn claude_hooks(home: &Path, root: Option<&Path>, out: &mut AgentCapabilities) {
     let mut files = vec![(home.join(".claude").join("settings.json"), "user")];
     if let Some(root) = root {

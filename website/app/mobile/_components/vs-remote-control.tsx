@@ -8,7 +8,7 @@ type Row = {
 const ROWS: Row[] = [
   {
     label: "Any agent, not one",
-    body: "Claude Code, Codex, Gemini CLI, or whatever else you run in an lpm terminal all open on your phone the same way, and Claude Code and Codex also send status and push alerts.",
+    body: "Claude Code, Codex, Gemini CLI, or whatever else you run in an lpm terminal all open on your phone the same way, and Claude Code, Codex, Gemini CLI and Cursor CLI also send status and push alerts.",
   },
   {
     label: "The real session, not a transcript",

@@ -56,7 +56,7 @@ const OTHER_ITEMS: SafetyItem[] = [
   {
     icon: SquareTerminal,
     title: "Your commands only",
-    body: "Runs what you configure as your user and adds Claude Code and Codex status hooks.",
+    body: "Runs what you configure as your user and adds status hooks for Claude Code, Codex, Gemini CLI and Cursor CLI.",
   },
   {
     icon: PackageCheck,

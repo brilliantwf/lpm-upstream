@@ -11,7 +11,7 @@ export type WalkthroughProject = {
   key: ProjectKey;
   name: string;
   run: RunState;
-  /** Only Claude Code and Codex report this. Undefined means no agent state. */
+  /** Only agents lpm installs hooks for report this. Undefined means no agent state. */
   agent?: "needs-you";
   summary: string;
 };

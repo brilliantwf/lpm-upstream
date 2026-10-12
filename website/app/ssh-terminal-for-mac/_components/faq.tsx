@@ -90,7 +90,7 @@ const FAQS: QA[] = [
   {
     question: "Do Claude Code and Codex on the remote box show up in lpm?",
     answer:
-      "Yes. When you open a terminal on an SSH project, lpm sets up its agent status and skills on the server, so Claude Code and Codex running there report working, needs you, and done to your Mac's sidebar and trigger the same sounds and banners as local agents. If a gateway host sends terminals to a different machine than lpm's connection, lpm warns you that alerts from that server won't arrive.",
+      "Yes. When you open a terminal on an SSH project, lpm sets up its agent status and skills on the server, so Claude Code, Codex, Gemini CLI and Cursor CLI running there report working, needs you, and done to your Mac's sidebar and trigger the same sounds and banners as local agents. If a gateway host sends terminals to a different machine than lpm's connection, lpm warns you that alerts from that server won't arrive.",
   },
   {
     question: "What happens when the SSH connection drops?",

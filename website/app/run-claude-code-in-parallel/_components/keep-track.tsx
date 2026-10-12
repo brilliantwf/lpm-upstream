@@ -23,7 +23,7 @@ const ITEMS: { icon: typeof BellRing; title: string; body: ReactNode }[] = [
   },
   {
     icon: LayoutList,
-    title: "Activity: every Claude Code and Codex session on one screen",
+    title: "Activity: every agent session on one screen",
     body: (
       <>
         Press{" "}
@@ -75,7 +75,7 @@ export default function KeepTrack() {
         <SectionHeader
           eyebrow="Keep track"
           title="Know which agent needs you without opening every tab"
-          description="Every Claude Code and Codex session reports its own state, so you see it in the tab, the sidebar and Activity."
+          description="Every Claude Code, Codex, Gemini CLI and Cursor CLI session reports its own state, so you see it in the tab, the sidebar and Activity."
         />
         <div className="grid items-center gap-12 lg:grid-cols-2">
           <figure className="min-w-0">

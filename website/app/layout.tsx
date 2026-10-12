@@ -92,7 +92,7 @@ const FEATURE_LIST = [
   "One-click start and stop for every service, with profiles",
   "Live output per service with listening ports and port-conflict checks",
   "Built-in terminals with Claude Code, Codex, Gemini, and OpenCode launchers",
-  "Live Claude Code and Codex status with sounds and system notifications",
+  "Live Claude Code, Codex, Gemini CLI and Cursor CLI status with sounds and system notifications",
   "Prompt composer with @ mentions, images, and slash-command autocomplete",
   "Duplicate a project or create Git worktrees to run agents in parallel",
   "Scheduled automations that run agent prompts, commands, or actions",

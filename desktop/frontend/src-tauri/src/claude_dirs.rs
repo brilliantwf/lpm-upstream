@@ -78,7 +78,7 @@ pub fn account_dirs() -> Vec<AccountDir> {
 pub fn sessions_dir(config_dir: &Path, project_root: &str) -> PathBuf {
     config_dir
         .join("projects")
-        .join(crate::hooks::claude_project_slug(project_root))
+        .join(crate::claude_transcripts::claude_project_slug(project_root))
 }
 
 /// Which account holds `session_id`, and the file. The project root's dir is
@@ -120,7 +120,7 @@ pub fn transcript_for(info: &config::SpawnInfo, session_id: &str) -> PathBuf {
     find_transcript(&info.root, session_id)
         .map(|(_, path)| path)
         .unwrap_or_else(|| {
-            crate::hooks::claude_transcript_path(
+            crate::claude_transcripts::claude_transcript_path(
                 config::claude_env_for_account(info.claude_account.as_deref()),
                 &info.root,
                 session_id,

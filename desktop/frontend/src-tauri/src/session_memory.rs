@@ -10,7 +10,7 @@
 // deleted once those builds are far enough behind us.
 //
 // The entry is recognised by its `# lpm-memory` marker, deliberately neither a
-// superstring nor a substring of hooks.rs's `# lpm-hook` (agent status) or
+// superstring nor a substring of the agent hooks' `# lpm-hook` (hooks/) or
 // `# lpm-statusline:` (usage meters), so stripping ours never disturbs theirs.
 use serde_json::{Map, Value};
 use std::path::{Path, PathBuf};
@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn the_status_hook_strip_leaves_our_entry_alone() {
-        // The mirror direction: hooks.rs strips by `# lpm-hook`, which must not
+        // The mirror direction: hooks/ strips by `# lpm-hook`, which must not
         // reach our entries — otherwise the two features would fight.
         let mut settings: Value = serde_json::from_str(&installed_settings()).unwrap();
         let hooks = settings["hooks"].as_object_mut().unwrap();

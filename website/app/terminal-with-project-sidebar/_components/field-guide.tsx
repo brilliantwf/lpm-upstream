@@ -20,7 +20,7 @@ const ENTRIES: { n: number; term: string; body: string }[] = [
   {
     n: 4,
     term: "Agent attention",
-    body: "Claude Code and Codex report back into the row: the name shimmers while an agent works, turns amber when it needs an answer, turns red and reads “Problem” on an error, and turns blue when it finishes. Underneath, each agent gets its own row with a bell, alert, or check and how long it has been going; click one to jump to its tab. Other agents run fine in a terminal too; their rows light up only if a hook or script reports through lpm set-status.",
+    body: "Claude Code, Codex, Gemini CLI and Cursor CLI report back into the row: the name shimmers while an agent works, turns amber when it needs an answer, turns red and reads “Problem” on an error, and turns blue when it finishes. Underneath, each agent gets its own row with a bell, alert, or check and how long it has been going; click one to jump to its tab. Other agents run fine in a terminal too; their rows light up only if a hook or script reports through lpm set-status.",
   },
   {
     n: 5,

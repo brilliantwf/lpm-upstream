@@ -9,8 +9,8 @@ const LIMITS = [
   },
   {
     icon: Bot,
-    title: "Live status is Claude Code and Codex only",
-    body: "Gemini CLI and OpenCode run fine in tabs, copies and worktrees, but only Claude Code and Codex send lpm their Working, Needs you and Done states, and only they get the sounds, banners, pushes and forking.",
+    title: "Not every agent reports or forks",
+    body: "Claude Code, Codex, Gemini CLI and Cursor CLI send lpm their Working, Needs you and Done states and get the sounds, banners and pushes, though Cursor CLI asks for approval without telling lpm, so it never shows Needs you. OpenCode runs fine in tabs, copies and worktrees but reports nothing, and only Claude Code and Codex can be forked.",
   },
   {
     icon: Coins,

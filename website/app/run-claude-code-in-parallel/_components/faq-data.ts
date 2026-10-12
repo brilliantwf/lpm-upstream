@@ -22,7 +22,7 @@ export const FAQ_ITEMS: { question: string; answer: string }[] = [
   {
     question: "How do I know which agent needs me?",
     answer:
-      "Claude Code and Codex tabs show Working, Needs you, Done or Problem, and so do the rows under each project in the sidebar, with how long each state has lasted. Press ⌘⇧A (Ctrl+Alt+Shift+A on Windows and Linux) for Activity, every Claude Code and Codex session across your projects, waiting ones first. lpm also plays a sound, shows a system notification when it isn't in front, and can push to your iPhone through the lpm link app.",
+      "Claude Code, Codex, Gemini CLI and Cursor CLI tabs show Working, Needs you, Done or Problem, and so do the rows under each project in the sidebar, with how long each state has lasted. Press ⌘⇧A (Ctrl+Alt+Shift+A on Windows and Linux) for Activity, every one of those sessions across your projects, waiting ones first. lpm also plays a sound, shows a system notification when it isn't in front, and can push to your iPhone through the lpm link app.",
   },
   {
     question: "Does running agents in parallel use more of my plan?",
@@ -35,8 +35,8 @@ export const FAQ_ITEMS: { question: string; answer: string }[] = [
       "No. lpm separates files, not runtime resources: copies and worktrees share your computer's ports, local databases and Docker. If a service's declared port is already taken when you start a project, lpm shows what holds the port and, unless you chose otherwise for that service, asks before stopping it.",
   },
   {
-    question: "Does it work with Codex, Gemini CLI or OpenCode?",
+    question: "Does it work with Codex, Gemini CLI, Cursor CLI or OpenCode?",
     answer:
-      "Codex gets the same live status, alerts, resume and fork support as Claude Code. Gemini CLI and OpenCode run in tabs, copies and worktrees like any terminal command, but without live status or alerts.",
+      "Codex gets the same live status, alerts, resume and fork support as Claude Code. Gemini CLI and Cursor CLI get live status and alerts too, though Cursor CLI asks for approval without telling lpm, so it never shows Needs you. OpenCode runs in tabs, copies and worktrees like any terminal command, but without live status or alerts.",
   },
 ];

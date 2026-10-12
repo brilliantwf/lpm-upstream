@@ -108,7 +108,7 @@ export const TOOL_ROWS: ToolRow[] = [
   },
   {
     label: "Says whether an agent is working, needs you or done",
-    lpm: "Claude Code, Codex",
+    lpm: "Claude Code, Codex, Gemini CLI, Cursor CLI",
     iterm2: "Claude Code, since 3.7",
     tmux: false,
     cmux: "when it needs you",

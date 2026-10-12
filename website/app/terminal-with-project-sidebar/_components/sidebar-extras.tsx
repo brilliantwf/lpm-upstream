@@ -29,7 +29,7 @@ const EXTRAS: { icon: LucideIcon; title: string; body: React.ReactNode }[] = [
   {
     icon: Activity,
     title: "Activity across projects",
-    body: "⌘⇧A lists your Claude Code and Codex agents, running services, and this Mac's automations, with whatever needs you at the top.",
+    body: "⌘⇧A lists your Claude Code, Codex, Gemini CLI and Cursor CLI agents, running services, and this Mac's automations, with whatever needs you at the top.",
   },
   {
     icon: Gauge,
