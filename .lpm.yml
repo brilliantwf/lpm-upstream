@@ -11,7 +11,7 @@ services:
 profiles:
   dev:
     - dev
- 
+
 actions:
   release:
     label: 🚀 Release · {{git.tag:v*}} · {{git.tagAge:v*}}
@@ -42,11 +42,4 @@ actions:
         default: stable
         required: true
     position: 1
-    display: footer
-  promote:
-    label: ⬆️ Promote Beta
-    type: background
-    cmd: ./scripts/release.sh promote
-    confirm: true
-    position: 3
     display: footer
