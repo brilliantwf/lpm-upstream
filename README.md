@@ -36,7 +36,7 @@ Supports macOS (Apple Silicon & Intel).
 ## See it in action
 
 <p align="center">
-  <strong>Add a project</strong> — browse to a directory, define services, save<br><br>
+  <strong>Add a project</strong> — pick a folder or clone a repo, and lpm finds its services<br><br>
   <img src="website/public/screenrecording/add-project.gif" alt="Adding a new project in lpm desktop app" width="700">
   <br><br>
   <strong>Start a project</strong> — one click, live terminal output for every service<br><br>
@@ -45,10 +45,10 @@ Supports macOS (Apple Silicon & Intel).
   <strong>Run AI agents alongside your services</strong> — Claude Code, Codex, or any agent in the same workspace<br><br>
   <img src="website/public/screenrecording/start-project-claude.gif" alt="Running Claude Code in lpm" width="700">
   <br><br>
-  <strong>Duplicate a project</strong> — work on features in parallel, no conflicts<br><br>
+  <strong>Duplicate a project</strong> — run an agent in each copy, in parallel, no conflicts<br><br>
   <img src="website/public/screenrecording/duplicate-project.gif" alt="Duplicating a project in lpm" width="700">
   <br><br>
-  <strong>Fast switching</strong> — stop one project, start another in seconds<br><br>
+  <strong>Fast switching</strong> — start, stop, and jump between projects in seconds<br><br>
   <img src="website/public/screenrecording/fast-start-stop-projects.gif" alt="Switching between projects in lpm" width="700">
   <br><br>
   <strong>Split terminals</strong> — arrange services and agents side-by-side<br><br>
