@@ -1,0 +1,23 @@
+appId: cx.lpm.mobile
+name: 05-project-menu
+tags: [demo, projects, git]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+# The project's "…" menu: icon-only, labelled "More" on both platforms.
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Review Changes.*"
+    timeout: 5000
+- assertVisible: "Stop"
+- assertVisible: "Git"
+- assertVisible: "Memory"
+- assertVisible: "Notes"
+- assertVisible: "Automations.*"
+- assertVisible: "Rename…"
+- assertVisible: "Configure…"
+- assertVisible: "Terminal Settings"
+- takeScreenshot: 1-project-menu

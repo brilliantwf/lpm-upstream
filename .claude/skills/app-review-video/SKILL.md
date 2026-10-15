@@ -29,7 +29,7 @@ and every tap and click is a real one made with computer use.
 - `stop`, then `render --device "<model>" [--build <n>] [--version <v>] [--cut a-b,…]
   [--redact <regex>] [--no-camera]` writes
   `~/Movies/lpm-app-review/<stamp>/lpm-link-<version>-app-review.mp4` and `steps.txt` (where
-  each step starts). The version defaults to `mobile/project.yml`. The render:
+  each step starts). The version defaults to `mobile/ios/project.yml`. The render:
   - keeps each click's response (the screen changes until the next click, at most 12 s) with a
     short hold, and drops everything between: waits, a server's log, a clock (`edit.js`);
   - draws a ripple at every click;

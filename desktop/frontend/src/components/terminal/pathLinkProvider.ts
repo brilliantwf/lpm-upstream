@@ -33,7 +33,7 @@ import { openInDefaultApp } from "./openInDefaultApp";
 // a `/` or digit right after `:` (a URL's tail, a port), while `12:src/a.ts`
 // and `HEAD:src/a.ts` still link; `file://` is taken as a prefix of the link,
 // not of the path. The Rust side expands `~/` to the user's home before
-// stat/read/write. Kept in step with the phone's copy in mobile/web/pathtap.js.
+// stat/read/write. Kept in step with the phone's copy in mobile/shared/web/pathtap.js.
 const SEG = String.raw`(?:[\w.@+-]|\[{1,2}[\w.-]+\]{1,2}|\([\w.-]+\))`;
 const POSITION = String.raw`(?::(\d+)(?::(\d+))?|\((\d+)(?:,\s?(\d+))?\)|#L(\d+)(?:C(\d+))?(?:-L?\d+)?)?`;
 const PATH_RE = new RegExp(

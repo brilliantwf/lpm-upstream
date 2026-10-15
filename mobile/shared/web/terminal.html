@@ -1,0 +1,402 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<link rel="stylesheet" href="xterm/xterm.css" />
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #2b2b2b; overscroll-behavior: none; }
+  /* The terminal sits within the safe area (below the nav bar); the insets are set from Swift. */
+  #term { position: absolute; inset: 0; padding: var(--top-inset, 0px) 6px calc(6px + var(--bottom-inset, 0px)) 6px; }
+  .xterm .xterm-viewport { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+</style>
+</head>
+<body>
+<div id="term"></div>
+<script src="xterm/xterm.js"></script>
+<script src="xterm/addon-fit.js"></script>
+<script src="xterm/addon-webgl.js"></script>
+<script src="xterm/addon-unicode11.js"></script>
+<script src="pathtap.js"></script>
+<script>
+  const post = (name, body) => window.webkit?.messageHandlers?.[name]?.postMessage(body);
+
+  // Theme, palette, and font mirror the lpm desktop (terminal-utils.ts): iTerm2
+  // ANSI colors with a brightened blue. Initial dynamic colors are Claude Dark —
+  // the default theme (TerminalPrefs.defaultTheme) — so the first paint matches
+  // before Swift pushes the stored theme via lpmSetTheme.
+  const theme = {
+    background: '#2b2b2b', foreground: '#c8c8c8',
+    cursor: '#c8c8c8', cursorAccent: '#2b2b2b', selectionBackground: '#484848',
+    black: '#000000', red: '#c91b00', green: '#00c200', yellow: '#c7c400',
+    blue: '#3b8eea', magenta: '#c930c7', cyan: '#00c5c7', white: '#c7c7c7',
+    brightBlack: '#686868', brightRed: '#ff6e67', brightGreen: '#5ffa68',
+    brightYellow: '#fffc67', brightBlue: '#83a5d6', brightMagenta: '#ff77ff',
+    brightCyan: '#60fdff', brightWhite: '#ffffff',
+  };
+
+  // Set when xterm opens an OSC 8 hyperlink, so the tap that did it can tell.
+  let linkOpened = false;
+  const term = new Terminal({
+    fontSize: 12,
+    // Match the desktop's effective font stack exactly (no color-emoji font):
+    // adding one pulls dual-presentation symbols like the ⏺ message bullet into
+    // emoji rendering (boxed/tinted) instead of the monospace text glyph. Real
+    // emoji still render via WebKit's automatic system fallback.
+    fontFamily: "ui-monospace, 'SF Mono', Menlo, Monaco, 'Courier New', monospace",
+    cursorBlink: true,
+    scrollback: 10000,
+    allowProposedApi: true,
+    theme,
+    // OSC 8 hyperlinks, whose text isn't the URL. xterm's default confirm() +
+    // window.open does nothing in a WKWebView.
+    linkHandler: { activate: (e, uri) => { linkOpened = true; post('openURL', uri); } },
+  });
+  const fit = new FitAddon.FitAddon();
+  term.loadAddon(fit);
+
+  // Unicode 11 width tables — same as the desktop. Without this xterm uses older
+  // (Unicode 6) widths, so emoji and other wide characters get the wrong cell
+  // width and render/align differently than on the Mac.
+  try {
+    term.loadAddon(new Unicode11Addon.Unicode11Addon());
+    term.unicode.activeVersion = '11';
+  } catch (e) {}
+
+  term.open(document.getElementById('term'));
+
+  // GPU-accelerated renderer — same as the desktop. This is the big performance
+  // win over xterm's default DOM renderer (far less layout/paint on each write).
+  // If the WebGL context is lost or unavailable, dispose and fall back silently
+  // to the DOM renderer so the terminal keeps working.
+  let webgl = null, webglAvailable = true;
+  function repaint() {
+    try { term.refresh(0, term.rows - 1); } catch (e) {}
+  }
+  function loadWebgl() {
+    if (!webglAvailable) return;
+    try {
+      const addon = new WebglAddon.WebglAddon();
+      addon.onContextLoss(() => {
+        addon.dispose();
+        if (webgl === addon) webgl = null;
+        repaint();
+      });
+      term.loadAddon(addon);
+      webgl = addon;
+    } catch (e) {
+      webgl = null;
+      webglAvailable = false;
+    }
+  }
+  loadWebgl();
+
+  // Backgrounding the app (locking the phone) lets WebKit reclaim the web view's
+  // GPU resources, including the WebGL glyph atlas texture — without the context
+  // itself being reported lost. The renderer then keeps drawing from a dead
+  // atlas: cell backgrounds still paint but every cached glyph comes out blank,
+  // so the screen reads as empty rows with grey blocks. Rebuild the atlas (or the
+  // whole renderer, if the context did go away) and repaint every row. Swift
+  // calls this when the app is back on screen; visibilitychange covers the
+  // transitions WebKit reports to the page itself.
+  window.lpmRevive = () => {
+    if (webgl) {
+      try {
+        webgl.clearTextureAtlas();
+      } catch (e) {
+        try { webgl.dispose(); } catch (e2) {}
+        webgl = null;
+      }
+    }
+    if (!webgl) loadWebgl();
+    repaint();
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') window.lpmRevive();
+  });
+
+  // Keystrokes → Swift → server. xterm hands us a UTF-8 string already.
+  //
+  // Drop mouse-tracking reports. Apps like Claude Code enable report-all-motion
+  // mouse mode; on a touchscreen every drag then makes xterm emit a mouse report,
+  // and because a touch doesn't map to a real cell the coords come out NaN
+  // (ESC[<NaN;NaN;NaNM…) — that's the garbage that floods the session. We never
+  // want a phone touch forwarded as a mouse event anyway; touch just scrolls.
+  const isMouseReport = d => d.startsWith('\x1b[<') || d.startsWith('\x1b[M');
+  term.onData(d => { if (!isMouseReport(d)) post('input', d); });
+
+  // Touch scrolling. An app that owns the mouse (Claude Code) makes xterm route
+  // drags to mouse reporting instead of scrolling its viewport, so a one-finger
+  // drag would do nothing. Handle it ourselves and pick the target the way a real
+  // terminal does:
+  //   - app has mouse tracking on (Claude Code, and any full-screen TUI) → forward
+  //     wheel reports so the app's OWN pager scrolls;
+  //   - otherwise (plain shell) → scroll xterm's local 10k-line scrollback.
+  // Claude renders its pager on the NORMAL buffer, so keying off mouse mode (not
+  // the buffer type) is what makes its scroll work. preventDefault also suppresses
+  // iOS's synthetic mouse events (the other source of NaN mouse-report garbage).
+  (function enableTouchScroll() {
+    const el = term.element;
+    const TAP_SLOP = 8; // px of movement under which a touch is a tap, not a scroll
+    let lastY = null, startY = 0, rect = null, accum = 0, scrolling = false;
+    // The WebGL renderer draws rows on a canvas, so a row's height is the screen's
+    // over the row count.
+    const rowHeight = () => {
+      const screen = el.querySelector('.xterm-screen');
+      return (screen && screen.getBoundingClientRect().height / term.rows) || Math.ceil(term.options.fontSize * 1.2);
+    };
+    // xterm opens OSC 8 hyperlinks on its own click, so a tap is replayed as one:
+    // iOS's compatibility mouse events can stop at the hover the link reacts to.
+    const clickAt = (x, y) => {
+      const screen = el.querySelector('.xterm-screen');
+      const init = { clientX: x, clientY: y, bubbles: true, cancelable: true, view: window, button: 0 };
+      screen.dispatchEvent(new MouseEvent('mousemove', init));
+      screen.dispatchEvent(new MouseEvent('mousedown', { ...init, buttons: 1 }));
+      screen.dispatchEvent(new MouseEvent('mouseup', init));
+    };
+    const mouseOn = () => {
+      const m = term.modes && term.modes.mouseTrackingMode;
+      return !!m && m !== 'none';
+    };
+    // Encode an SGR wheel report at the touch point so the app scrolls the region
+    // under the finger. Button 64 = wheel up (drag down → older), 65 = wheel down.
+    const wheel = (up, x, y) => {
+      const col = Math.max(1, Math.min(term.cols, Math.round(((x - rect.left) / rect.width) * term.cols)));
+      const row = Math.max(1, Math.min(term.rows, Math.round(((y - rect.top) / rect.height) * term.rows)));
+      return '\x1b[<' + (up ? 64 : 65) + ';' + col + ';' + row + 'M';
+    };
+    // Scroll by `dy` px of finger travel. Returns false once local scrollback
+    // hits its end, so a fling stops there.
+    const scrollBy = (dy, x, y) => {
+      accum += dy;
+      const rh = rowHeight();
+      const lines = (accum / rh) | 0;
+      if (lines === 0) return true;
+      accum -= lines * rh;
+      if (mouseOn() || term.buffer.active.type === 'alternate') {
+        const seq = wheel(lines > 0, x, y);
+        for (let i = 0; i < Math.abs(lines); i++) post('input', seq);
+        return true;
+      }
+      const before = term.buffer.active.viewportY;
+      term.scrollLines(-lines);
+      return term.buffer.active.viewportY !== before;
+    };
+    // A flick keeps scrolling after the finger lifts, slowing down as iOS does.
+    let samples = [], fling = 0, stoppedFling = false;
+    const flingFrom = (v, x, y) => {
+      let prev = performance.now();
+      const step = now => {
+        const dt = now - prev;
+        prev = now;
+        v *= Math.pow(0.95, dt / 16.7);
+        if (Math.abs(v) < 0.05 || !scrollBy(v * dt, x, y)) { fling = 0; return; }
+        fling = requestAnimationFrame(step);
+      };
+      fling = requestAnimationFrame(step);
+    };
+    el.addEventListener('touchstart', e => {
+      stoppedFling = fling !== 0;
+      if (fling) { cancelAnimationFrame(fling); fling = 0; }
+      if (e.touches.length === 1) {
+        lastY = startY = e.touches[0].clientY;
+        rect = el.getBoundingClientRect();
+        accum = 0;
+        scrolling = false;
+        samples = [];
+      }
+    }, { passive: true });
+    el.addEventListener('touchmove', e => {
+      if (lastY === null || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      // Until the finger clearly moves, treat it as a (possible) tap: don't
+      // preventDefault, so the tap still reaches xterm to focus its input and
+      // raise the keyboard. Only take over the gesture once it's a real scroll.
+      if (!scrolling && Math.abs(t.clientY - startY) < TAP_SLOP) return;
+      scrolling = true;
+      const now = performance.now();
+      samples.push({ t: now, y: t.clientY });
+      while (samples.length > 1 && now - samples[0].t > 80) samples.shift();
+      scrollBy(t.clientY - lastY, t.clientX, t.clientY);
+      lastY = t.clientY;
+      e.preventDefault();
+    }, { passive: false });
+    const end = e => {
+      if (lastY !== null && scrolling && samples.length > 1) {
+        const first = samples[0], last = samples[samples.length - 1];
+        const t = e.changedTouches[0];
+        const v = (last.y - first.y) / Math.max(1, last.t - first.t);
+        if (Math.abs(v) > 0.3 && performance.now() - last.t < 60 && t) flingFrom(v, t.clientX, t.clientY);
+      }
+      // A tap that only stopped a fling does nothing else, as on iOS.
+      if (stoppedFling && !scrolling) { lastY = null; e.preventDefault(); return; }
+      // A touch that never became a scroll is a tap: on a URL it opens in the
+      // browser and on a file path it opens the preview (preventDefault keeps iOS
+      // from also focusing and raising the keyboard); anywhere else it focuses the
+      // terminal so iOS opens the keyboard (xterm focuses its hidden input on
+      // focus()).
+      if (lastY !== null && !scrolling) {
+        const t = e.changedTouches[0];
+        const url = t ? LpmPathTap.urlAtPoint(term, t.clientX, t.clientY) : null;
+        const hits = t && !url ? LpmPathTap.pathsAtPoint(term, t.clientX, t.clientY) : [];
+        if (url) {
+          e.preventDefault();
+          LpmPathTap.flash(term, url);
+          post('openURL', url.url);
+        } else if (hits.length) {
+          e.preventDefault();
+          LpmPathTap.flash(term, hits[0]);
+          post('openPath', { paths: hits.map(h => h.path), line: hits[0].line });
+        } else if (t) {
+          const hadFocus = document.activeElement === term.textarea;
+          linkOpened = false;
+          clickAt(t.clientX, t.clientY);
+          if (!linkOpened) term.focus();
+          else {
+            e.preventDefault();
+            if (!hadFocus) term.blur();
+          }
+        } else {
+          term.focus();
+        }
+      }
+      lastY = null;
+    };
+    el.addEventListener('touchend', end, { passive: false });
+    el.addEventListener('touchcancel', () => { lastY = null; }, { passive: true });
+  })();
+
+  // Report geometry after a fit so the PTY reflows to the phone's real size.
+  let lastCols = 0, lastRows = 0;
+  function refit() {
+    try { fit.fit(); } catch (e) {}
+    const c = term.cols, r = term.rows;
+    if (c !== lastCols || r !== lastRows) {
+      lastCols = c; lastRows = r;
+      post('resize', { cols: c, rows: r });
+    }
+  }
+
+  // Swift → JS bridge. Output is base64(UTF-8) to survive the evaluateJavaScript
+  // string boundary without escaping headaches.
+  function b64ToBytes(b64) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  }
+  function b64ToStr(b64) {
+    return new TextDecoder('utf-8').decode(b64ToBytes(b64));
+  }
+  // Time of the last server write, so submit can wait for the terminal to settle
+  // after a paste before sending the submitting CR (see lpmSubmit).
+  //
+  // Output goes to term.write as a Uint8Array: xterm's WriteBuffer decodes UTF-8
+  // internally (same decoder path), so wide chars / emoji render identically while
+  // skipping a full TextDecoder pass + intermediate JS string on every chunk.
+  let lastOutputAt = 0;
+  window.lpmFeed = b64 => { lastOutputAt = performance.now(); term.write(b64ToBytes(b64)); };
+  window.lpmSeed = b64 => { lastOutputAt = performance.now(); term.reset(); term.write(b64ToBytes(b64)); refit(); };
+  window.lpmSetInsets = (top, bottom) => {
+    document.documentElement.style.setProperty('--top-inset', top + 'px');
+    document.documentElement.style.setProperty('--bottom-inset', bottom + 'px');
+  };
+
+  // Where the text ends, for the keyboard slide: the bottom of the cursor's row
+  // from the top of the page, and whether regaining rows would pull scrollback
+  // down so the text still ends at the bottom. Swift keeps the terminal pinned
+  // to its top while the text ends above the keyboard.
+  let extent = '', extentQueued = false;
+  const reportExtent = () => {
+    extentQueued = false;
+    const screen = term.element.querySelector('.xterm-screen');
+    if (!screen) return;
+    const b = term.buffer.active, box = screen.getBoundingClientRect();
+    const row = b.cursorY + b.baseY - b.viewportY;
+    const bottom = Math.round(box.top + (row + 1) * box.height / term.rows);
+    const fills = b.baseY > 0 && b.cursorY === term.rows - 1;
+    const next = bottom + ',' + fills;
+    if (next !== extent) { extent = next; post('extent', { bottom, fills }); }
+  };
+  const queueExtent = () => {
+    if (!extentQueued) { extentQueued = true; requestAnimationFrame(reportExtent); }
+  };
+  term.onCursorMove(queueExtent);
+  term.onScroll(queueExtent);
+  term.onResize(queueExtent);
+
+  // Font size / theme, pushed from Swift (Settings → Terminal). Changing the font
+  // reflows the grid, so refit afterwards to re-report geometry. Theme keeps the
+  // shared ANSI palette (above) and only swaps the four dynamic colors; the page
+  // ground is set too so the padding around xterm matches the terminal background.
+  window.lpmSetFontSize = px => {
+    if (px > 0 && term.options.fontSize !== px) { term.options.fontSize = px; refit(); }
+  };
+  window.lpmSetTheme = (bg, fg, cursor, selection) => {
+    term.options.theme = Object.assign({}, theme, {
+      background: bg, foreground: fg, cursor, cursorAccent: bg, selectionBackground: selection,
+    });
+    document.documentElement.style.background = bg;
+    document.body.style.background = bg;
+  };
+
+  // Return the last `n` lines of the terminal buffer (viewport + scrollback) as
+  // plain text, for the composer's "@ terminal output" mention. Trailing blank
+  // lines are trimmed so a mostly-empty screen doesn't inject a wall of newlines.
+  window.lpmCapture = n => {
+    const buf = term.buffer.active;
+    const count = Math.min(n, buf.length);
+    const start = buf.length - count;
+    const lines = [];
+    for (let i = start; i < buf.length; i++) {
+      const line = buf.getLine(i);
+      lines.push(line ? line.translateToString(true) : '');
+    }
+    while (lines.length && lines[lines.length - 1].trim() === '') lines.pop();
+    return lines.join('\n');
+  };
+
+  // Submit a composed message the way the desktop composer does (InteractivePane
+  // submitInput): wrap the body in bracketed-paste markers when the running program
+  // enabled them — so newlines are pasted content, not executed — and neutralize ESC
+  // so the body can't break out of the paste.
+  //
+  // The submitting CR is then sent SEPARATELY, gated on the terminal settling: a CR
+  // glued onto the paste-end marker arrives while Claude Code is still doing its async
+  // "[Pasted text]" redraw and gets swallowed, so the first send would only paste and
+  // never submit. Wait for output to go quiet (capped by a ceiling) before the CR.
+  // A send made during that wait queues behind it instead of being dropped — the
+  // composer has already cleared it.
+  const PASTE_QUIET_MS = 100, PASTE_CEILING_MS = 1500, QUIET_POLL_MS = 20;
+  const deliver = async b64 => {
+    const body = b64ToStr(b64).replace(/\r?\n/g, '\r');
+    if (!term.modes.bracketedPasteMode) { post('input', body + '\r'); return; }
+    post('input', '\x1b[200~' + body.replace(/\x1b/g, '␛') + '\x1b[201~');
+    const sentAt = performance.now();
+    await new Promise(resolve => {
+      const check = () => {
+        const now = performance.now();
+        const settled = lastOutputAt >= sentAt && now - lastOutputAt >= PASTE_QUIET_MS;
+        if (settled || now - sentAt >= PASTE_CEILING_MS) resolve();
+        else setTimeout(check, QUIET_POLL_MS);
+      };
+      setTimeout(check, QUIET_POLL_MS);
+    });
+    post('input', '\r');
+  };
+  let delivering = Promise.resolve();
+  // A send jumps to the live end: left scrolled back, the reply lands out of
+  // sight and the viewport, pinned to the oldest retained line once scrollback
+  // trims, reads as a frozen terminal.
+  window.lpmSubmit = b64 => {
+    term.scrollToBottom();
+    delivering = delivering.then(() => deliver(b64), () => deliver(b64));
+  };
+
+  new ResizeObserver(() => refit()).observe(document.getElementById('term'));
+  // Don't auto-focus on load — that would pop the keyboard open every time the
+  // terminal opens. The user taps the terminal to focus and type.
+  window.addEventListener('load', () => { refit(); post('ready', {}); });
+</script>
+</body>
+</html>

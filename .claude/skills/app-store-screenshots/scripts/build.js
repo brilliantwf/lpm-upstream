@@ -52,16 +52,16 @@ function applyPatches(sources) {
 function build({ log = console.log } = {}) {
   fs.rmSync(SRC, { recursive: true, force: true });
   fs.mkdirSync(SRC, { recursive: true });
-  execFileSync("rsync", ["-a", "--exclude", "build", "--exclude", ".build", "--exclude", "xcuserdata",
+  execFileSync("rsync", ["-a", "--exclude", "/android", "--exclude", "build", "--exclude", ".build", "--exclude", "xcuserdata",
     path.join(REPO, "mobile") + "/", path.join(SRC, "mobile") + "/"]);
   fs.symlinkSync(path.join(REPO, "tailnet"), path.join(SRC, "tailnet"));
 
-  const sources = path.join(SRC, "mobile/Sources/LpmMobile");
+  const sources = path.join(SRC, "mobile/ios/Sources/LpmMobile");
   applyPatches(sources);
   for (const f of fs.readdirSync(path.join(__dirname, "swift"))) {
     fs.copyFileSync(path.join(__dirname, "swift", f), path.join(sources, f));
   }
-  execFileSync("xcodegen", ["generate", "--quiet"], { cwd: path.join(SRC, "mobile"), stdio: "inherit" });
+  execFileSync("xcodegen", ["generate", "--quiet"], { cwd: path.join(SRC, "mobile/ios"), stdio: "inherit" });
 
   log("building lpm Link for the simulator (about a minute and a half)");
   const logFile = path.join(CACHE, "build.log");
@@ -69,7 +69,7 @@ function build({ log = console.log } = {}) {
     const out = execFileSync("xcodebuild", ["-project", "LpmMobile.xcodeproj", "-scheme", "LpmMobile",
       "-configuration", "Release", "-sdk", "iphonesimulator", "-destination", "generic/platform=iOS Simulator",
       "-derivedDataPath", path.join(CACHE, "dd"), "CODE_SIGNING_ALLOWED=NO", "build"],
-      { cwd: path.join(SRC, "mobile"), maxBuffer: 1 << 28 });
+      { cwd: path.join(SRC, "mobile/ios"), maxBuffer: 1 << 28 });
     fs.writeFileSync(logFile, out);
   } catch (e) {
     fs.writeFileSync(logFile, String(e.stdout || "") + String(e.stderr || ""));

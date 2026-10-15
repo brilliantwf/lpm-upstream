@@ -6,11 +6,18 @@ lpm starts, stops, duplicates, and switches between local dev projects, with a b
 
 - `desktop/frontend/` — Tauri 2 desktop app: React/TypeScript UI in `src/`, Rust backend in `src-tauri/`
 - `cli/` — Rust CLI (`lpm`)
-- `mobile/` — iOS companion app (SwiftUI); `.xcodeproj` is generated — run `xcodegen generate` after adding files
+- `mobile/` — lpm Link, the phone companion apps:
+  - `PROTOCOL.md` — the wire contract both apps implement
+  - `shared/web/` — xterm.js terminal and markdown pages, bundled into both apps' WebViews
+  - `ios/` — iOS app (SwiftUI); `.xcodeproj` is generated — run `xcodegen generate` in `mobile/ios` after adding files
+  - `android/` — Android app (Kotlin, Jetpack Compose, Gradle); build with `./gradlew assembleDebug` in `mobile/android`.
+    It's a port of the iOS app: follow `mobile/android/PORTING.md`
+  - `parity/` — the same Maestro flows on both apps in an iPhone simulator and an
+    Android emulator, with a side-by-side report (`node mobile/parity/parity.js all --open`)
 - `website/` — Next.js marketing site (lpm.cx)
 - `tailnet/` — built-in Tailscale (Go, tsnet): `cmd/lpm-tailnet` is the desktop
   sidecar (`scripts/build-tailnet.mjs`), `ios/` the static library lpm Link links
-  (`mobile/build-tailnet.sh`). Needs Go (`brew install go`)
+  (`mobile/ios/build-tailnet.sh`). Needs Go (`brew install go`)
 
 
 ## Conventions
@@ -44,8 +51,10 @@ lpm starts, stops, duplicates, and switches between local dev projects, with a b
   automations, Git, notes, memory, project config), update the mobile app in the
   same change so it looks and behaves the same — same fields, defaults, placement
   and colors. Data the phone needs goes through `remote.rs`, `mobile/PROTOCOL.md`
-  and Demo Mode's seed (`mobile/Sources/LpmMobile/Demo*.swift`), and a phone edit
-  writes the config exactly as a desktop edit would
+  and Demo Mode's seed (`mobile/ios/Sources/LpmMobile/Demo*.swift`), and a phone edit
+  writes the config exactly as a desktop edit would. Once the Android app
+  implements a feature, change it on both phones in the same change, and keep
+  its parity flow in `mobile/parity/flows` passing on both
 - Never commit or push any changes
 
 ## Analytics

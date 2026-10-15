@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { IBuffer } from "@xterm/xterm";
-import phoneTapSource from "../../../../../mobile/web/pathtap.js?raw";
+import phoneTapSource from "../../../../../mobile/shared/web/pathtap.js?raw";
 
 import { readLineWindow } from "./lineWindow";
 import { findPathMatches, resolvePrinted, scanLine } from "./pathLinkProvider";

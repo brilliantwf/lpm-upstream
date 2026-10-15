@@ -1,0 +1,13 @@
+appId: cx.lpm.mobile
+name: 09-stats
+tags: [demo, stats]
+---
+- runFlow: subflows/enter-demo.yaml
+- runFlow: subflows/open-more-menu.yaml
+- tapOn: "Stats.*"
+- waitForAnimationToEnd:
+    timeout: 3000
+- assertVisible: "Today"
+- assertVisible: "7 days"
+- assertVisible: "30 days"
+- takeScreenshot: 1-stats

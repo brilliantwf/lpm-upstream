@@ -1,0 +1,11 @@
+# Fresh launch → pairing screen → Demo Mode (the in-app sample Mac).
+appId: cx.lpm.mobile
+---
+- launchApp:
+    clearState: true
+- scrollUntilVisible:
+    element: "No Mac nearby? Try the demo"
+- tapOn: "No Mac nearby? Try the demo"
+- extendedWaitUntil:
+    visible: "storefront"
+    timeout: 15000
