@@ -27,6 +27,7 @@ import { FileViewerHost } from "./components/FileViewerHost";
 import { TerminalDropOverlayHost } from "./components/terminal/TerminalDropOverlayHost";
 import { Toaster } from "sonner";
 import { TOASTER_OFFSET } from "./toasterOffset";
+import { DictationOverlay } from "./components/dictation/DictationOverlay";
 import { MainTopBar } from "./components/MainTopBar";
 import { ProjectSwitcher } from "./components/ProjectSwitcher";
 import { useIsFullscreen } from "./hooks/useIsFullscreen";
@@ -261,6 +262,7 @@ export default function App() {
         toastOptions={{ duration: 5000 }}
       />
       <ClaudeAccountPoolDialog />
+      <DictationOverlay />
       <ClaudePoolConsentDialog />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar

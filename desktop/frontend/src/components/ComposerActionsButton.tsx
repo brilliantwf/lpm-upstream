@@ -60,7 +60,7 @@ export function ComposerActionsButton({
   // CUSTOM_KEY for the free-form field). Defaults to 1 when absent.
   const [counts, setCounts] = useState<Record<string, number>>({});
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { toggle: toggleDictation, installOpen, setInstallOpen } = useVoiceDictation();
+  const { toggle: toggleDictation, active: dictating, installOpen, setInstallOpen } = useVoiceDictation();
   // Portaled and fixed-positioned: the composer's rounded footer and any
   // scrolling host (e.g. a modal body) would otherwise clip the panel. It opens
   // above the trigger where there's room and flips below when there isn't.
@@ -261,9 +261,14 @@ export function ComposerActionsButton({
                     type="button"
                     onMouseDown={keepEditorFocus}
                     onClick={() => void toggleDictation()}
-                    title="Dictate"
-                    aria-label="Dictate"
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                    title={dictating ? "Stop dictation" : "Dictate"}
+                    aria-label={dictating ? "Stop dictation" : "Dictate"}
+                    aria-pressed={dictating}
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                      dictating
+                        ? "bg-[var(--accent-red)]/12 text-[var(--accent-red)]"
+                        : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                    }`}
                   >
                     <MicIcon size={14} />
                   </button>

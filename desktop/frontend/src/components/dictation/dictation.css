@@ -1,0 +1,78 @@
+/* The recorder's palette: the app's own colors when it floats over a page,
+   the composer's when it sits inside one. */
+.dictation-tone-app {
+  --dictation-ink: var(--text-primary);
+  --dictation-muted: var(--text-muted);
+  --dictation-hover: var(--bg-hover);
+  --dictation-track: var(--border);
+}
+
+.dictation-tone-composer {
+  --dictation-ink: var(--composer-fg);
+  --dictation-muted: var(--composer-fg-muted);
+  --dictation-hover: var(--composer-hover-bg);
+  --dictation-track: var(--composer-border);
+}
+
+.dictation-capsule {
+  animation: dictation-in 180ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  transform-origin: 50% 100%;
+}
+
+@keyframes dictation-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.94);
+  }
+}
+
+/* The record head: red while sound goes in, a quiet dot once it's done. */
+.dictation-head {
+  background: var(--accent-red);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-red) 45%, transparent);
+  animation: dictation-head 1.6s ease-out infinite;
+  transition: transform 60ms linear;
+}
+
+.dictation-head[data-frozen] {
+  background: var(--dictation-muted);
+  animation: none;
+}
+
+@keyframes dictation-head {
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent-red) 0%, transparent);
+  }
+}
+
+/* Live words scroll in from the right; the oldest fade out at the left. */
+.dictation-live {
+  mask-image: linear-gradient(to right, transparent, #000 18%);
+}
+
+.dictation-progress {
+  transition: width 200ms ease-out;
+}
+
+.dictation-progress[data-indeterminate] {
+  width: 35%;
+  animation: dictation-progress 1.3s ease-in-out infinite;
+}
+
+@keyframes dictation-progress {
+  from {
+    margin-left: -35%;
+  }
+  to {
+    margin-left: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dictation-capsule,
+  .dictation-head,
+  .dictation-progress[data-indeterminate] {
+    animation: none;
+  }
+}

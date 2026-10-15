@@ -1931,6 +1931,9 @@ fn is_denied(cmd: &str) -> bool {
             | "resume_tts"
             | "play_sound_preview"
             | "voice_to_text_toggle"
+            | "voice_to_text_start"
+            | "voice_to_text_stop"
+            | "voice_to_text_cancel"
             // launch an app on this machine's screen; the Mac asking opens its own
             | "open_in"
             | "open_file_in_editor"
