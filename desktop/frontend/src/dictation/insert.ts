@@ -35,6 +35,24 @@ export function captureDictationTarget(
   return { element: el, caret: range && el.contains(range.startContainer) ? range.cloneRange() : null };
 }
 
+// Readies the field a mic belongs to: focused, with the caret where typing
+// would land — kept when the field already had focus, at the end when the
+// mic was pressed from somewhere else (the terminal, another input).
+export function focusDictationField(el: HTMLElement): void {
+  if (document.activeElement === el) return;
+  el.focus();
+  if (isTextField(el)) {
+    el.setSelectionRange(el.value.length, el.value.length);
+  } else if (el.isContentEditable) {
+    const sel = window.getSelection();
+    const end = document.createRange();
+    end.selectNodeContents(el);
+    end.collapse(false);
+    sel?.removeAllRanges();
+    sel?.addRange(end);
+  }
+}
+
 const OPENS = /[\s([{"'“‘]$/;
 const CLOSES = /^[\s,.;:!?)\]}"'”’]/;
 

@@ -32,6 +32,8 @@ export interface ComposerForkProps {
 interface ComposerToolbarProps {
   // The composer box, which the history popovers span whatever they hang from.
   boxRef: RefObject<HTMLDivElement | null>;
+  // The composer's editor: where its mic dictates, whatever has focus.
+  editorRef: RefObject<HTMLElement | null>;
   history: ComposerHistorySource;
   onNewInput: () => void;
   // Null when the tool has nothing to offer this terminal: it then shows in
@@ -46,10 +48,13 @@ interface ComposerToolbarProps {
 // The button row under the terminal input. Every tool but Send lives either
 // here, as a button, or in the More menu at the row's end, and the user moves
 // it between the two from either place.
-export function ComposerToolbar({ boxRef, history, onNewInput, actions, memory, model, fork, send }: ComposerToolbarProps) {
+export function ComposerToolbar({ boxRef, editorRef, history, onNewInput, actions, memory, model, fork, send }: ComposerToolbarProps) {
   // Dictating into this composer: the recorder takes over the row — the
-  // strip where the tools were, the mic as the one button beside them.
-  const dictating = useDictationHost(boxRef) !== null;
+  // strip where the tools were, the mic as the one button beside them. A
+  // failed take's notice keeps the strip but gives Send back.
+  const dictationPhase = useDictationHost(boxRef);
+  const dictating = dictationPhase !== null;
+  const recording = dictating && dictationPhase !== "error";
   const layout = useComposerToolbar({
     mic: DICTATION_AVAILABLE,
     actions: actions !== null,
@@ -64,9 +69,10 @@ export function ComposerToolbar({ boxRef, history, onNewInput, actions, memory, 
       case "mic":
         return (
           <ComposerMicButton
+            into={editorRef}
             variant={variant}
             onPick={host?.close}
-            prominent={variant === "button" && (send.disabled || dictating)}
+            prominent={variant === "button" && (send.disabled || recording)}
           />
         );
       case "actions":
@@ -177,8 +183,8 @@ export function ComposerToolbar({ boxRef, history, onNewInput, actions, memory, 
       )}
       <div className="flex shrink-0 items-center gap-1.5">
         {layout.toolbar.includes("model") && slot("model")}
-        {micBesideSend ? slot("mic") : dictating && <ComposerMicButton prominent />}
-        {!(micBesideSend && send.disabled) && !dictating && <SendSplitButton {...send} />}
+        {micBesideSend ? slot("mic") : recording && <ComposerMicButton into={editorRef} prominent />}
+        {!(micBesideSend && send.disabled) && !recording && <SendSplitButton {...send} />}
       </div>
     </div>
   );

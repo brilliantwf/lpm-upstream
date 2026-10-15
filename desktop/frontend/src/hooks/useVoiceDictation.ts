@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { VoiceToTextAvailable } from "../../bridge/commands";
 import { isMac } from "../platform";
-import { captureDictationTarget } from "../dictation/insert";
+import { captureDictationTarget, focusDictationField } from "../dictation/insert";
 import { ACTIVE_PHASES, useDictationStore } from "../store/dictation";
 
 // VoiceToText is a macOS app; elsewhere the composer offers no dictation.
@@ -17,12 +17,15 @@ export function useVoiceDictation() {
   const phase = useDictationStore((s) => s.phase);
   const active = ACTIVE_PHASES.has(phase);
 
-  const toggle = useCallback(async () => {
+  // `into` is the field the mic belongs to, and so where the words go;
+  // without it, whichever field has focus.
+  const toggle = useCallback(async (into?: HTMLElement | null) => {
     const { phase, start, stop, cancel } = useDictationStore.getState();
     if (phase === "recording") return stop();
     if (phase === "transcribing") return;
     if (ACTIVE_PHASES.has(phase)) return cancel();
-    const target = captureDictationTarget();
+    if (into) focusDictationField(into);
+    const target = captureDictationTarget(into ?? document.activeElement);
     try {
       if (!(await VoiceToTextAvailable())) {
         setInstallOpen(true);
