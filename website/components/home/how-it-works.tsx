@@ -1,3 +1,4 @@
+import { HowItWorksSteps } from "@/components/home/how-it-works-steps";
 import { LessonPlayer } from "@/components/home/lesson-player";
 import { SectionHeader } from "@/components/section-header";
 import { YOUTUBE_PLAYLIST_URL } from "@/lib/youtube-lessons";
@@ -8,10 +9,20 @@ export function HowItWorks() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <SectionHeader
           eyebrow="How it works"
-          title="Add a folder. Start everything. Run agents in parallel."
-          description="Six video lessons, recorded in the real app. Pick one to play it."
-          className="mb-10"
+          title="Up and running in three steps"
+          className="mb-8 sm:mb-10"
         />
+
+        <HowItWorksSteps />
+
+        <div className="mt-14 mb-6 text-center sm:mt-16 sm:mb-8">
+          <h3 className="text-balance text-lg font-semibold tracking-tight text-gray-900 sm:text-xl dark:text-gray-100">
+            Watch it in the real app
+          </h3>
+          <p className="mt-1.5 text-pretty text-sm text-gray-500 dark:text-gray-400">
+            Six short video lessons. Pick one to play it.
+          </p>
+        </div>
 
         <LessonPlayer />
 

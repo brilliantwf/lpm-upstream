@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
 import { AppStoreButton } from "@/components/app-store-button";
 import { DevicesCapabilities } from "@/components/home/devices-capabilities";
@@ -11,6 +12,7 @@ import { MotionToggle } from "@/components/home/paired-devices-pause";
 import { PhoneReplica } from "@/components/home/paired-devices-phone";
 import { DeviceStatus } from "@/components/home/paired-devices-status";
 import { SectionHeader } from "@/components/section-header";
+import { MOBILE_PATH } from "@/lib/links";
 
 type Props = {
   // false on the iPhone page itself, which keeps only the mirror, drops
@@ -122,9 +124,15 @@ export function PairedDevices({ companionLink = true, flush = false }: Props) {
           <>
             <div className="mt-12 flex flex-col items-center gap-3 text-center sm:mt-14">
               <AppStoreButton source="home-devices" />
-              <p className="text-[13px] text-gray-500 dark:text-gray-400">
+              <p className="text-pretty text-[13px] text-gray-500 dark:text-gray-400">
                 lpm link for iPhone and iPad. Scan one QR code to pair it with
-                your computer.
+                your computer.{" "}
+                <Link
+                  href={MOBILE_PATH}
+                  className="font-medium text-gray-700 underline decoration-gray-300 underline-offset-4 transition-colors hover:text-gray-900 hover:decoration-current dark:text-gray-300 dark:decoration-gray-600 dark:hover:text-white"
+                >
+                  See the iPhone app
+                </Link>
               </p>
             </div>
             <div className="mt-10 border-t border-gray-200 pt-10 sm:mt-14 sm:pt-12 dark:border-gray-800/60">

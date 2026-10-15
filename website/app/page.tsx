@@ -40,9 +40,9 @@ export default function HomePage() {
       <CtaBand />
       <HowItWorks />
       <PairedDevices />
-      <Contributors />
       <Features />
       <HomeFaq />
+      <Contributors />
       <Downloads>
         <DownloadSafety />
       </Downloads>

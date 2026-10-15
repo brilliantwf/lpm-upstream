@@ -15,7 +15,7 @@ import { NavLink } from "./nav-link";
 const PANEL_ID = "nav-mobile-panel";
 const MENU_LINKS = [
   { href: FEATURES_PATH, label: "Features" },
-  { href: AI_AGENTS_PATH, label: "For AI agents" },
+  { href: AI_AGENTS_PATH, label: "AI agents" },
   { href: AUTOMATIONS_PATH, label: "Automations" },
   { href: MOBILE_PATH, label: "iPhone app" },
   { href: VS_BASE_PATH, label: "Compare" },

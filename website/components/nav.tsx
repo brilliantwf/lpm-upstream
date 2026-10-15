@@ -50,7 +50,7 @@ export function Nav() {
             href={AI_AGENTS_PATH}
             className={`hidden md:inline-flex whitespace-nowrap ${linkClass}`}
           >
-            For AI agents
+            AI agents
           </NavLink>
           <NavLink href={VS_BASE_PATH} className={`hidden md:inline-flex ${linkClass}`}>
             Compare
