@@ -16,11 +16,10 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use crate::peertunnel::{push_target_args, ssh_common_args, SshTarget, Tunnel};
+use crate::updatechannel::Channel;
 
-/// Where a host fetches its own copy. The repo is public, so the server pulls the
-/// release directly rather than the Mac shipping 16MB up an SSH channel.
-const RELEASE_URL: &str =
-    "https://github.com/gug007/lpm/releases/latest/download/lpm-host-linux-amd64.tar.gz";
+const RELEASES: &str = "https://github.com/gug007/lpm/releases";
+const HOST_TARBALL: &str = "lpm-host-linux-amd64.tar.gz";
 
 /// Generous, because it covers the whole remote install: curl, tar, an apt run
 /// that fetches a GTK/WebKit runtime on a cold machine, and the installer's own
@@ -202,14 +201,27 @@ fn as_root(command: &str) -> String {
     format!("if [ \"$(id -u)\" = 0 ]; then {command}; else sudo -n -H {command}; fi")
 }
 
+/// Where a host fetches its own copy. The repo is public, so the server pulls the
+/// release directly rather than the Mac shipping 16MB up an SSH channel. An app on
+/// the Beta update channel puts hosts on its own build, which the latest
+/// stable release can be behind; otherwise hosts get that latest stable release.
+fn release_url(channel: Channel, app_version: &str) -> String {
+    if channel == Channel::Beta && app_version != "dev" {
+        format!("{RELEASES}/download/v{app_version}/{HOST_TARBALL}")
+    } else {
+        format!("{RELEASES}/latest/download/{HOST_TARBALL}")
+    }
+}
+
 /// How the host pulls its own copy down. curl first because a server has it, wget
 /// second because a container often has that instead — the images this runs on
 /// are not all cloud VMs, and "curl: not found" from a machine that can perfectly
 /// well download things reads as lpm being broken.
 fn fetch_command() -> String {
+    let url = release_url(Channel::current(), &crate::updates::current_version());
     format!(
-        "if command -v curl >/dev/null 2>&1; then curl -fsSL {RELEASE_URL} -o lpm-host.tar.gz; \
-         elif command -v wget >/dev/null 2>&1; then wget -qO lpm-host.tar.gz {RELEASE_URL}; \
+        "if command -v curl >/dev/null 2>&1; then curl -fsSL {url} -o lpm-host.tar.gz; \
+         elif command -v wget >/dev/null 2>&1; then wget -qO lpm-host.tar.gz {url}; \
          else echo 'that machine has neither curl nor wget, so it cannot download lpm' >&2; exit 1; fi"
     )
 }
@@ -876,6 +888,18 @@ mod tests {
         // And a machine with neither says so itself, rather than failing on a
         // tar of a file that was never written.
         assert!(script.contains("neither curl nor wget"), "{script}");
+    }
+
+    #[test]
+    fn a_beta_app_puts_hosts_on_its_own_build() {
+        assert_eq!(
+            release_url(Channel::Beta, "1.5.0"),
+            "https://github.com/gug007/lpm/releases/download/v1.5.0/lpm-host-linux-amd64.tar.gz"
+        );
+        let latest =
+            "https://github.com/gug007/lpm/releases/latest/download/lpm-host-linux-amd64.tar.gz";
+        assert_eq!(release_url(Channel::Stable, "1.5.0"), latest);
+        assert_eq!(release_url(Channel::Beta, "dev"), latest);
     }
 
     // Armed before anything lands in the directory, so a download or unpack that

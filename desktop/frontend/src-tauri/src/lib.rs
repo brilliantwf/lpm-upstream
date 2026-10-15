@@ -225,6 +225,7 @@ mod telegramlink;
 mod telegramsync;
 mod tts;
 mod uninstall;
+mod updatechannel;
 mod updatejob;
 #[cfg(any(not(target_os = "macos"), test))]
 mod updatenotice;

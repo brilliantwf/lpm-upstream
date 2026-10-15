@@ -21,7 +21,7 @@ import { useClaudePoolStore } from "../store/claudePool";
 import { useTerminalTitles } from "../store/terminalTitles";
 import { useGlobalAgentStatus } from "../store/globalAgentStatus";
 import { EventsOn } from "../../bridge/runtime";
-import { CheckForUpdate, SetClipboardText } from "../../bridge/commands";
+import { SetClipboardText } from "../../bridge/commands";
 import {
   isDuplicate,
   type DuplicateMode,
@@ -127,6 +127,7 @@ import { peerAlias, usePeerState } from "../peer/usePeerState";
 import { useMacUpdateWatch } from "../peer/useMacUpdateWatch";
 import { SidebarSendLaterMark } from "./SidebarSendLaterMark";
 import { openReleasePage, UPDATES_INSTALL_IN_APP } from "../releasePage";
+import { checkForUpdate, noteUpdateCheck, useUpdateCheck } from "../store/updateCheck";
 
 // Half a row: `py-2` (8px twice) around `text-sm`'s 20px line. The elbows meet a
 // row here, and a row showing its agents is taller than the block it sits in, so
@@ -232,7 +233,8 @@ interface PeerRowOptions {
 }
 
 export function Sidebar({ projects, groups, sidebarOrder, selected, collapsed, onCollapsedChange, onSelect, onOpenProjectView, onToggle, onTerminals, onTerminalTab, onFleet, onStats, onUsage, onScheduled, onMobile, onFeedback, onSettings, onAddProject, onBulkDuplicate, onRemoveProject, onRemoveProjectCascade, onRemoveProjectFromDisk, onRemoveProjectsBatch, onRenameProject, onSetWorkStatus, onMoveProjectRoot, onApplySidebarLayout, onReorderDuplicate, onCreateGroup, onRenameGroup, onDeleteGroup, onToggleGroupCollapsed, onMoveProjectToGroup, onMoveProjectsToGroup, onDetachProject, onAttachProject, detached, detachedSelf, showTerminals, showFleet, showStats, showUsage, showMobile, showScheduled, showSettings, duplicatingNames, pendingDuplicates, removingNames }: SidebarProps) {
-  const [updateInfo, setUpdateInfo] = useState<{ currentVersion: string; latestVersion: string } | null>(null);
+  const checkedUpdate = useUpdateCheck((s) => s.info);
+  const updateInfo = checkedUpdate?.updateAvail ? checkedUpdate : null;
   const update = useUpdateInstall();
   const [contextMenu, setContextMenu] = useState<{ name: string; x: number; y: number } | null>(null);
   const [groupMenu, setGroupMenu] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -780,17 +782,15 @@ export function Sidebar({ projects, groups, sidebarOrder, selected, collapsed, o
     : 0;
   const trashDupPlural = trashDupCount === 1 ? "" : "s";
 
-  useEffect(() => EventsOn("update-available", setUpdateInfo), []);
+  useEffect(() => EventsOn("update-available", noteUpdateCheck), []);
   useEffect(() => {
-    CheckForUpdate()
-      .then((info) => { if (info.updateAvail) setUpdateInfo(info); })
-      .catch((err) =>
-        logDiagnostic("warn", "update.check_failed", "Update check failed", err),
-      );
+    checkForUpdate().catch((err) =>
+      logDiagnostic("warn", "update.check_failed", "Update check failed", err),
+    );
   }, []);
   const handleUpdate = () => {
     if (!UPDATES_INSTALL_IN_APP) {
-      openReleasePage();
+      openReleasePage(updateInfo?.latestVersion);
       return;
     }
     update.request();
@@ -1328,6 +1328,7 @@ export function Sidebar({ projects, groups, sidebarOrder, selected, collapsed, o
           status={section.status}
           version={section.version}
           selfUpdate={section.selfUpdate}
+          updateChannel={section.updateChannel}
           hostSettings={section.hostSettings}
           projects={section.projects}
           strays={section.strays}

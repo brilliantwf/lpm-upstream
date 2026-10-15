@@ -47,6 +47,12 @@ describe("macUpdateLine", () => {
     expect(macUpdateLine(undefined, behind, "")).toBeNull();
   });
 
+  it("offers nothing to a Mac on another update channel", () => {
+    expect(macUpdateLine(undefined, { ...behind, updateChannel: "beta" }, "1.43.0")).toBeNull();
+    expect(macUpdateLine(undefined, behind, "1.43.0", "beta")).toBeNull();
+    expect(macUpdateLine(undefined, { ...behind, updateChannel: "beta" }, "1.43.0", "beta")).not.toBeNull();
+  });
+
   it("can be cancelled until the app starts being replaced", () => {
     expect(macUpdateLine(update({ phase: "downloading", progress: 62 }), behind, "1.43.0")).toEqual({
       kind: "busy",

@@ -176,6 +176,14 @@ export const ROWS = {
     description: "Check for new versions",
     keywords: ["upgrade", "update", "new version"],
   },
+  "general.updateChannel": {
+    kind: "row",
+    tab: "general",
+    id: "general.updateChannel",
+    label: "Update channel",
+    description: "Beta gets new versions first. They may be less stable",
+    keywords: ["beta", "stable", "pre-release", "early access", "roll back", "rollback", "downgrade"],
+  },
   "general.agentTools": {
     kind: "row",
     tab: "general",

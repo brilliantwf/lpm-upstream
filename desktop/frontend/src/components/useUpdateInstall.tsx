@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { CancelUpdate, InstallUpdate } from "../../bridge/commands";
+import { CancelUpdate, InstallUpdate, RollbackUpdate } from "../../bridge/commands";
 import { EventsOn } from "../../bridge/runtime";
 import { useAppStore } from "../store/app";
 import { useGlobalAgentStatus } from "../store/globalAgentStatus";
@@ -17,11 +17,14 @@ function isUpdatePhase(value: string): value is UpdatePhase {
 
 const setInstall = (patch: Partial<UpdateInstallState>) => useUpdateInstallState.setState(patch);
 
-async function install() {
+/** An update or a rollback: either resolves only when cancelled, since a
+ *  finished install restarts the app. */
+type Run = () => Promise<unknown>;
+
+async function install(run: Run) {
   setInstall({ active: true, phase: "checking", progress: -1, cancelling: false, error: "" });
   try {
-    // Resolves only when cancelled; a finished install restarts the app.
-    await InstallUpdate();
+    await run();
   } catch (err) {
     setInstall({ error: String(err) });
   } finally {
@@ -37,6 +40,8 @@ async function cancel() {
 
 export interface UpdateInstall extends UpdateInstallState {
   request: () => void;
+  /** Install the newest stable release over a newer Beta build. */
+  rollback: () => void;
   cancel: () => void;
   dismissError: () => void;
   dialogs: ReactNode;
@@ -48,7 +53,7 @@ export interface UpdateInstall extends UpdateInstallState {
  *  other modals. */
 export function useUpdateInstall(): UpdateInstall {
   const state = useUpdateInstallState();
-  const [busy, setBusy] = useState<BusyAgentPlace[] | null>(null);
+  const [busy, setBusy] = useState<{ places: BusyAgentPlace[]; run: Run } | null>(null);
 
   useEffect(() => EventsOn("update-progress", (pct: number) => setInstall({ progress: pct })), []);
   // A paired Mac can start the install too, so its steps alone say one is
@@ -62,29 +67,30 @@ export function useUpdateInstall(): UpdateInstall {
     [],
   );
 
-  const request = () => {
+  const request = (run: Run) => {
     const places = busyAgentPlaces(
       useAppStore.getState().projects,
       useGlobalAgentStatus.getState().entries,
     );
-    if (places.length > 0) setBusy(places);
-    else void install();
+    if (places.length > 0) setBusy({ places, run });
+    else void install(run);
   };
 
   const dialogs: ReactNode = (
     <UpdateBusyAgentsDialog
-      places={busy}
+      places={busy?.places ?? null}
       onCancel={() => setBusy(null)}
       onConfirm={() => {
         setBusy(null);
-        void install();
+        if (busy) void install(busy.run);
       }}
     />
   );
 
   return {
     ...state,
-    request,
+    request: () => request(InstallUpdate),
+    rollback: () => request(RollbackUpdate),
     cancel: () => void cancel(),
     dismissError: () => setInstall({ error: "" }),
     dialogs,

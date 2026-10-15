@@ -104,6 +104,7 @@ struct PeerConn {
     supports_media_range: AtomicBool, // host serves a video's byte ranges for preview
     supports_file_range: AtomicBool, // host serves any file a chunk at a time
     supports_self_update: AtomicBool, // a paired Mac can update lpm there (peermacupdate.rs)
+    beta_updates: AtomicBool, // the host follows the Beta update channel (updatechannel.rs)
     supports_host_settings: AtomicBool, // host shares its own settings (peersettings.rs)
     supports_phone_relay: AtomicBool, // host runs phones this Mac relays to it (peerclient/phone.rs)
     // The phones this Mac is relaying to the host, by channel: where the frames
@@ -166,6 +167,7 @@ impl PeerConn {
             supports_media_range: AtomicBool::new(false),
             supports_file_range: AtomicBool::new(false),
             supports_self_update: AtomicBool::new(false),
+            beta_updates: AtomicBool::new(false),
             supports_host_settings: AtomicBool::new(false),
             supports_phone_relay: AtomicBool::new(false),
             phones: Mutex::new(HashMap::new()),
@@ -415,6 +417,9 @@ impl PeerClientHub {
                 let supports_host_settings = conn
                     .map(|c| c.supports_host_settings.load(Ordering::Relaxed))
                     .unwrap_or(false);
+                let beta_updates = conn
+                    .map(|c| c.beta_updates.load(Ordering::Relaxed))
+                    .unwrap_or(false);
                 let last_error = conn
                     .map(|c| c.last_error.lock().unwrap().clone())
                     .unwrap_or_default();
@@ -446,6 +451,7 @@ impl PeerClientHub {
                     "supportsMediaRange": supports_media_range,
                     "supportsSelfUpdate": supports_self_update,
                     "supportsHostSettings": supports_host_settings,
+                    "updateChannel": if beta_updates { "beta" } else { "stable" },
                     // Whether the peer's identity is pinned (verified-encrypted). An
                     // auto run refuses an unpinned channel, so the UI hints on it.
                     "pinned": p.tls_fp.is_some(),
@@ -2024,6 +2030,11 @@ fn connect_session(
     );
     conn.supports_self_update.store(
         has_feature(crate::peerupdate::SELF_UPDATE_FEATURE),
+        Ordering::Relaxed,
+    );
+    // A host too old to say follows stable releases.
+    conn.beta_updates.store(
+        rv.get("hostUpdateChannel").and_then(Value::as_str) == Some("beta"),
         Ordering::Relaxed,
     );
     conn.supports_host_settings.store(

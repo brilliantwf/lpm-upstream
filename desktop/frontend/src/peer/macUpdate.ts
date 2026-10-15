@@ -1,3 +1,4 @@
+import type { UpdateChannel } from "../store/settings";
 import { isHostBehind } from "./hostVersion";
 
 // Updating lpm on a paired Mac from this one: what the update is doing, and the
@@ -26,6 +27,8 @@ export interface MacUpdatePeer {
   connected?: boolean;
   supportsSelfUpdate?: boolean;
   version?: string;
+  /** Unset on a Mac too old to say, which follows stable releases. */
+  updateChannel?: UpdateChannel;
 }
 
 export interface MacUpdateLine {
@@ -41,13 +44,17 @@ export function updateTarget(appVersion: string, latestVersion: string): string 
   return isHostBehind(appVersion, latestVersion) ? latestVersion : appVersion;
 }
 
+/** `channel` is this Mac's: a Mac updates to its own channel's newest
+ *  release, and `target` names one only when the two channels match. */
 export function macUpdateLine(
   update: MacUpdate | undefined,
   peer: MacUpdatePeer,
   target: string,
+  channel: UpdateChannel = "stable",
 ): MacUpdateLine | null {
   if (update) return progressLine(update, peer.version);
   if (!peer.connected || !peer.supportsSelfUpdate || !peer.version) return null;
+  if ((peer.updateChannel ?? "stable") !== channel) return null;
   if (!isHostBehind(peer.version, target)) return null;
   return {
     kind: "available",

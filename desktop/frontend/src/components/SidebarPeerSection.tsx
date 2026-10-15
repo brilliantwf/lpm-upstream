@@ -19,6 +19,7 @@ import { isMac } from "../platform";
 import { isPeerSectionCollapsed, setPeerSectionCollapsed } from "../peer/peerSectionCollapse";
 import { PeerReconnect, PeerRemotePair, PeerRemove, PeerSetAlias } from "../../bridge/commands";
 import { useAppStore } from "../store/app";
+import type { UpdateChannel } from "../store/settings";
 import type { ProjectInfo } from "../types";
 import { useMacUpdateLine } from "../peer/useMacUpdateLine";
 
@@ -64,6 +65,7 @@ export function SidebarPeerSection({
   status,
   version,
   selfUpdate,
+  updateChannel,
   hostSettings,
   projects,
   strays,
@@ -87,6 +89,7 @@ export function SidebarPeerSection({
   /// The lpm it runs, and whether it can be updated from here.
   version: string;
   selfUpdate: boolean;
+  updateChannel?: UpdateChannel;
   /// Whether its own settings can be changed from here.
   hostSettings: boolean;
   projects: ProjectInfo[];
@@ -156,6 +159,7 @@ export function SidebarPeerSection({
     connected,
     supportsSelfUpdate: selfUpdate,
     version,
+    updateChannel,
   });
 
   const { head, tail, address } = splitAlias(alias);

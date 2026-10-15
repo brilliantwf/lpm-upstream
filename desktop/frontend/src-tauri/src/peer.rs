@@ -1071,6 +1071,7 @@ fn authenticate(ws: &mut ConnWs, hub: &PeerHub, app: &AppHandle) -> Option<Strin
                     json!({ "t": "ready", "hostName": machine_name(),
                         "hostPlatform": platform_id(), "hostHeadless": crate::sys::headless(),
                         "hostVersion": crate::commands_real::get_version(),
+                        "hostUpdateChannel": crate::updatechannel::Channel::current().as_str(),
                         "phoneServerId": crate::remote::phone_server_id(app),
                         "features": host_features() })
                     .to_string(),

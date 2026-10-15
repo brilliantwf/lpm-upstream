@@ -1,11 +1,12 @@
 // Self-updater — port of desktop/updates.go.
 //
-// CheckForUpdate hits the GitHub releases API and stashes the matching
-// macos-<arch>.dmg download URL. InstallUpdate re-runs that check so it always
-// targets the actual latest release (the stashed URL can be up to 24h stale),
-// downloads the DMG (emitting progress), mounts it, swaps the running .app, and
-// relaunches. In dev there is no enclosing .app, so InstallUpdate errors early
-// (before any destructive step).
+// CheckForUpdate asks GitHub for the newest release on this app's update
+// channel (updatechannel.rs) and the newest stable one. InstallUpdate re-runs
+// that check so it always targets the actual latest release, downloads its
+// macos-<arch>.dmg (emitting progress), mounts it, swaps the running .app, and
+// relaunches. RollbackUpdate does the same with the newest stable release, for
+// a Beta build going back. In dev there is no enclosing .app, so both
+// error early (before any destructive step).
 //
 // The download-and-swap flow is .app/DMG-shaped and therefore macOS-only. A
 // Linux or Windows desktop gets a notice instead: the same check picks this
@@ -16,20 +17,23 @@
 // refuse, and no auto-check thread is started.
 #![cfg_attr(not(target_os = "macos"), allow(dead_code))]
 
+use crate::updatechannel::{Asset, Channel, Choice, Found};
 use crate::updatejob::UpdateJob;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 use std::time::SystemTime;
+use tauri::Emitter;
+#[cfg(target_os = "macos")]
+use tauri::Manager;
 use tauri::{AppHandle, State};
-use tauri::{Emitter, Manager};
 
-const RELEASES_URL: &str = "https://api.github.com/repos/gug007/lpm/releases/latest";
+const DEV_BUILD: &str = "Updates aren't available in development builds.";
 
 /// Hears an install's `update-status` and `update-progress` steps besides this
 /// app's own windows: the paired Mac that asked for it (peerupdate.rs).
@@ -37,7 +41,6 @@ pub(crate) type Observer = Arc<dyn Fn(&'static str, Value) + Send + Sync>;
 
 #[derive(Default)]
 pub struct UpdateState {
-    pending_url: Mutex<String>,
     job: UpdateJob,
 }
 
@@ -45,27 +48,50 @@ pub struct UpdateState {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateInfo {
     pub current_version: String,
+    /// The newest release on `channel`.
     pub latest_version: String,
     pub update_avail: bool,
+    pub channel: &'static str,
+    /// The newest stable release, which a rollback installs.
+    pub stable_version: String,
+    /// This build is newer than the newest stable release: a Beta build.
+    pub rollback_avail: bool,
     /// Linux/Windows: the installer to download for this update.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub download_url: Option<String>,
 }
 
-#[derive(Deserialize)]
-struct Release {
-    #[serde(default)]
-    tag_name: String,
-    #[serde(default)]
-    assets: Vec<Asset>,
+/// A check's answer, and where the releases it names are downloaded from.
+struct Check {
+    info: UpdateInfo,
+    newest_url: String,
+    stable_url: String,
 }
 
-#[derive(Deserialize)]
-struct Asset {
-    #[serde(default)]
-    name: String,
-    #[serde(default, rename = "browser_download_url")]
-    browser_download_url: String,
+/// What an install moves to: this channel's newest release, or back to the
+/// newest stable one.
+#[derive(Clone, Copy, PartialEq)]
+enum Target {
+    Newest,
+    Stable,
+}
+
+impl Check {
+    /// The version and download `target` installs, or why there is none.
+    fn target(self, target: Target) -> Result<(String, String), String> {
+        match target {
+            Target::Newest if self.info.update_avail => {
+                Ok((self.info.latest_version, self.newest_url))
+            }
+            Target::Stable if self.info.rollback_avail => {
+                Ok((self.info.stable_version, self.stable_url))
+            }
+            Target::Newest => Err("You're already on the latest version.".into()),
+            Target::Stable => {
+                Err("This version isn't newer than the latest stable release.".into())
+            }
+        }
+    }
 }
 
 pub(crate) fn current_version() -> String {
@@ -82,7 +108,7 @@ fn go_arch() -> &'static str {
 }
 
 /// version.Newer: compare up to 3 dot-separated integer parts.
-fn newer(latest: &str, current: &str) -> bool {
+pub(crate) fn newer(latest: &str, current: &str) -> bool {
     fn parse(v: &str) -> [i64; 3] {
         let mut p = [0i64; 3];
         for (i, s) in v.splitn(3, '.').enumerate() {
@@ -105,12 +131,12 @@ const UNSUPPORTED: &str =
     "lpm updates itself only on macOS — update this host the way you installed it.";
 
 #[tauri::command(async)]
-pub fn check_for_update(state: State<'_, UpdateState>) -> Result<UpdateInfo, String> {
+pub fn check_for_update() -> Result<UpdateInfo, String> {
     #[cfg(not(target_os = "macos"))]
     if crate::sys::headless() {
         return Err(UNSUPPORTED.into());
     }
-    do_check(&state)
+    Ok(do_check()?.info)
 }
 
 /// Background check used by the "Check for Updates…" menu item and the
@@ -120,8 +146,7 @@ pub fn check_and_emit(app: &AppHandle) -> Result<(), String> {
     if crate::sys::headless() {
         return Err(UNSUPPORTED.into());
     }
-    let state = app.state::<UpdateState>();
-    let info = do_check(&state)?;
+    let info = do_check()?.info;
     if info.update_avail {
         let _ = app.emit("update-available", info);
     }
@@ -156,7 +181,7 @@ pub fn start_auto_check(app: AppHandle) {
 // reqwest::blocking owns a tokio runtime that panics if dropped on a
 // #[command(async)] worker; run such work on a plain thread, which is not an async
 // context (the start_auto_check path relied on the same property).
-fn run_off_worker<T: Send + 'static>(
+pub(crate) fn run_off_worker<T: Send + 'static>(
     f: impl FnOnce() -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
     std::thread::spawn(f)
@@ -164,73 +189,57 @@ fn run_off_worker<T: Send + 'static>(
         .map_err(|_| "background thread panicked".to_string())?
 }
 
-fn do_check(state: &UpdateState) -> Result<UpdateInfo, String> {
-    let body = run_off_worker(|| {
-        let client = reqwest::blocking::Client::builder()
-            .timeout(Duration::from_secs(30))
-            .user_agent("lpm")
-            .build()
-            .map_err(|e| e.to_string())?;
-        let resp = client
-            .get(RELEASES_URL)
-            .send()
-            .map_err(|e| format!("failed to check for updates: {e}"))?;
-        if !resp.status().is_success() {
-            return Err(format!(
-                "GitHub API returned status {}",
-                resp.status().as_u16()
-            ));
-        }
-        resp.text().map_err(|e| e.to_string())
-    })?;
-    let release: Release =
-        serde_json::from_str(&body).map_err(|e| format!("failed to parse response: {e}"))?;
-
-    let latest = release.tag_name.trim_start_matches('v').to_string();
-    let current = current_version();
-    let current = current.trim_start_matches('v').to_string();
-
-    #[cfg(target_os = "macos")]
-    let (url, installable) = {
-        let suffix = format!("macos-{}.dmg", go_arch());
-        let url = release
-            .assets
-            .iter()
-            .find(|a| a.name.ends_with(&suffix))
-            .map(|a| a.browser_download_url.clone())
-            .unwrap_or_default();
-        (url, true)
-    };
-    // A release without this platform's installer is not offered at all, so
-    // the notice never points at nothing.
-    #[cfg(not(target_os = "macos"))]
-    let (url, installable) = {
-        let url = installer_url(&release.assets);
-        let found = !url.is_empty();
-        (url, found)
-    };
-    let download_url = (cfg!(not(target_os = "macos")) && installable).then(|| url.clone());
-    *state.pending_url.lock().unwrap() = url;
-
-    Ok(UpdateInfo {
-        // Dev/debug builds report version "dev" (parsed as 0.0.0) and have no
-        // enclosing .app to swap — never offer them an update they can't apply.
-        update_avail: current != "dev" && installable && newer(&latest, &current),
-        latest_version: latest,
-        current_version: current,
-        download_url,
+fn do_check() -> Result<Check, String> {
+    let channel = Channel::current();
+    let Choice { newest, stable } = crate::updatechannel::fetch(channel, &download)?;
+    let current = current_version().trim_start_matches('v').to_string();
+    // Dev/debug builds report version "dev" (parsed as 0.0.0) and have no
+    // enclosing .app to swap — never offer them a release they can't apply.
+    let release_build = current != "dev";
+    let update_avail =
+        release_build && newest.as_ref().is_some_and(|f| newer(&f.version, &current));
+    let rollback_avail =
+        release_build && stable.as_ref().is_some_and(|f| newer(&current, &f.version));
+    let version = |f: &Option<Found>| f.as_ref().map(|f| f.version.clone()).unwrap_or_default();
+    let url = |f: &Option<Found>| f.as_ref().map(|f| f.url.clone()).unwrap_or_default();
+    Ok(Check {
+        info: UpdateInfo {
+            latest_version: version(&newest),
+            stable_version: version(&stable),
+            current_version: current,
+            update_avail,
+            rollback_avail,
+            channel: channel.as_str(),
+            download_url: newest
+                .as_ref()
+                .filter(|_| cfg!(not(target_os = "macos")))
+                .map(|f| f.url.clone()),
+        },
+        newest_url: url(&newest),
+        stable_url: url(&stable),
     })
 }
 
-/// Download URL of this machine's installer in the release, or "".
-#[cfg(not(target_os = "macos"))]
-fn installer_url(assets: &[Asset]) -> String {
-    let names: Vec<&str> = assets.iter().map(|a| a.name.as_str()).collect();
-    let kind = crate::updatenotice::current();
-    crate::updatenotice::pick(&names, kind, std::env::consts::ARCH)
+/// This machine's download in a release: its DMG on macOS, its installer
+/// elsewhere. A release without one is never offered, so an update never
+/// points at nothing.
+fn download(assets: &[Asset]) -> Option<String> {
+    #[cfg(target_os = "macos")]
+    let asset = {
+        let suffix = format!("macos-{}.dmg", go_arch());
+        assets.iter().find(|a| a.name.ends_with(&suffix))
+    };
+    #[cfg(not(target_os = "macos"))]
+    let asset = {
+        let names: Vec<&str> = assets.iter().map(|a| a.name.as_str()).collect();
+        crate::updatenotice::pick(
+            &names,
+            crate::updatenotice::current(),
+            std::env::consts::ARCH,
+        )
         .and_then(|name| assets.iter().find(|a| a.name == name))
-        .map(|a| a.browser_download_url.clone())
-        .unwrap_or_default()
+    };
+    asset.map(|a| a.browser_download_url.clone())
 }
 
 /// Probe that the folder holding the .app is writable before downloading
@@ -280,45 +289,50 @@ pub(crate) fn app_bundle_path() -> Result<PathBuf, String> {
     ))
 }
 
-/// Linux/Windows: open the new installer's download in the browser. Returns
-/// Err even then, so a caller waiting for the app to restart stops waiting and
-/// shows what to do next.
-#[cfg(not(target_os = "macos"))]
 #[tauri::command(async)]
 pub fn install_update(app: AppHandle, state: State<'_, UpdateState>) -> Result<(), String> {
+    install_command(&app, &state, Target::Newest)
+}
+
+/// Back from a Beta build to the newest stable release.
+#[tauri::command(async)]
+pub fn rollback_update(app: AppHandle, state: State<'_, UpdateState>) -> Result<(), String> {
+    install_command(&app, &state, Target::Stable)
+}
+
+/// Linux/Windows: open the installer's download in the browser. Returns Err
+/// even then, so a caller waiting for the app to restart stops waiting and
+/// shows what to do next.
+#[cfg(not(target_os = "macos"))]
+fn install_command(app: &AppHandle, _state: &UpdateState, target: Target) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
     if crate::sys::headless() {
         return Err(UNSUPPORTED.into());
     }
     if current_version() == "dev" {
-        return Err("Updates aren't available in development builds.".into());
+        return Err(DEV_BUILD.into());
     }
-    let info = do_check(&state)?;
-    let Some(url) = info.download_url.filter(|_| info.update_avail) else {
-        return Err("You're already on the latest version.".into());
-    };
+    let (version, url) = do_check()?.target(target)?;
     app.opener()
         .open_url(url, None::<String>)
         .map_err(|e| format!("failed to open the download: {e}"))?;
     Err(format!(
-        "The lpm {} installer is downloading in your browser. Open it to finish updating.",
-        info.latest_version
+        "The lpm {version} installer is downloading in your browser. Open it to finish updating."
     ))
 }
 
 /// Returns Ok only when cancel_update stopped it: a finished install relaunches
 /// the app instead of returning.
 #[cfg(target_os = "macos")]
-#[tauri::command(async)]
-pub fn install_update(app: AppHandle, state: State<'_, UpdateState>) -> Result<(), String> {
+fn install_command(app: &AppHandle, state: &UpdateState, target: Target) -> Result<(), String> {
     // No enclosing .app in dev — bail with a product-terms message instead of
     // leaking the debug binary path from app_bundle_path() into the UI.
     if current_version() == "dev" {
-        return Err("Updates aren't available in development builds.".into());
+        return Err(DEV_BUILD.into());
     }
     let mut job = state.job.begin()?;
-    let result = install(&app, &state, &mut job, &reporter(&app, None));
-    crate::remote_update::relay(&app, "update-status", &Value::from("idle"));
+    let result = install(app, &mut job, &reporter(app, None), target);
+    crate::remote_update::relay(app, "update-status", &Value::from("idle"));
     match result {
         Err(_) if job.cancelled() => Ok(()),
         result => result,
@@ -336,11 +350,11 @@ pub(crate) fn install_for_peer(
     observer: Option<Observer>,
 ) -> Result<bool, String> {
     if current_version() == "dev" {
-        return Err("Updates aren't available in development builds.".into());
+        return Err(DEV_BUILD.into());
     }
     let state = app.state::<UpdateState>();
     let mut job = state.job.begin()?;
-    let result = install(app, &state, &mut job, &reporter(app, observer));
+    let result = install(app, &mut job, &reporter(app, observer), Target::Newest);
     let _ = app.emit("update-status", "idle");
     crate::remote_update::relay(app, "update-status", &Value::from("idle"));
     match result {
@@ -370,27 +384,20 @@ pub fn cancel_update(state: State<'_, UpdateState>) -> bool {
 #[cfg(target_os = "macos")]
 fn install(
     app: &AppHandle,
-    state: &UpdateState,
     job: &mut crate::updatejob::JobGuard,
     report: &Observer,
+    target: Target,
 ) -> Result<(), String> {
     report("update-status", Value::from("checking"));
 
-    // Re-check so we install the actual latest release, not whatever was
-    // stashed at the last check — a newer version may have shipped since.
-    let check_app = app.clone();
-    let info = job.run(move || do_check(&check_app.state::<UpdateState>()))?;
-    if !info.update_avail {
-        return Err("You're already on the latest version.".into());
+    // Re-check so we install the actual latest release, not whatever an earlier
+    // check saw — a newer version may have shipped since.
+    let check = job.run(do_check)?;
+    let info = check.info.clone();
+    let (_, url) = check.target(target)?;
+    if target == Target::Newest {
+        let _ = app.emit("update-available", info);
     }
-    let url = state.pending_url.lock().unwrap().clone();
-    if url.is_empty() {
-        return Err(
-            "The download for this version isn't available yet — try again in a few minutes."
-                .into(),
-        );
-    }
-    let _ = app.emit("update-available", info);
 
     // Errors here in dev (no enclosing .app) BEFORE any download/swap.
     let app_path = app_bundle_path()?;

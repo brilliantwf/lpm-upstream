@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { PeerState } from "../../bridge/commands";
 import { EventsOn } from "../../bridge/runtime";
+import type { UpdateChannel } from "../store/settings";
 
 export interface PeerHostDevice {
   id: string;
@@ -54,6 +55,8 @@ export interface PeerClient {
   supportsMediaRange?: boolean;
   // The peer's lpm installs its own updates when this Mac asks (a Mac).
   supportsSelfUpdate?: boolean;
+  // The releases it updates to.
+  updateChannel?: UpdateChannel;
   // The peer's build shares its own settings, so they can be changed from here.
   supportsHostSettings?: boolean;
   pinned?: boolean;

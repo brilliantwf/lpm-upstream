@@ -30,6 +30,8 @@ export interface DetachedWindowState {
 
 export type FilesTreeSide = "left" | "right";
 
+export type UpdateChannel = "stable" | "beta";
+
 export interface Settings {
   theme: Theme;
   browserTheme?: "light" | "dark"; // unset = follow the app theme
@@ -88,6 +90,8 @@ export interface Settings {
   // Put Linux hosts on this app's release once nothing is running on them.
   // Unset means on.
   autoUpdateHosts?: boolean;
+  // Which releases this app updates to. Unset means stable.
+  updateChannel?: UpdateChannel;
   experimentalTTS?: boolean;
   ttsEnabled?: boolean;
   ttsEngine?: string;
@@ -193,6 +197,7 @@ function normalize(s: main.Settings): Settings {
     checkOrigin: s.checkOrigin,
     autoPull: s.autoPull === undefined ? undefined : normalizeAutoPullMode(s.autoPull),
     autoUpdateHosts: s.autoUpdateHosts,
+    updateChannel: s.updateChannel === "beta" ? "beta" : undefined,
     experimentalTTS: s.experimentalTTS,
     ttsEnabled: s.ttsEnabled,
     ttsEngine: s.ttsEngine || undefined,

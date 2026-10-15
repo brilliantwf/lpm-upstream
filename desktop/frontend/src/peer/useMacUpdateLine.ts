@@ -1,5 +1,6 @@
 import { useMacUpdates, cancelMacUpdate, startMacUpdate } from "../store/macUpdates";
 import { useUpdateTarget } from "../store/releaseVersions";
+import { useSettingsStore } from "../store/settings";
 import { macUpdateLine, type MacUpdateLine, type MacUpdatePeer } from "./macUpdate";
 
 /** What a paired Mac's header or row says about updating it, and its action:
@@ -10,8 +11,9 @@ export function useMacUpdateLine(
   peer: MacUpdatePeer,
 ): { line: MacUpdateLine | null; act: () => void } {
   const target = useUpdateTarget();
+  const channel = useSettingsStore((s) => s.updateChannel ?? "stable");
   const update = useMacUpdates((s) => s[slug]);
-  const line = macUpdateLine(update, peer, target);
+  const line = macUpdateLine(update, peer, target, channel);
   const act = () => {
     if (line?.action?.kind === "update") void startMacUpdate(slug, name, peer.version ?? "", target);
     else if (line?.action?.kind === "cancel") void cancelMacUpdate(slug);

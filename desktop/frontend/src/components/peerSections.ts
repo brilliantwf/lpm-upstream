@@ -3,6 +3,7 @@ import { isLinuxHost, peerNoun, type PeerNoun } from "../peer/platform";
 import { peerStatus, type PeerStatus } from "../peer/peerStatus";
 import type { FollowState } from "../followApi";
 import type { PeerClient } from "../peer/usePeerState";
+import type { UpdateChannel } from "../store/settings";
 import type { ProjectInfo } from "../types";
 
 // What each paired Mac's sidebar section holds.
@@ -40,6 +41,7 @@ export interface PeerSection {
   /// The lpm it runs, and whether it can be updated from here.
   version: string;
   selfUpdate: boolean;
+  updateChannel?: UpdateChannel;
   /// Whether its own settings can be changed from here.
   hostSettings: boolean;
   /// The Mac's own project rows; empty while it is away.
@@ -82,6 +84,7 @@ export function buildPeerSections(
     status: peerStatus(peer),
     version: peer.version ?? "",
     selfUpdate: Boolean(peer.supportsSelfUpdate),
+    updateChannel: peer.updateChannel,
     hostSettings: Boolean(peer.supportsHostSettings),
     projects: peer.connected ? (byPeer.get(peer.slug) ?? []) : [],
     mirrors: new Map(),

@@ -370,6 +370,9 @@ export function InstallAgentSkill() {
 export function InstallUpdate() {
   return invoke("install_update");
 }
+export function RollbackUpdate() {
+  return invoke("rollback_update");
+}
 export function CancelUpdate() {
   return invoke("cancel_update");
 }

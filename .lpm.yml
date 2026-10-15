@@ -14,22 +14,39 @@ profiles:
  
 actions:
   release:
-    label: 🚀 Release
+    label: 🚀 Release · {{git.tag:v*}} · {{git.tagAge:v*}}
     type: background
-    cmd: ./scripts/release.sh {{bump}}
+    cmd: ./scripts/release.sh {{bump}} {{channel}}
     confirm: true
     inputs:
       bump:
         type: radio
         label: What kind of release?
         options:
-          - label: Patch — bug fixes (0.0.X)
+          - label: Patch — bug fixes ({{git.nextPatch:v*}})
             value: patch
-          - label: Minor — new features (0.X.0)
+          - label: Minor — new features ({{git.nextMinor:v*}})
             value: minor
-          - label: Major — breaking changes (X.0.0)
+          - label: Major — breaking changes ({{git.nextMajor:v*}})
             value: major
         default: patch
         required: true
+      channel:
+        type: radio
+        label: Who gets it?
+        options:
+          - label: Stable — everyone
+            value: stable
+          - label: Beta — only apps on the Beta update channel
+            value: beta
+        default: stable
+        required: true
     position: 1
+    display: footer
+  promote:
+    label: ⬆️ Promote Beta
+    type: background
+    cmd: ./scripts/release.sh promote
+    confirm: true
+    position: 3
     display: footer

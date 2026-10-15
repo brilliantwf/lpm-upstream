@@ -52,7 +52,6 @@ import { AgentToolsManualSetup } from "./AgentToolsManualSetup";
 import { BrowserOpenURL } from "../../bridge/runtime";
 import {
   GetVersion,
-  CheckForUpdate,
   CheckClaudeHooks,
   ResetClaudeHooks,
   ExportConfig,
@@ -82,6 +81,8 @@ import { ClaudeAccountsSection } from "./ClaudeAccountsSection";
 import { SettingsSection } from "./SettingsSection";
 import { SettingsRow } from "./SettingsRow";
 import { AutoPullSettingsRow } from "./AutoPullSettingsRow";
+import { UpdateChannelRow } from "./UpdateChannelRow";
+import { checkForUpdate, useUpdateCheck } from "../store/updateCheck";
 import { Toggle } from "./ui/Toggle";
 import { InlineNameEditor } from "./InlineNameEditor";
 import { modalInputClass, modalInputDefaults } from "../forms/styles";
@@ -307,8 +308,9 @@ export function Settings({
   }, [ttsEnabled]);
 
   const [version, setVersion] = useState("");
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
-  const [latestVersion, setLatestVersion] = useState("");
+  const [checkState, setCheckState] = useState<"idle" | "checking" | "checked" | "error">("idle");
+  const checkedUpdate = useUpdateCheck((s) => s.info);
+  const latestVersion = checkedUpdate?.latestVersion ?? "";
   const [updateError, setUpdateError] = useState("");
   const [hooksStatus, setHooksStatus] = useState<HooksStatus>("idle");
   const [showResetDialog, setShowResetDialog] = useState(false);
@@ -407,18 +409,27 @@ export function Settings({
   );
 
   const update = useUpdateInstall();
+  // An update any check found is offered here too; "up to date" only once
+  // this page has asked.
+  const updateStatus: UpdateStatus =
+    checkState === "checking" || checkState === "error"
+      ? checkState
+      : checkedUpdate?.updateAvail
+        ? "available"
+        : checkState === "checked"
+          ? "up-to-date"
+          : "idle";
   const shownUpdateStatus: UpdateStatus = update.active ? "installing" : update.error ? "error" : updateStatus;
 
   const handleCheckUpdate = async () => {
-    setUpdateStatus("checking");
+    setCheckState("checking");
     setUpdateError("");
     update.dismissError();
     try {
-      const info = await CheckForUpdate();
-      setUpdateStatus(info.updateAvail ? "available" : "up-to-date");
-      if (info.updateAvail) setLatestVersion(info.latestVersion);
+      await checkForUpdate();
+      setCheckState("checked");
     } catch (err) {
-      setUpdateStatus("error");
+      setCheckState("error");
       setUpdateError(String(err));
     }
   };
@@ -672,7 +683,7 @@ export function Settings({
                     {update.phase === "installing" ? <RefreshIcon spinning /> : "Cancel"}
                   </button>
                 ) : shownUpdateStatus === "available" ? (
-                  <button onClick={UPDATES_INSTALL_IN_APP ? update.request : openReleasePage} className="rounded-md bg-[var(--accent-green)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90">
+                  <button onClick={UPDATES_INSTALL_IN_APP ? update.request : () => openReleasePage(latestVersion)} className="rounded-md bg-[var(--accent-green)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90">
                     {UPDATES_INSTALL_IN_APP ? "Update" : "Download"}
                   </button>
                 ) : (
@@ -681,6 +692,7 @@ export function Settings({
                   </button>
                 )}
               </SettingsRow>
+              {version !== "dev" && <UpdateChannelRow update={update} />}
               <SettingsRow
                 {...rowProps("general.agentTools")}
                 details={

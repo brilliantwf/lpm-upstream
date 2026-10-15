@@ -117,6 +117,7 @@ export function AgentSkillStatus(...args: any[]): Promise<any>;
 export function InstallAgentSkill(...args: any[]): Promise<any>;
 export function InstallKokoro(...args: any[]): Promise<any>;
 export function InstallUpdate(...args: any[]): Promise<any>;
+export function RollbackUpdate(...args: any[]): Promise<any>;
 export function CancelUpdate(...args: any[]): Promise<boolean>;
 export function IsTerminalRemote(...args: any[]): Promise<any>;
 export function TerminalExists(...args: any[]): Promise<boolean>;

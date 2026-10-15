@@ -8,7 +8,8 @@
 // lpm, so a phone learns it landed from the version on its next `ready`.
 #![cfg_attr(not(target_os = "macos"), allow(dead_code))]
 
-use crate::updates::{UpdateInfo, UpdateState};
+use crate::updatechannel::Channel;
+use crate::updates::UpdateInfo;
 use serde_json::{json, Value};
 use std::sync::mpsc::SyncSender;
 use std::sync::Mutex;
@@ -57,7 +58,7 @@ pub fn handle(app: &AppHandle, out: &SyncSender<String>, t: &str, v: &Value) {
     let out = out.clone();
     std::thread::spawn(move || {
         let mut reply = match verb.as_str() {
-            "updateCheck" => check(&app, force),
+            "updateCheck" => check(force),
             "updateInstall" => install(&app),
             _ => json!({ "ok": true, "stopping": crate::updates::cancel_update(app.state()) }),
         };
@@ -67,8 +68,8 @@ pub fn handle(app: &AppHandle, out: &SyncSender<String>, t: &str, v: &Value) {
 }
 
 /// The release this Mac could move to, and the install running now, if any.
-fn check(app: &AppHandle, force: bool) -> Value {
-    let mut reply = match recent_check(app, force) {
+fn check(force: bool) -> Value {
+    let mut reply = match recent_check(force) {
         Ok(info) => json!({
             "ok": true,
             "currentVersion": info.current_version,
@@ -83,15 +84,16 @@ fn check(app: &AppHandle, force: bool) -> Value {
     reply
 }
 
-fn recent_check(app: &AppHandle, force: bool) -> Result<UpdateInfo, String> {
+/// A cached answer stands only for the update channel it was asked on.
+fn recent_check(force: bool) -> Result<UpdateInfo, String> {
     if !force {
         if let Some((at, info)) = &*LAST_CHECK.lock().unwrap() {
-            if at.elapsed() < CHECK_MAX_AGE {
+            if at.elapsed() < CHECK_MAX_AGE && info.channel == Channel::current().as_str() {
                 return Ok(info.clone());
             }
         }
     }
-    let info = crate::updates::check_for_update(app.state::<UpdateState>())?;
+    let info = crate::updates::check_for_update()?;
     *LAST_CHECK.lock().unwrap() = Some((Instant::now(), info.clone()));
     Ok(info)
 }

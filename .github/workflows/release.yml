@@ -484,6 +484,26 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
+      # `scripts/release.sh <bump> beta` tags with the message "beta". That
+      # release goes out as a pre-release, which only the app's Beta update
+      # channel installs and releases/latest never points at, until
+      # `release.sh promote` makes it stable. Read through the API because a
+      # checkout turns an annotated tag into a lightweight one.
+      - name: Resolve channel
+        id: channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ref=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME")
+          message=""
+          if [ "$(jq -r .object.type <<<"$ref")" = tag ]; then
+            message=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$(jq -r .object.sha <<<"$ref")" --jq .message)
+          fi
+          case "$message" in
+            beta*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -497,13 +517,15 @@ jobs:
             dist/*.dmg
             dist/lpm-host-linux-amd64.tar.gz
           fail_on_unmatched_files: true
+          prerelease: ${{ steps.channel.outputs.prerelease }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # The desktop packages for Linux and Windows join the release `release` just
   # created, one job each, so neither waits on or blocks the other. They wait
   # for `release` on purpose: a latest release without DMGs would leave the Mac
-  # updater and the website's download links with nothing to fetch.
+  # updater and the website's download links with nothing to fetch. They leave
+  # out `prerelease`, so a beta promoted before they finish stays promoted.
   release-linux-desktop:
     needs: [release, build-linux-desktop]
     if: startsWith(github.ref, 'refs/tags/')

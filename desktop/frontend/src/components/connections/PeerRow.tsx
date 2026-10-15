@@ -187,6 +187,7 @@ export function PeerRow({
     connected: live,
     supportsSelfUpdate: !reachable && peer.supportsSelfUpdate,
     version: peer.version,
+    updateChannel: peer.updateChannel,
   });
   // Only offer a retry once a dial has actually failed — while it's still
   // "Connecting…" the button would just interrupt the attempt in flight.
