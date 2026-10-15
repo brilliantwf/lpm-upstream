@@ -234,6 +234,7 @@ final class LpmClient: NSObject {
     private(set) var lastHeard: Date?
     /// What the Mac said it answers in its `paired`/`ready` frame.
     private(set) var hostFeatures = Set<String>()
+    static let serviceLogsWatchFeature = "serviceLogsWatch"
 
     // Requests made while the link is down or half-dead, delivered on the next
     // `ready`. iOS kills the socket seconds after backgrounding and the
@@ -272,6 +273,10 @@ final class LpmClient: NSObject {
     private let probeTimeout: TimeInterval = 4
     private let baseBackoff: TimeInterval = 1.5
     private let maxBackoff: TimeInterval = 20
+    // A refusal means the Mac answered and only lpm isn't listening (restarting
+    // for an update, or quit), so a retry costs one local round trip and lpm
+    // should be picked up within seconds of coming back.
+    private let refusedMaxBackoff: TimeInterval = 4
     // After a quick retry fails, stop pretending and surface an honest error
     // (while still retrying underneath), so the UI never spins forever. The
     // status bar already says "connecting" after a couple of seconds.
@@ -461,7 +466,7 @@ final class LpmClient: NSObject {
             if case .ready = self.state { return }
             self.injectInbound(Wire.json([
                 "t": "ready", "serverId": DemoServer.serverId, "serverName": DemoServer.serverName,
-                "features": [ChunkedUpload.feature],
+                "features": [ChunkedUpload.feature, Self.serviceLogsWatchFeature],
             ]))
         }
     }
@@ -696,7 +701,8 @@ final class LpmClient: NSObject {
     private func scheduleReconnect(_ reason: String) {
         guard wantConnected, reconnectWork == nil else { return }
         retryAttempt += 1
-        let capped = min(baseBackoff * pow(2, Double(retryAttempt - 1)), maxBackoff)
+        let cap = failureHint == Self.refusedError ? refusedMaxBackoff : maxBackoff
+        let capped = min(baseBackoff * pow(2, Double(retryAttempt - 1)), cap)
         let delay = capped * Double.random(in: 0.85...1.15)
         // Stay hopeful ("connecting") for the first few fast retries; after that,
         // show the honest offline hint while the slow retries continue underneath.
@@ -1092,6 +1098,11 @@ final class LpmClient: NSObject {
     func requestServices(project: String) { send(Wire.services(project: project)) }
     func requestServiceLogs(project: String, paneIndex: Int, lines: Int) {
         send(Wire.serviceLogs(project: project, paneIndex: paneIndex, lines: lines))
+    }
+    /// Live like a terminal `sub`: dropped on a dead link rather than replayed,
+    /// since the Mac forgets a connection's watches and the sheet re-watches on ready.
+    func setServiceLogsWatch(project: String, paneIndex: Int, watch: Bool) {
+        sendLive(Wire.serviceLogsWatch(project: project, paneIndex: paneIndex, watch: watch))
     }
     func requestHistoryQuery(project: String?, search: String?, favoritesOnly: Bool,
                              folder: String?, before: (at: Int, seq: Int)?) {

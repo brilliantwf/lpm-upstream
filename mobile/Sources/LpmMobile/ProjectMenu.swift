@@ -270,6 +270,7 @@ struct ProjectMenuHost: ViewModifier {
             } message: {
                 Text(model.git.opError[project.name]?.message ?? "")
             }
+            .gitNotice(project: project.name, isActive: isVisible && !showChanges)
             .sheet(item: $runInputsFor) { action in
                 ActionInputsSheet(action: action) { values in afterInputs(action, values) }
             }

@@ -8,6 +8,7 @@ export interface VideoPreview {
   src: string | null;
   error: string | null;
   meta: string | null;
+  size: { w: number; h: number } | null;
   onLoadedMetadata: (e: SyntheticEvent<HTMLVideoElement>) => void;
   onError: (e: SyntheticEvent<HTMLVideoElement>) => void;
 }
@@ -92,6 +93,7 @@ export function useVideoPreview(path: string, active: boolean): VideoPreview {
     src: active && path && !error && !waiting ? mediaSrc(path, undefined, media.base) : null,
     error,
     meta: parts.length > 0 ? parts.join(" · ") : null,
+    size: dims,
     onLoadedMetadata,
     onError,
   };

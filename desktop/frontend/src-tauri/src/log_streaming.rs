@@ -146,9 +146,14 @@ pub fn get_service_logs(
 ) -> Result<String, String> {
     let info = config::spawn_info(&project_name)?;
     let idx = usize::try_from(pane_index).map_err(|_| "invalid pane index".to_string())?;
-    let pane_id = sessions::list_pane_ids(&info.session)
+    capture_service_pane(&info.session, idx, lines)
+}
+
+/// The recent output of the `index`th pane of `session`, in pane order.
+pub fn capture_service_pane(session: &str, index: usize, lines: i64) -> Result<String, String> {
+    let pane_id = sessions::list_pane_ids(session)
         .into_iter()
-        .nth(idx)
-        .ok_or_else(|| format!("pane index {idx} out of range"))?;
+        .nth(index)
+        .ok_or_else(|| format!("pane index {index} out of range"))?;
     sessions::capture_pane(&pane_id, lines)
 }

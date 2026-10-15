@@ -1,6 +1,6 @@
 import type { ContentZoom } from "../hooks/useContentZoom";
 import { basename } from "../path";
-import { XIcon } from "./icons";
+import { PanelRightIcon, PictureInPictureIcon, XIcon } from "./icons";
 import { OpenFileWithDropdown } from "./OpenFileWithDropdown";
 import { SegmentedControl } from "./ui/SegmentedControl";
 import { ZoomControl } from "./ui/ZoomControl";
@@ -8,6 +8,8 @@ import type { FileViewerView } from "./useFileViewerView";
 
 const CHIP =
   "rounded bg-[var(--bg-hover)] px-1.5 py-0.5 font-mono text-[11px] font-normal text-[var(--text-secondary)]";
+const ICON_BUTTON =
+  "rounded-xl p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]";
 const QUIET_BUTTON =
   "rounded-lg border border-[var(--border)] px-3 py-1.5 text-[13px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:opacity-40";
 
@@ -33,6 +35,9 @@ interface FileViewerHeaderProps {
     onCancel: () => void;
     onSave: () => void;
   };
+  // Set when the viewer can step aside into a corner or a side panel.
+  onMinimize?: () => void;
+  onDock?: () => void;
   onClose: () => void;
 }
 
@@ -46,6 +51,8 @@ export function FileViewerHeader({
   views,
   zoom,
   edit,
+  onMinimize,
+  onDock,
   onClose,
 }: FileViewerHeaderProps) {
   return (
@@ -110,12 +117,29 @@ export function FileViewerHeader({
               </button>
             )}
             <OpenFileWithDropdown absPath={absPath} line={line} col={col} />
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="rounded-xl p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-            >
+            {onDock && (
+              <button
+                type="button"
+                onClick={onDock}
+                aria-label="Dock to the side"
+                title="Dock to the side"
+                className={ICON_BUTTON}
+              >
+                <PanelRightIcon />
+              </button>
+            )}
+            {onMinimize && (
+              <button
+                type="button"
+                onClick={onMinimize}
+                aria-label="Minimize"
+                title="Minimize"
+                className={ICON_BUTTON}
+              >
+                <PictureInPictureIcon />
+              </button>
+            )}
+            <button type="button" onClick={onClose} aria-label="Close" className={ICON_BUTTON}>
               <XIcon />
             </button>
           </>

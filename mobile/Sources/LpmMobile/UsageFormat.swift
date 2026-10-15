@@ -87,11 +87,27 @@ func paceLabel(_ pace: Pace?) -> String {
     }
 }
 
-/// Bar color for a percentage already clamped to 0…100.
+/// Bar color for a percentage already clamped to 0…100 — the desktop's
+/// `--accent-red` / `--accent-amber` / `--accent-cyan` in each appearance.
 func barTint(_ pct: Double) -> Color {
-    if pct >= 95 { return .red }
-    if pct >= 80 { return .orange }
-    return .accentColor
+    if pct >= 95 { return Color(light: "#EF4444", dark: "#F87171") }
+    if pct >= 80 { return Color(light: "#F59E0B", dark: "#FBBF24") }
+    return Color(light: "#06B6D4", dark: "#22D3EE")
+}
+
+extension Color {
+    init(light: String, dark: String) {
+        let light = UIColor(Color(hex: light))
+        let dark = UIColor(Color(hex: dark))
+        self.init(UIColor { $0.userInterfaceStyle == .dark ? dark : light })
+    }
+}
+
+/// When a window turns over, as a bare duration ("4d 10h", "now"); empty when
+/// the tool did not say. The desktop sidebar's `resetDurationShort`.
+func resetShort(_ resetsAt: Int, now: Double) -> String {
+    guard resetsAt != 0 else { return "" }
+    return durationShort(Double(resetsAt) * 1000 - now)
 }
 
 /// "resets in 2h 30m" / "resets now"; empty when the turnover time is unknown.

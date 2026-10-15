@@ -159,6 +159,7 @@ mod remote_claude;
 mod remote_git_auto;
 mod remote_machines;
 mod remote_memory;
+mod remote_service_logs;
 mod remote_notes;
 mod remote_update;
 mod remote_upload;

@@ -40,6 +40,7 @@ import { useProjectWatcher } from "./hooks/useProjectWatcher";
 import { useOriginStatusPoller } from "./hooks/useOriginStatusPoller";
 import { getSettings, saveSettings, useSettingsStore } from "./store/settings";
 import { useAppStore } from "./store/app";
+import { useFileViewerStore } from "./store/fileViewer";
 import { useResolvedTheme } from "./theme";
 import { onRunInDuplicates } from "./mirror";
 import { duplicateBeside } from "./store/sideBySide";
@@ -56,6 +57,7 @@ import { ClaudeAccountPoolDialog } from "./components/ClaudeAccountPoolDialog";
 
 export default function App() {
   const projects = useAppStore((s) => s.projects);
+  const dockInset = useFileViewerStore((s) => s.dockInset);
   const groups = useAppStore((s) => s.groups);
   const sidebarOrder = useAppStore((s) => s.sidebarOrder);
   const selected = useAppStore((s) => s.selected);
@@ -244,7 +246,7 @@ export default function App() {
   );
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen" style={{ paddingRight: dockInset }}>
       <Toaster
         position="top-right"
         theme={theme}

@@ -86,3 +86,6 @@ export function UserIcon() { return <svg {...iconProps}><circle cx="12" cy="8" r
 export function DetachIcon({ size = 12 }: { size?: number } = {}) { return <svg {...iconProps} width={size} height={size}><path d="M14 3h7v7" /><path d="M10 14 21 3" /><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" /></svg>; }
 export function CollapseIcon() { return <svg {...iconProps} viewBox="0 0 10 10" width={10} height={10} strokeWidth={1.2}><path d="M1 5h3M2.5 3.5 4 5 2.5 6.5M9 5H6M7.5 3.5 6 5l1.5 1.5" /></svg>; }
 export function ExpandIcon() { return <svg {...iconProps} viewBox="0 0 10 10" width={10} height={10} strokeWidth={1.2}><path d="M4 5H1M2.5 3.5 1 5l1.5 1.5M6 5h3M7.5 3.5 9 5 7.5 6.5" /></svg>; }
+export function PanelRightIcon() { return <svg {...iconProps}><rect x="3" y="4" width="18" height="16" rx="2.5" /><line x1="15" y1="4" x2="15" y2="20" /></svg>; }
+export function PictureInPictureIcon() { return <svg {...iconProps}><rect x="3" y="4" width="18" height="16" rx="2.5" /><rect x="12" y="12" width="6" height="5" rx="1" fill="currentColor" stroke="none" /></svg>; }
+export function MaximizeIcon() { return <svg {...iconProps}><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" /></svg>; }

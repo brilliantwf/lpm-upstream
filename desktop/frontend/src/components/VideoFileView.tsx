@@ -3,16 +3,18 @@ import type { VideoPreview } from "./videoPreview";
 
 // max-h/max-w are explicit: the base stylesheet's `max-width: 100%` covers
 // images only, so a 4K frame would otherwise overflow the modal.
-const VIDEO_CLASS =
-  "m-auto block max-h-full max-w-full rounded-md bg-black ring-1 ring-[var(--border)]";
+const VIDEO_CLASS = "m-auto block max-h-full max-w-full bg-black";
+const FRAMED = "rounded-md ring-1 ring-[var(--border)]";
 
 interface VideoFileViewProps {
   video: VideoPreview;
+  // A minimized viewer is sized to the video, so it fills it edge to edge.
+  compact?: boolean;
 }
 
-export function VideoFileView({ video }: VideoFileViewProps) {
+export function VideoFileView({ video, compact = false }: VideoFileViewProps) {
   return (
-    <div className="flex h-full w-full overflow-hidden p-6">
+    <div className={`flex h-full w-full overflow-hidden ${compact ? "bg-black" : "p-6"}`}>
       {video.error || !video.src ? (
         <PreviewStatus error={video.error} />
       ) : (
@@ -25,7 +27,7 @@ export function VideoFileView({ video }: VideoFileViewProps) {
           preload="metadata"
           onLoadedMetadata={video.onLoadedMetadata}
           onError={video.onError}
-          className={VIDEO_CLASS}
+          className={`${VIDEO_CLASS} ${compact ? "" : FRAMED}`}
         />
       )}
     </div>

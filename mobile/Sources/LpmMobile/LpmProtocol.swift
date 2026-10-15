@@ -333,6 +333,9 @@ enum Wire {
     static func serviceLogs(project: String, paneIndex: Int, lines: Int) -> String {
         json(["t": "serviceLogs", "project": project, "paneIndex": paneIndex, "lines": lines])
     }
+    static func serviceLogsWatch(project: String, paneIndex: Int, watch: Bool) -> String {
+        json(["t": watch ? "serviceLogsWatch" : "serviceLogsUnwatch", "project": project, "paneIndex": paneIndex])
+    }
     static func historyQuery(project: String?, search: String?, favoritesOnly: Bool,
                              folder: String?, before: (at: Int, seq: Int)?) -> String {
         var obj: [String: Any] = ["t": "historyQuery"]

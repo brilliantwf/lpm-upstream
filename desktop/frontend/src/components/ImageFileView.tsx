@@ -13,10 +13,13 @@ const IMG_CLASS =
 
 interface ImageFileViewProps {
   preview: ImagePreview;
+  // A minimized viewer is sized to the image, so it fills it edge to edge.
+  compact?: boolean;
 }
 
-export function ImageFileView({ preview }: ImageFileViewProps) {
+export function ImageFileView({ preview, compact = false }: ImageFileViewProps) {
   const boxRef = useRef<HTMLDivElement>(null);
+  const pad = compact ? 0 : PAD_PX;
   const [box, setBox] = useState<Size | null>(null);
 
   useEffect(() => {
@@ -27,15 +30,15 @@ export function ImageFileView({ preview }: ImageFileViewProps) {
     const measure = () => {
       const r = el.getBoundingClientRect();
       setBox({
-        w: Math.max(0, r.width - PAD_PX * 2),
-        h: Math.max(0, r.height - PAD_PX * 2),
+        w: Math.max(0, r.width - pad * 2),
+        h: Math.max(0, r.height - pad * 2),
       });
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [pad]);
 
   const { setFit, natural, scale } = preview;
   useEffect(() => {
@@ -48,7 +51,7 @@ export function ImageFileView({ preview }: ImageFileViewProps) {
     : { width: `${Math.round(scale * 100)}%`, height: "auto" as const };
 
   return (
-    <div ref={boxRef} className="flex h-full w-full overflow-auto p-6">
+    <div ref={boxRef} className={`flex h-full w-full ${compact ? "overflow-hidden" : "overflow-auto p-6"}`}>
       {preview.error || !preview.dataUrl ? (
         <PreviewStatus error={preview.error} />
       ) : (

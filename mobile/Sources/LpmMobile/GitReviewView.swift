@@ -67,6 +67,7 @@ struct GitReviewView: View {
             .navigationBarTitleDisplayMode(.inline)
             .refreshable { await refresh() }
             .overlay { stateOverlay }
+            .gitNotice(project: name, isActive: isVisible)
             .animation(.default, value: snapshot?.files.count ?? -1)
             .toolbar {
                 ToolbarItem(placement: .principal) {

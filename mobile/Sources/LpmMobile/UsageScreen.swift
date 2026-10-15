@@ -66,7 +66,8 @@ struct UsageScreen: View {
 
     @ViewBuilder
     private func cards(_ snapshot: LimitsSnapshot, now: Double, macNow: Double) -> some View {
-        let claude = snapshot.claudeEnabled ? claudeCards(snapshot) : []
+        let claude = snapshot.claudeEnabled
+            ? claudeCards(snapshot, accounts: model.claudeAccounts?.accounts ?? []) : []
 
         ForEach(claude, id: \.key) { card in
             UsageProviderCardView(

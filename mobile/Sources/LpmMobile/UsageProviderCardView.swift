@@ -11,6 +11,10 @@ struct UsageProviderCardView: View {
     let macNow: Double
     let title: String
     var subtitle: String? = nil
+    /// Lines under the meters — the usage rows add which sessions use the
+    /// account and the day's spend, which the windows themselves don't carry.
+    var footer: [String] = []
+    var fill = Color(.secondarySystemGroupedBackground)
 
     private var stale: Bool { macNow - Double(data.updatedAt) > staleMs }
 
@@ -36,10 +40,22 @@ struct UsageProviderCardView: View {
                     stale: stale
                 )
             }
+
+            if !footer.isEmpty {
+                Divider().padding(.vertical, 12)
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(footer, id: \.self) { line in
+                        Text(line)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
         }
         .padding(16)
-        .background(Color(.secondarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(fill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     /// One row while it fits; then the timestamp drops to its own line, then the

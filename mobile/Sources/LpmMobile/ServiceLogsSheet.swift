@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// A service's recent pane output, polled from the Mac every 3s while the service
-/// runs (service pane capture via `serviceLogs` — the mobile counterpart of the
-/// desktop's service pane). The toolbar carries the service's Start/Stop toggle.
+/// A service's recent pane output while the service runs — the mobile counterpart
+/// of the desktop's service pane. The Mac pushes it as it changes
+/// (`serviceLogsWatch`); one that predates that is polled every 3s instead. The
+/// toolbar carries the service's Start/Stop toggle.
 struct ServiceLogsSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -22,6 +23,7 @@ struct ServiceLogsSheet: View {
     }
     private var key: String? { paneIndex.map { model.serviceLogsKey(project, $0) } }
     private var text: String { key.flatMap { model.serviceLogsResult[$0] } ?? "" }
+    private var feed: Feed { Feed(running: running, paneIndex: paneIndex, ready: model.connection == .ready) }
     private var fetchError: String? { key.flatMap { model.serviceLogsError[$0] } }
 
     var body: some View {
@@ -71,25 +73,37 @@ struct ServiceLogsSheet: View {
         .presentationDetents([.medium, .large])
         .presentationBackground(Color(.systemBackground))
         .preferredColorScheme(.dark)
-        .task(id: running) {
-            guard running else { return }
-            while !Task.isCancelled {
-                if let paneIndex {
-                    model.fetchServiceLogs(project, paneIndex: paneIndex)
-                    try? await Task.sleep(nanoseconds: 3_000_000_000)
-                } else {
-                    // Fetch the moment discovery answers rather than a whole poll
-                    // later, so a first open isn't three seconds of nothing.
+        // Restarts as the service starts or stops, its pane is found, or the link
+        // comes back — the Mac forgets a dropped connection's watch.
+        .task(id: feed) {
+            guard feed.running, feed.ready else { return }
+            guard let paneIndex = feed.paneIndex else {
+                while !Task.isCancelled {
                     model.loadServices(project)
-                    for _ in 0..<12 where paneIndex == nil && !Task.isCancelled {
-                        try? await Task.sleep(nanoseconds: 250_000_000)
-                    }
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
                 }
+                return
+            }
+            if model.canWatchServiceLogs {
+                model.watchServiceLogs(project, paneIndex: paneIndex, true)
+                while !Task.isCancelled { try? await Task.sleep(nanoseconds: 3_600_000_000_000) }
+                model.watchServiceLogs(project, paneIndex: paneIndex, false)
+                return
+            }
+            while !Task.isCancelled {
+                model.fetchServiceLogs(project, paneIndex: paneIndex)
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
         }
         .onDisappear {
             if let key { model.consumeServiceLogs(key) }
         }
+    }
+
+    private struct Feed: Equatable {
+        let running: Bool
+        let paneIndex: Int?
+        let ready: Bool
     }
 
     private var statusBar: some View {

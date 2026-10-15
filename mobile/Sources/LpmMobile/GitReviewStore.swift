@@ -44,6 +44,9 @@ final class GitReviewStore {
     var commitTick: [String: Int] = [:]
     var prDraft: [String: GitPrDraft] = [:]
     var createdPrURL: [String: String] = [:]
+    // A finished pull/push/fetch/commit's confirmation, cleared after a moment.
+    var notice: [String: GitNotice] = [:]
+    @ObservationIgnored private var noticeExpiry: [String: DispatchWorkItem] = [:]
     // Per-file diffs, keyed by diffKey(project, path).
     var diffs: [String: GitDiffResult] = [:]
     var diffLoading: Set<String> = []
@@ -460,7 +463,7 @@ final class GitReviewStore {
         if let error {
             opError[project] = GitOpError(title: "Commit failed", message: error)
         } else {
-            Haptics.success()
+            announce(project, "Committed successfully")
             commitTick[project, default: 0] += 1
             load(project)
         }
@@ -472,7 +475,7 @@ final class GitReviewStore {
         if let error {
             opError[project] = GitOpError(title: "Push failed", message: error)
         } else {
-            Haptics.success()
+            announce(project, "Pushed")
             load(project)
         }
     }
@@ -512,13 +515,33 @@ final class GitReviewStore {
     func finishPull(_ project: String, error: String?) {
         clearTimeout("pull", project)
         pulling.remove(project)
-        if let error { opError[project] = GitOpError(title: "Pull failed", message: error) } else { load(project) }
+        if let error {
+            opError[project] = GitOpError(title: "Pull failed", message: error)
+        } else {
+            announce(project, "Pulled")
+            load(project)
+        }
     }
 
     func finishFetch(_ project: String, error: String?) {
         clearTimeout("fetch", project)
         fetching.remove(project)
-        if let error { opError[project] = GitOpError(title: "Fetch failed", message: error) } else { load(project) }
+        if let error {
+            opError[project] = GitOpError(title: "Fetch failed", message: error)
+        } else {
+            announce(project, "Fetched")
+            load(project)
+        }
+    }
+
+    private func announce(_ project: String, _ text: String) {
+        Haptics.success()
+        AccessibilityNotification.Announcement(text).post()
+        notice[project] = GitNotice(text: text)
+        noticeExpiry[project]?.cancel()
+        let expiry = DispatchWorkItem { [weak self] in self?.notice[project] = nil }
+        noticeExpiry[project] = expiry
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: expiry)
     }
 
     func finishAutoPullUndo(_ project: String, error: String?) {

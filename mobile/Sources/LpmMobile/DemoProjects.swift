@@ -39,6 +39,7 @@ extension DemoServer {
 
         registerLifecycleHandlers()
         registerServiceHandlers()
+        registerServiceLogHandlers()
         registerProjectMutationHandlers()
         registerCreationHandlers()
         registerSidebarHandlers()
@@ -130,23 +131,6 @@ extension DemoServer {
             }
             self.push(["t": "services", "project": project, "ok": true,
                        "running": p.running, "services": services])
-        }
-        register("serviceLogs") { [weak self] o in
-            guard let self, let project = o["project"] as? String else { return }
-            let pane = o["paneIndex"] as? Int ?? 0
-            let running = (self.world.project(named: project)?.running ?? false)
-                ? (self.world.project(named: project)?.services.filter { $0.running } ?? [])
-                : []
-            guard running.indices.contains(pane) else {
-                self.push(["t": "serviceLogs", "project": project, "paneIndex": pane,
-                           "ok": false, "error": "That service isn't running."])
-                return
-            }
-            let key = project + "\n" + running[pane].name
-            let ticks = self.world.serviceLogTicks[key] ?? 0
-            self.world.serviceLogTicks[key] = ticks + 1
-            self.push(["t": "serviceLogs", "project": project, "paneIndex": pane, "ok": true,
-                       "text": self.serviceLogText(svc: running[pane], ticks: ticks)])
         }
         register("fileChunk") { [weak self] o in
             guard let self, let project = o["project"] as? String,
@@ -615,66 +599,6 @@ extension DemoServer {
             lines = ["Done."]
         }
         return lines.joined(separator: "\r\n")
-    }
-
-    private func serviceLogText(svc: DemoWorld.Svc, ticks: Int) -> String {
-        let (header, pool) = logTemplate(svc)
-        var lines = header
-        let extra = min(3 + ticks * 2, 60)
-        for i in 0..<extra { lines.append(pool[i % pool.count]) }
-        return lines.joined(separator: "\n") + "\n"
-    }
-
-    private func logTemplate(_ svc: DemoWorld.Svc) -> ([String], [String]) {
-        switch svc.name {
-        case "web":
-            return (["▲ Next.js 15.3.2",
-                     "- Local:        http://localhost:3000",
-                     "✓ Ready in 1.2s",
-                     ""],
-                    ["GET / 200 in 41ms",
-                     "GET /products 200 in 63ms",
-                     "GET /checkout 200 in 57ms",
-                     "POST /api/cart 200 in 22ms",
-                     "GET /products/canvas-tote 200 in 48ms",
-                     "GET /api/health 200 in 4ms"])
-        case "api":
-            return (["api listening on http://localhost:4000", ""],
-                    ["POST /v1/cart 200 18ms",
-                     "GET /v1/products 200 12ms",
-                     "POST /v1/checkout/intent 201 44ms",
-                     "GET /v1/products/canvas-tote 200 9ms",
-                     "GET /v1/health 200 2ms"])
-        case "worker":
-            return (["worker ready — waiting for jobs", ""],
-                    ["processed email-receipt #1042 (320ms)",
-                     "processed image-resize #1043 (911ms)",
-                     "processed inventory-sync #1044 (204ms)"])
-        case "server":
-            return (["listening on :8080", ""],
-                    ["GET /healthz 200 1ms",
-                     "POST /v1/token 200 12ms",
-                     "GET /v1/routes 200 7ms"])
-        case "metro":
-            return (["Welcome to Metro",
-                     "Dev server ready on http://localhost:8081",
-                     ""],
-                    ["BUNDLE ./index.js ▓▓▓▓▓▓▓▓▓▓ 100.0% (612/612)",
-                     "LOG Running \"mobile-app\" with 1 root tag"])
-        case "storybook":
-            return (["Storybook started",
-                     "Local: http://localhost:6006/",
-                     ""],
-                    ["info => Serving static files from ./public",
-                     "compiled successfully"])
-        default:
-            return (["> \(svc.cmd)",
-                     "Local http://localhost:\(svc.port)/",
-                     "watching for file changes…"],
-                    ["200 / (12ms)",
-                     "200 /posts/hello-world (18ms)",
-                     "200 /about (9ms)"])
-        }
     }
 
     // MARK: cross-domain hooks

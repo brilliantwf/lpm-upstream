@@ -443,6 +443,76 @@ describe("FileViewerModal zoom and focus", () => {
   });
 });
 
+describe("FileViewerModal minimize and dock", () => {
+  const labelled = (label: string) => document.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`);
+  const dialog = () => document.querySelector('[role="dialog"]');
+
+  async function openInHost(opener: HTMLElement) {
+    opener.focus();
+    await act(async () => root.render(<FileViewerHost />));
+    await act(async () => openFileViewer({ absPath: DOC, line: 0, col: 0, projectRoot: "/proj" }));
+    await settle();
+  }
+
+  it("keeps the file mounted while minimized and hands the app its focus and keys", async () => {
+    const opener = document.createElement("button");
+    document.body.appendChild(opener);
+    await openInHost(opener);
+    const rendered = document.querySelector("h1");
+    expect(rendered?.textContent).toBe("Design");
+
+    await act(async () => labelled("Minimize")?.click());
+    expect(document.querySelector("h1")).toBe(rendered);
+    expect(document.querySelector("[data-modal-overlay]")).toBeNull();
+    expect(dialog()?.getAttribute("aria-modal")).toBe("false");
+    expect(document.activeElement).toBe(opener);
+
+    const reachedWindow = vi.fn();
+    window.addEventListener("keydown", reachedWindow);
+    for (const init of [{ key: "Escape" }, { key: "w", metaKey: true }]) {
+      await act(async () =>
+        document.body.dispatchEvent(new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true })),
+      );
+    }
+    window.removeEventListener("keydown", reachedWindow);
+    expect(reachedWindow).toHaveBeenCalledTimes(2);
+    expect(useFileViewerStore.getState().current).not.toBeNull();
+
+    await act(async () => labelled("Expand")?.click());
+    expect(document.querySelector("h1")).toBe(rendered);
+    expect(dialog()?.getAttribute("aria-modal")).toBe("true");
+    opener.remove();
+  });
+
+  it("docks to the side and gives the app its room back on close", async () => {
+    const opener = document.createElement("button");
+    document.body.appendChild(opener);
+    await openInHost(opener);
+    const rendered = document.querySelector("h1");
+
+    await act(async () => labelled("Dock to the side")?.click());
+    expect(document.querySelector("h1")).toBe(rendered);
+    expect(useFileViewerStore.getState().mode).toBe("docked");
+    expect(useFileViewerStore.getState().dockInset).toBeGreaterThan(0);
+
+    await act(async () => labelled("Close")?.click());
+    expect(useFileViewerStore.getState().dockInset).toBe(0);
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
+  });
+
+  it("shows a newly opened file in full", async () => {
+    await act(async () => root.render(<FileViewerHost />));
+    await act(async () => openFileViewer({ absPath: DOC, line: 0, col: 0, projectRoot: "/proj" }));
+    await settle();
+    await act(async () => labelled("Minimize")?.click());
+    await act(async () => openFileViewer({ absPath: MAIN, line: 0, col: 0, projectRoot: "/proj" }));
+    await settle();
+    expect(useFileViewerStore.getState().mode).toBe("open");
+    expect(document.querySelector("[data-modal-overlay]")).not.toBeNull();
+  });
+});
+
 describe("FileViewerModal choices", () => {
   it("asks which file to open when a reference matches several", async () => {
     mocks.files["/proj/docs/README.md"] = "# Docs\n";

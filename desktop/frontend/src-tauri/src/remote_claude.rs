@@ -63,7 +63,7 @@ fn accounts_reply() -> Value {
     let pools: Vec<Value> = state
         .pools
         .iter()
-        .map(|p| json!({ "project": p.project, "current": p.current }))
+        .map(|p| json!({ "project": p.project, "members": p.members, "current": p.current }))
         .collect();
     json!({
         "t": "claudeAccounts",

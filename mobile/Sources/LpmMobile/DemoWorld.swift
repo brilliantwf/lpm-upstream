@@ -76,6 +76,8 @@ struct DemoWorld {
     var backgroundRuns: [BgRun] = []
     // Poll counters ("project\nservice") so service logs grow between polls.
     var serviceLogTicks: [String: Int] = [:]
+    var serviceLogWatches: [String: Int] = [:]   // project + "\n" + pane -> watch token
+    var serviceLogWatchSeq = 0
 
     // MARK: Sidebar
 

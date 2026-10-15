@@ -15,6 +15,9 @@ final class UsageStore {
     var snapshot: LimitsSnapshot?
     var loading = false
     var error: String?
+    /// Today's spend per tool, for the usage rows' fallback when a tool has no
+    /// window yet — the desktop sidebar's `useTokensToday`.
+    var today: AgentStats?
 
     /// Millis to ADD to this phone's `Date()` to land on the Mac's clock. Only the
     /// Mac-stamped `updatedAt` belongs on that clock; a window's `resetsAt` is
@@ -32,10 +35,48 @@ final class UsageStore {
     // instead of leaving the screen on stale numbers.
     @ObservationIgnored private var active = false
     @ObservationIgnored private let timeout = GenerationTimeout<String>()
+    // How many lists with usage rows are on screen; while any is, a usage push
+    // also refreshes today's spend and the account pools.
+    @ObservationIgnored private var rowViewers = 0
+    @ObservationIgnored private var extrasAskedAt: Date?
+
+    // MARK: usage rows (projects list, project screen)
+
+    /// A list showing usage rows appeared, or the link came back under it: read
+    /// the meters, today's spend and the accounts the rows are named and tagged by.
+    func rowsDidAppear() {
+        rowViewers += 1
+        client?.requestLimits()
+        refreshExtras()
+    }
+
+    func rowsDidDisappear() { rowViewers = max(0, rowViewers - 1) }
+
+    /// Today's spend changes as agents work, and the pools move as switching
+    /// picks another account, but neither is pushed. Scanning today's history and
+    /// reading every account's login are cheap but not free, so they run at most
+    /// every 30 seconds — sooner only when the accounts were never read.
+    func refreshExtras() {
+        let due = extrasAskedAt.map { Date().timeIntervalSince($0) >= 30 } ?? true
+        if due {
+            extrasAskedAt = Date()
+            client?.requestStats(days: 1)
+        }
+        if due || model?.claudeAccounts == nil {
+            client?.requestClaudeAccounts()
+        }
+    }
+
+    func applyToday(_ stats: AgentStats) { today = stats }
 
     // MARK: screen lifecycle
 
-    func screenDidOpen() { load() }
+    /// The cards are titled by the names accounts were given on the Mac, so the
+    /// accounts are read too when nothing else has read them yet.
+    func screenDidOpen() {
+        load()
+        if model?.claudeAccounts == nil { client?.requestClaudeAccounts() }
+    }
     func screenDidClose() { active = false }
 
     /// Pull-to-refresh: re-request when live, else nudge the link back up.
@@ -81,6 +122,9 @@ final class UsageStore {
         timeout.cancel("limits")
         loading = false
         adopt(snapshot)
+        // A push means an agent just reported work — the closest thing to a
+        // "spend changed" signal there is.
+        if rowViewers > 0 { refreshExtras() }
     }
 
     private func adopt(_ snapshot: LimitsSnapshot) {

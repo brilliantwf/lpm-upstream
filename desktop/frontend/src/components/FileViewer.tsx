@@ -1,8 +1,10 @@
 import { useContentZoom } from "../hooks/useContentZoom";
 import { useEditorZoom } from "../hooks/useEditorZoom";
 import { useEventListener } from "../hooks/useEventListener";
+import { FileViewerCompactHeader } from "./FileViewerCompactHeader";
 import { FileViewerContent } from "./FileViewerContent";
 import { FileViewerHeader } from "./FileViewerHeader";
+import { miniSize, type FileViewerLayout } from "./fileViewerLayout";
 import { isSourceImage } from "./fileMedia";
 import { isMarkdownPath } from "./files/useFileView";
 import { useImagePreview } from "./imagePreview";
@@ -26,6 +28,8 @@ interface FileViewerProps {
   projectRoot: string;
   editing: boolean;
   onEditingChange: (editing: boolean) => void;
+  // Minimize and dock are offered only when the host lays the viewer out.
+  layout?: FileViewerLayout;
   onClose: () => void;
 }
 
@@ -38,8 +42,10 @@ export function FileViewer({
   projectRoot,
   editing,
   onEditingChange,
+  layout,
   onClose,
 }: FileViewerProps) {
+  const mode = layout?.mode ?? "open";
   const file = useFileViewerFile(absPath, projectRoot);
   const { buffer } = file;
   const svg = file.kind === "image" && isSourceImage(absPath);
@@ -70,6 +76,17 @@ export function FileViewer({
   const textZoom = useContentZoom(previewing);
   const editorZoom = useEditorZoom(inEditor);
 
+  const meta = zoomed?.meta ?? (showVideo ? video.meta : null);
+  const mini =
+    mode === "minimized"
+      ? miniSize(showVideo ? video.size : showImage ? image.natural : null, showVideo || showImage)
+      : null;
+  const frameStyle = mini
+    ? { width: mini.w, height: mini.h }
+    : mode === "docked"
+      ? { width: layout?.dockWidth }
+      : undefined;
+
   const canEdit = file.text && !!buffer.file?.writable && !showVideo && !(showImage && !svg);
   const dirty = buffer.draft !== null;
 
@@ -90,7 +107,7 @@ export function FileViewer({
 
   // Capture phase on window so we beat xterm's keydown handler, which calls
   // stopPropagation on keys it consumes. ⌘W closes the viewer rather than the
-  // terminal tab underneath it.
+  // terminal tab underneath it. Minimized or docked, the keys are the app's.
   useEventListener(
     "keydown",
     (e) => {
@@ -110,36 +127,55 @@ export function FileViewer({
       onClose();
     },
     window,
-    true,
+    mode === "open",
     true,
   );
 
   return (
-    <div className="flex h-[90vh] w-[min(1480px,calc(100vw-32px))] flex-col">
-      <FileViewerHeader
-        absPath={absPath}
-        label={file.label}
-        line={line}
-        col={col}
-        meta={zoomed?.meta ?? (showVideo ? video.meta : null)}
-        statusLabel={file.statusLabel}
-        views={
-          textView.options
-            ? { value: textView.view, options: textView.options, onChange: textView.select }
-            : null
-        }
-        zoom={zoomed?.zoom ?? (previewing ? textZoom : inEditor ? editorZoom : null)}
-        edit={{
-          editing,
-          canEdit,
-          dirty,
-          saving: buffer.saving,
-          onEdit: startEdit,
-          onCancel: cancelEdit,
-          onSave: () => void save(),
-        }}
-        onClose={onClose}
-      />
+    <div
+      style={frameStyle}
+      className={
+        mode === "open"
+          ? "flex h-[90vh] w-[min(1480px,calc(100vw-32px))] flex-col"
+          : `relative flex flex-col ${mode === "docked" ? "h-full" : ""}`
+      }
+    >
+      {layout && mode !== "open" ? (
+        <FileViewerCompactHeader
+          absPath={absPath}
+          meta={meta}
+          mode={mode}
+          onModeChange={layout.onModeChange}
+          onClose={onClose}
+        />
+      ) : (
+        <FileViewerHeader
+          absPath={absPath}
+          label={file.label}
+          line={line}
+          col={col}
+          meta={meta}
+          statusLabel={file.statusLabel}
+          views={
+            textView.options
+              ? { value: textView.view, options: textView.options, onChange: textView.select }
+              : null
+          }
+          zoom={zoomed?.zoom ?? (previewing ? textZoom : inEditor ? editorZoom : null)}
+          edit={{
+            editing,
+            canEdit,
+            dirty,
+            saving: buffer.saving,
+            onEdit: startEdit,
+            onCancel: cancelEdit,
+            onSave: () => void save(),
+          }}
+          onMinimize={layout && (() => layout.onModeChange("minimized"))}
+          onDock={layout && (() => layout.onModeChange("docked"))}
+          onClose={onClose}
+        />
+      )}
       {buffer.conflict && (
         <DiffConflictBanner
           path={buffer.conflict.path}
@@ -168,11 +204,19 @@ export function FileViewer({
           image={showImage ? image : null}
           video={showVideo ? video : null}
           pdf={showPdf ? pdf : null}
+          compact={mode === "minimized"}
           textZoom={textZoom}
           onChange={buffer.setDraft}
           onSave={() => void save()}
         />
       </div>
+      {layout && mode === "docked" && (
+        <div
+          onMouseDown={layout.onDockResizeStart}
+          aria-hidden
+          className="absolute inset-y-0 -left-1.5 z-10 w-3 cursor-col-resize before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 hover:before:bg-[var(--accent-cyan)]/30 active:before:bg-[var(--accent-cyan)]/50"
+        />
+      )}
     </div>
   );
 }

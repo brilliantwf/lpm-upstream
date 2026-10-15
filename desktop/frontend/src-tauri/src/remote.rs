@@ -135,7 +135,10 @@ const LIVE_REFRESH_GAP: Duration = Duration::from_secs(5); // established-sessio
 
 /// Sent in `paired` and `ready`: requests this Mac answers that an older one
 /// silently ignores, so the phone only sends what will get a reply.
-const PHONE_FEATURES: &[&str] = &[crate::peeruploadhost::FILE_UPLOAD_FEATURE];
+const PHONE_FEATURES: &[&str] = &[
+    crate::peeruploadhost::FILE_UPLOAD_FEATURE,
+    crate::remote_service_logs::WATCH_FEATURE,
+];
 
 /// Whether a device-list re-read may wait for a save that is in progress.
 #[derive(Clone, Copy)]
@@ -1098,9 +1101,10 @@ fn handle_conn(stream: TcpStream, hub: RemoteHub, app: AppHandle, generation: u6
     let _ = ws.get_ref().tcp().set_read_timeout(Some(POLL));
     let _ = ws.get_ref().tcp().set_write_timeout(Some(WRITE_TIMEOUT));
 
-    // Per-connection working-tree watchers (project -> watcher). Local to this
-    // connection so they stop deterministically on teardown below, which also
-    // covers device revocation (the loop self-exits, then this scope drops).
+    // Per-connection watchers: working trees (keyed by project) and live service
+    // logs (keyed by remote_service_logs::key). Local to this connection so they
+    // stop deterministically on teardown below, which also covers device
+    // revocation (the loop self-exits, then this scope drops).
     let mut watches: HashMap<String, RemoteWatch> = HashMap::new();
 
     // Any inbound frame — data, the phone's keepalive Ping, a Pong — counts as
@@ -1979,12 +1983,13 @@ fn file_stamp(cwd: &str, path: &str) -> String {
 
 // --- live working-tree watch (per connection) --------------------------------
 
-/// One project's filesystem watcher for a single phone connection. Dropping it
-/// closes the notify channel, which ends the debounce thread; the `stop` flag is
-/// an explicit belt-and-suspenders for the mid-debounce window.
+/// One watch for a single phone connection: a project's filesystem watcher, or
+/// a service pane's log poller (no watcher; `stop` alone ends it). Dropping a
+/// filesystem watch closes the notify channel, which ends the debounce thread;
+/// the `stop` flag is an explicit belt-and-suspenders for the mid-debounce window.
 struct RemoteWatch {
     stop: Arc<AtomicBool>,
-    _watcher: notify::RecommendedWatcher,
+    _watcher: Option<notify::RecommendedWatcher>,
 }
 
 /// Watch a project's working tree for this connection and push a debounced
@@ -2053,7 +2058,7 @@ fn start_git_watch(
 
     Ok(RemoteWatch {
         stop,
-        _watcher: watcher,
+        _watcher: Some(watcher),
     })
 }
 
@@ -3820,6 +3825,22 @@ fn handle_msg(
                 };
                 let _ = out.try_send(reply.to_string());
             });
+        }
+        // Live logs for the phone's logs sheet: push one service pane's output as it
+        // changes (see remote_service_logs). Kept in `watches` beside the git
+        // watchers, so it stops on unwatch, connection close and revocation alike.
+        // Watching again restarts it, which pushes the current output at once.
+        "serviceLogsWatch" | "serviceLogsUnwatch" => {
+            let project = str_field("project").unwrap_or_default();
+            let pane_index = v.get("paneIndex").and_then(Value::as_i64).unwrap_or(0);
+            let key = crate::remote_service_logs::key(&project, pane_index);
+            if let Some(w) = watches.remove(&key) {
+                w.stop.store(true, Ordering::SeqCst);
+            }
+            if t == "serviceLogsWatch" {
+                let stop = crate::remote_service_logs::start(project, pane_index, out.clone());
+                watches.insert(key, RemoteWatch { stop, _watcher: None });
+            }
         }
         // Paginated history query (keyset, page 60), mirroring the desktop popover.
         // `project` scopes to that project (else all); `favoritesOnly`/`folder`

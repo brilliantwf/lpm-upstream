@@ -94,17 +94,23 @@ struct UsageCard: Identifiable {
 /// The Claude cards, one per account, ordered by title then key so the list does
 /// not reshuffle between snapshots. Empty while Claude reporting is off on the
 /// Mac — no window ever arrives then, and the screen turns that into its own
-/// panel. The phone has no account directory, so a named account is titled by its
-/// own name and carries no subtitle; the desktop shows the signed-in email there.
-func claudeCards(_ snapshot: LimitsSnapshot) -> [UsageCard] {
+/// panel. As on the desktop, an account is titled by the name it was given on the
+/// Mac (its id until the accounts arrive) over its signed-in email, or over its
+/// id when no email is known.
+func claudeCards(_ snapshot: LimitsSnapshot, accounts: [ClaudeAccountInfo]) -> [UsageCard] {
     guard snapshot.claudeEnabled else { return [] }
     return snapshot.entries
         .filter { $0.value.provider == "claude" }
         .map { key, data -> UsageCard in
-            let account = data.accountId ?? ""
-            let named = !account.isEmpty && account != "default"
-            return UsageCard(key: key, data: data,
-                             title: named ? account : "Claude", subtitle: nil)
+            let id = data.accountId.flatMap { $0.isEmpty ? nil : $0 } ?? claudeMainLogin
+            let account = accounts.first { $0.id == id }
+            let email = account.flatMap { $0.email.isEmpty ? nil : $0.email }
+            if id == claudeMainLogin {
+                return UsageCard(key: key, data: data, title: "Claude", subtitle: email)
+            }
+            let name = account?.name
+            return UsageCard(key: key, data: data, title: name ?? id,
+                             subtitle: email ?? (name == nil ? nil : id))
         }
         .sorted { lhs, rhs in
             switch lhs.title.localizedCompare(rhs.title) {

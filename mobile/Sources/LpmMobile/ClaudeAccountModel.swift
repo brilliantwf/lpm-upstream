@@ -8,6 +8,8 @@ let claudeMainLogin = "default"
 struct ClaudeAccountInfo: Identifiable {
     let id: String
     let label: String
+    /// The name given on the Mac, which usage cards and rows are titled by.
+    let name: String?
     let signedIn: Bool
     let email: String
     /// "max", "pro", "team", "enterprise", or "" when unknown.
@@ -23,6 +25,7 @@ struct ClaudeAccountInfo: Identifiable {
         plan = o["plan"] as? String ?? ""
         confirmed = o["confirmed"] as? Bool ?? false
         let named = (o["label"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        name = named
         if id == claudeMainLogin {
             label = "Main login"
         } else {
@@ -47,6 +50,8 @@ struct ClaudeSwitching {
     /// Each pool's account for new sessions, keyed by the project whose list it
     /// is, or "" for the main accounts.
     let current: [String: String]
+    /// Each pool's accounts in order, keyed like `current`; empty from older Macs.
+    let members: [String: [String]]
 
     init(_ o: [String: Any]) {
         enabled = o["enabled"] as? Bool ?? false
@@ -55,12 +60,14 @@ struct ClaudeSwitching {
         allowed = o["allowed"] as? [String] ?? []
         maxMembers = o["maxMembers"] as? Int ?? 3
         var current: [String: String] = [:]
+        var members: [String: [String]] = [:]
         for pool in o["pools"] as? [[String: Any]] ?? [] {
-            if let id = pool["current"] as? String {
-                current[pool["project"] as? String ?? ""] = id
-            }
+            let key = pool["project"] as? String ?? ""
+            if let id = pool["current"] as? String { current[key] = id }
+            if let ids = pool["members"] as? [String] { members[key] = ids }
         }
         self.current = current
+        self.members = members
     }
 }
 

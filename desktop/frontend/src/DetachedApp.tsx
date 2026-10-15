@@ -15,6 +15,7 @@ import { useProjectWatcher } from "./hooks/useProjectWatcher";
 import { useKeyboardShortcut } from "./hooks/useKeyboardShortcut";
 import { useIsFullscreen } from "./hooks/useIsFullscreen";
 import { useAppStore } from "./store/app";
+import { useFileViewerStore } from "./store/fileViewer";
 import { useResolvedTheme } from "./theme";
 import { FocusMainWindow } from "../bridge/commands";
 import { focusMainTerminal } from "./mainWindowFocus";
@@ -26,6 +27,7 @@ interface DetachedAppProps {
 
 export function DetachedApp({ projectName }: DetachedAppProps) {
   const projects = useAppStore((s) => s.projects);
+  const dockInset = useFileViewerStore((s) => s.dockInset);
   const groups = useAppStore((s) => s.groups);
   const sidebarOrder = useAppStore((s) => s.sidebarOrder);
   const detached = useAppStore((s) => s.detached);
@@ -97,7 +99,7 @@ export function DetachedApp({ projectName }: DetachedAppProps) {
   }
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen" style={{ paddingRight: dockInset }}>
       <Toaster
         position="top-right"
         theme={theme}

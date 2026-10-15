@@ -15,6 +15,7 @@ import UniformTypeIdentifiers
 struct TerminalComposer: View {
     @Environment(AppModel.self) private var model
     @Environment(\.colorScheme) private var systemColorScheme
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @ObservedObject var store: ComposerStore
     private let onSend: ((String) -> Void)?
     private let terminalTools: Bool
@@ -284,12 +285,30 @@ struct TerminalComposer: View {
                                 onRetry: { store.retryUpload($0) },
                                 onRemove: { store.removeAttachment($0) })
                 .equatable()
+            keysAndInput
+        }
+    }
+
+    // A phone on its side is short of height, not width, so there the keys share
+    // the message field's row and the terminal keeps two more lines. AnyLayout
+    // keeps both views' identity across the switch, so rotating mid-message
+    // doesn't drop the keyboard.
+    private var keysAndInput: some View {
+        let sideBySide = terminalTools && verticalSizeClass == .compact
+        let layout = sideBySide
+            ? AnyLayout(HStackLayout(alignment: .bottom, spacing: 0))
+            : AnyLayout(VStackLayout(spacing: 0))
+        return layout {
             if terminalTools {
                 SpecialKeyBar(key: key, onPaste: pasteClipboard)
+                    .padding(.bottom, sideBySide ? 8 : 0)
             }
-            Divider().opacity(0.5)
+            if !sideBySide {
+                Divider().opacity(0.5)
+            }
             inputRow
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     // Cheap Int change-proxies for the observed source dicts, so the mention

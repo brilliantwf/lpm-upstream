@@ -30,6 +30,11 @@ interface ModalProps {
   // When false the dialog leaves focus where it is — for read-only HUDs with
   // nothing focusable inside, which would otherwise blur whatever is behind.
   autoFocus?: boolean;
+  // When true the dialog steps aside without unmounting (a minimized file
+  // viewer keeps its video playing) and the app behind it stays fully live:
+  // no backdrop, focus and shortcuts go back to the app, the in-pane browser
+  // stays up, and containerClassName places the content instead of centering.
+  passive?: boolean;
   ref?: Ref<HTMLDivElement>;
 }
 
@@ -46,8 +51,11 @@ export function Modal({
   backdrop = true,
   draggable = false,
   autoFocus = true,
+  passive = false,
   ref,
 }: ModalProps) {
+  const dimmed = backdrop && !passive;
+
   // A blocking modal owns Escape globally; a non-blocking one must not hijack
   // it from the rest of the app, so it handles Escape only when focused (below).
   useEventListener(
@@ -56,10 +64,10 @@ export function Modal({
       if (e.key === "Escape") onClose();
     },
     document,
-    open && closeOnEscape && backdrop,
+    open && closeOnEscape && dimmed,
   );
 
-  useOverlay(open); // park the in-pane browser webview while open (it floats above the DOM)
+  useOverlay(open && !passive); // park the in-pane browser webview while open (it floats above the DOM)
 
   const contentRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
@@ -72,18 +80,25 @@ export function Modal({
   }
   wasOpenRef.current = open;
 
+  // While stepped aside, wherever the user works becomes the spot to return to.
+  useEventListener(
+    "focusin",
+    (e) => {
+      if (!contentRef.current?.contains(e.target as Node)) previousFocusRef.current = e.target as Element;
+    },
+    document,
+    open && passive,
+  );
+
   // Move focus into the dialog on open (unless the caller opted out, or already
   // focused something inside, e.g. an autoFocus input) so Enter/Tab don't act on
-  // the obscured trigger; on close, hand focus back to the opener — but only when
-  // focus is still in the dialog or dropped to body, never yanking it from a
-  // spot the user deliberately moved to.
+  // the obscured trigger; on close or stepping aside, hand focus back to the
+  // opener — but only when focus is still in the dialog or dropped to body,
+  // never yanking it from a spot the user deliberately moved to.
   useEffect(() => {
     if (!open) return;
     const content = contentRef.current;
-    if (autoFocus && content && !content.contains(document.activeElement)) content.focus();
-    return () => {
-      // Still connected means a dev StrictMode effect re-run, not a close.
-      if (content?.isConnected) return;
+    const handBack = () => {
       const prev = previousFocusRef.current;
       const active = document.activeElement;
       if (
@@ -94,7 +109,15 @@ export function Modal({
         prev.focus();
       }
     };
-  }, [open, autoFocus]);
+    if (passive) handBack();
+    else if (autoFocus && content && !content.contains(document.activeElement)) content.focus();
+    return () => {
+      // Still connected means a dev StrictMode effect re-run or a step aside,
+      // not a close.
+      if (content?.isConnected) return;
+      handBack();
+    };
+  }, [open, passive, autoFocus]);
 
   // Gate on `open` too: the content element is created/destroyed with it, so the
   // drag hook re-measures and re-observes the fresh node each time it reopens.
@@ -133,12 +156,12 @@ export function Modal({
 
   return createPortal(
     <div
-      data-modal-overlay
-      className={`fixed inset-0 ${zIndexClassName} flex items-center justify-center ${
-        backdrop ? "" : "pointer-events-none"
+      data-modal-overlay={!passive || undefined}
+      className={`fixed inset-0 ${zIndexClassName} flex ${passive ? "" : "items-center justify-center"} ${
+        dimmed ? "" : "pointer-events-none"
       } ${containerClassName}`}
     >
-      {backdrop && (
+      {dimmed && (
         <div
           className={`absolute inset-0 ${backdropClassName}`}
           onClick={closeOnBackdrop ? onClose : undefined}
@@ -147,10 +170,10 @@ export function Modal({
       <div
         ref={setContentRef}
         role="dialog"
-        aria-modal={backdrop}
+        aria-modal={dimmed}
         tabIndex={-1}
         onKeyDown={
-          !backdrop && closeOnEscape
+          !dimmed && closeOnEscape
             ? (e) => {
                 if (e.key === "Escape") onClose();
               }
@@ -158,7 +181,7 @@ export function Modal({
         }
         onPointerDown={draggable ? drag.onPointerDown : undefined}
         style={dragStyle}
-        className={`relative outline-none ${backdrop ? "" : "pointer-events-auto"} ${contentClassName}`}
+        className={`relative outline-none ${dimmed ? "" : "pointer-events-auto"} ${contentClassName}`}
       >
         {children}
       </div>

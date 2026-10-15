@@ -31,6 +31,8 @@ interface FileViewerContentProps {
   image: ImagePreview | null;
   video: VideoPreview | null;
   pdf: PdfPreview | null;
+  // Minimized: media fills the small window edge to edge.
+  compact: boolean;
   textZoom: ContentZoom;
   onChange: (text: string) => void;
   onSave: () => void;
@@ -52,12 +54,13 @@ export function FileViewerContent({
   image,
   video,
   pdf,
+  compact,
   textZoom,
   onChange,
   onSave,
 }: FileViewerContentProps) {
-  if (video) return <VideoFileView video={video} />;
-  if (image) return <ImageFileView preview={image} />;
+  if (video) return <VideoFileView video={video} compact={compact} />;
+  if (image) return <ImageFileView preview={image} compact={compact} />;
   if (pdf) return <PdfFileView pdf={pdf} />;
   if (loading || !file) {
     return (

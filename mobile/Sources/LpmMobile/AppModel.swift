@@ -562,16 +562,21 @@ final class AppModel {
     /// `repickHostIfStale` reacts to). If the active Mac has a known identity,
     /// browse the local network for it: a Mac whose LAN address changed (new DHCP
     /// lease, moved networks) re-appears here under the same identity, and we
-    /// migrate the connection to its fresh address. Bounded to a short window and
-    /// re-armed on each slow retry's hint, so it never browses in the background.
+    /// migrate the connection to its fresh address — or reconnect the moment a
+    /// restarted lpm advertises again. Each slow retry's hint extends a short
+    /// window, so the browse spans the wait between retries but never outlives
+    /// them (and stops when the app backgrounds).
     private func startRecoveryIfStale(_ s: LpmClient.State, from c: LpmClient) {
         guard case .failed(let hint) = s, LpmClient.isOfflineHint(hint),
-              c === client, !recovering, !isVisit,
+              c === client, !isVisit,
               let sid = linkRecord?.serverId, !sid.isEmpty else { return }
-        recovering = true
-        recoveryHandled = []
-        discovery.onChange = { [weak self] found in self?.handleDiscovered(found) }
-        discovery.start()
+        if !recovering {
+            recovering = true
+            recoveryHandled = []
+            discovery.onChange = { [weak self] found in self?.handleDiscovered(found) }
+            discovery.start()
+        }
+        recoveryWindow?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.stopBrowsing()
@@ -2179,6 +2184,14 @@ final class AppModel {
     func fetchServiceLogs(_ project: String, paneIndex: Int, lines: Int = 200) {
         client?.requestServiceLogs(project: project, paneIndex: paneIndex, lines: lines)
     }
+    /// The Mac pushes a watched service's output as it changes; an older one only
+    /// answers `serviceLogs` polls.
+    var canWatchServiceLogs: Bool {
+        client?.hostFeatures.contains(LpmClient.serviceLogsWatchFeature) == true
+    }
+    func watchServiceLogs(_ project: String, paneIndex: Int, _ watch: Bool) {
+        client?.setServiceLogsWatch(project: project, paneIndex: paneIndex, watch: watch)
+    }
     func consumeServiceLogs(_ key: String) {
         serviceLogsResult[key] = nil
         serviceLogsError[key] = nil
@@ -2596,6 +2609,9 @@ final class AppModel {
         c.onStats = { [weak self] stats, error in
             guard let self else { return }
             if let stats {
+                // The usage rows ask for today alone; the echoed period tells their
+                // answer apart from the Stats screen's.
+                if stats.days == 1 { self.usage.applyToday(stats) }
                 // Drop a stale reply from a superseded period — the payload echoes the
                 // period it was scanned for, and only the current one may land.
                 guard stats.days == self.statsDays else { return }
@@ -2603,7 +2619,8 @@ final class AppModel {
                 self.stats = stats
                 self.statsError = nil
                 self.statsLoading = false
-            } else {
+            } else if self.statsLoading {
+                // A failure echoes no period; only a screen waiting on one claims it.
                 self.statsTimeout.cancel("stats")
                 self.statsLoading = false
                 self.statsError = error ?? "Couldn't load stats."

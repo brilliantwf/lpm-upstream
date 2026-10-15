@@ -37,6 +37,16 @@ extension DemoServer {
                                           resetsIn: 4 * daySeconds, now: now),
                     "updatedAt": advanced ? nowMs : nowMs - 90_000,
                 ],
+                // A second account, so the projects list shows one usage row per
+                // account with its "in use" / "pool" tags.
+                "claude:work": [
+                    "provider": "claude",
+                    "accountId": "work",
+                    "label": "Opus 4.6",
+                    "fiveHour": limitWindow(used: 34, resetsIn: 2 * hourSeconds + 600, now: now),
+                    "weekly": limitWindow(used: 11, resetsIn: 4 * daySeconds + 10 * hourSeconds, now: now),
+                    "updatedAt": nowMs - 240_000,
+                ],
                 // No accountId: the Mac omits it for Codex, so the phone's
                 // optional decode gets exercised here too.
                 "codex": [

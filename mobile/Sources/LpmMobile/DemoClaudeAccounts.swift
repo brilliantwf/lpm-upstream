@@ -49,14 +49,16 @@ extension DemoServer {
     }
 
     /// Each list takes turns starting on its first signed-in account; the main
-    /// accounts are on the main login.
+    /// accounts take turns between the main login and Work, on the main login now.
     private func claudeAccountsPayload() -> [String: Any] {
         let claude = world.claude
         let signedIn = Set(claude.accounts.filter(\.signedIn).map(\.id))
-        var pools: [[String: Any]] = [["project": NSNull(), "current": claudeMainLogin]]
+        var pools: [[String: Any]] = [
+            ["project": NSNull(), "members": [claudeMainLogin, "work"], "current": claudeMainLogin],
+        ]
         for p in world.projects where p.claudeAccount == nil {
-            if let first = p.claudeAccounts?.first(where: signedIn.contains) {
-                pools.append(["project": p.name, "current": first])
+            if let list = p.claudeAccounts, let first = list.first(where: signedIn.contains) {
+                pools.append(["project": p.name, "members": list, "current": first])
             }
         }
         return [
