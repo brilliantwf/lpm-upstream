@@ -10,8 +10,10 @@ lpm starts, stops, duplicates, and switches between local dev projects, with a b
   - `PROTOCOL.md` — the wire contract both apps implement
   - `shared/web/` — xterm.js terminal and markdown pages, bundled into both apps' WebViews
   - `ios/` — iOS app (SwiftUI); `.xcodeproj` is generated — run `xcodegen generate` in `mobile/ios` after adding files
-  - `android/` — Android app (Kotlin, Jetpack Compose, Gradle); build with `./gradlew assembleDebug` in `mobile/android`.
-    It's a port of the iOS app: follow `mobile/android/PORTING.md`
+  - `android/` — Android app (Kotlin, Compose, Hilt, Navigation 3; modules built from
+    the `build-logic` convention plugins). In `mobile/android` run `./gradlew spotlessApply`,
+    then `./gradlew check assembleRelease`. It's a port of the iOS app on Google's
+    architecture recommendations: read `mobile/android/PORTING.md` first
   - `parity/` — the same Maestro flows on both apps in an iPhone simulator and an
     Android emulator, with a side-by-side report (`node mobile/parity/parity.js all --open`)
 - `website/` — Next.js marketing site (lpm.cx)

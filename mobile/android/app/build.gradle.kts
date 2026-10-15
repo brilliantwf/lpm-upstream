@@ -1,18 +1,24 @@
 plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.lpm.android.application)
+    alias(libs.plugins.lpm.android.compose)
+    alias(libs.plugins.lpm.hilt)
 }
 
 android {
     namespace = "cx.lpm.mobile"
-    compileSdk = 37
 
     defaultConfig {
         applicationId = "cx.lpm.mobile"
-        minSdk = 26
-        targetSdk = 37
         versionCode = 1
         versionName = "0.1"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+        }
     }
 
     sourceSets {
@@ -22,17 +28,9 @@ android {
             assets.directories.add("../../shared")
         }
     }
-
-    buildFeatures {
-        compose = true
-    }
 }
 
 dependencies {
-    implementation(platform(libs.androidx.compose.bom))
+    implementation(projects.core.designsystem)
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.tooling.preview)
-    debugImplementation(libs.androidx.compose.ui.tooling)
 }
