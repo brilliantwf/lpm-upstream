@@ -1,0 +1,44 @@
+name: Android
+
+# lpm Link for Android: ktlint, lint, unit tests (`check`) and the R8 release
+# build. The parity flows in mobile/parity need an iPhone simulator next to the
+# emulator, so they run on a Mac, not here.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mobile/android/**"
+      - "mobile/shared/**"
+      - ".github/workflows/android.yml"
+  pull_request:
+    paths:
+      - "mobile/android/**"
+      - "mobile/shared/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile/android
+    steps:
+      - uses: actions/checkout@v7
+      # The Gradle daemon runs on JDK 21 (gradle/gradle-daemon-jvm.properties).
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      # Also validates the Gradle wrapper jar's checksum.
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Check and build release
+        run: ./gradlew check assembleRelease -PwarningsAsErrors=true
