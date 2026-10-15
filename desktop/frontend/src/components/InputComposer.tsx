@@ -807,7 +807,7 @@ export function InputComposer({
         )}
 
         <div className="flex items-center justify-start gap-1 px-2 pb-2">
-          {DICTATION_AVAILABLE && <ComposerMicButton disabled={disabled} />}
+          {DICTATION_AVAILABLE && <ComposerMicButton into={editorRef} disabled={disabled} />}
           {showActions && (
             <ComposerActionsButton
               align="left"

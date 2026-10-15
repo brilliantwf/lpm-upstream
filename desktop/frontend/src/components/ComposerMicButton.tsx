@@ -1,4 +1,4 @@
-import { type MouseEvent } from "react";
+import { type MouseEvent, type RefObject } from "react";
 import { useVoiceDictation } from "../hooks/useVoiceDictation";
 import type { ComposerToolVariant } from "../composerTools";
 import { MicIcon, StopIcon } from "./icons";
@@ -10,6 +10,8 @@ import { COMPOSER_TOOLTIP_DELAY_MS } from "../composerText";
 import { SEND_SHELL_CLASS, sendGlow, sendShellTint } from "./composerSendStyles";
 
 interface ComposerMicButtonProps {
+  // The field this mic dictates into, whatever has focus when it's pressed.
+  into?: RefObject<HTMLElement | null>;
   disabled?: boolean;
   variant?: ComposerToolVariant;
   // Row only: the menu holding the row, told to fold away once dictation starts.
@@ -19,7 +21,7 @@ interface ComposerMicButtonProps {
   prominent?: boolean;
 }
 
-export function ComposerMicButton({ disabled, variant = "button", onPick, prominent = false }: ComposerMicButtonProps) {
+export function ComposerMicButton({ into, disabled, variant = "button", onPick, prominent = false }: ComposerMicButtonProps) {
   const { toggle, phase, active, installOpen, setInstallOpen } = useVoiceDictation();
   const label =
     phase === "recording"
@@ -38,7 +40,7 @@ export function ComposerMicButton({ disabled, variant = "button", onPick, promin
   const buttonProps = {
     type: "button" as const,
     onMouseDown: keepEditorFocus,
-    onClick: () => void toggle(),
+    onClick: () => void toggle(into?.current),
     disabled,
     "aria-label": label,
     "aria-pressed": active,
@@ -53,7 +55,7 @@ export function ComposerMicButton({ disabled, variant = "button", onPick, promin
           onMouseDown={keepEditorFocus}
           onClick={() => {
             onPick?.();
-            void toggle();
+            void toggle(into?.current);
           }}
           disabled={disabled}
         />

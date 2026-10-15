@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { captureDictationTarget, insertDictation, spaceDictation } from "./insert";
+import { captureDictationTarget, focusDictationField, insertDictation, spaceDictation } from "./insert";
 
 // happy-dom has no execCommand; a refused one sends text fields down the
 // setRangeText path, which is what these tests then check.
@@ -90,5 +90,46 @@ describe("insertDictation", () => {
     area.remove();
     expect(insertDictation(target, "lost words")).toBe(false);
     expect(insertDictation(null, "no field")).toBe(false);
+  });
+});
+
+describe("focusDictationField", () => {
+  it("focuses a field the mic was pressed away from, caret at the end", () => {
+    const terminal = document.createElement("textarea");
+    const field = document.createElement("textarea");
+    field.value = "Fix the build";
+    document.body.append(terminal, field);
+    terminal.focus();
+    field.setSelectionRange(0, 0);
+
+    focusDictationField(field);
+    expect(document.activeElement).toBe(field);
+    expect(captureDictationTarget()).toEqual({ element: field, caret: { start: 13, end: 13 } });
+  });
+
+  it("keeps the caret of a field already being typed in", () => {
+    const field = document.createElement("textarea");
+    field.value = "Fix the build";
+    document.body.append(field);
+    field.focus();
+    field.setSelectionRange(4, 4);
+
+    focusDictationField(field);
+    expect(captureDictationTarget()).toEqual({ element: field, caret: { start: 4, end: 4 } });
+  });
+
+  it("dictation then lands in that field, not where focus was", () => {
+    const terminal = document.createElement("textarea");
+    const field = document.createElement("textarea");
+    field.value = "Fix the build";
+    document.body.append(terminal, field);
+    terminal.focus();
+
+    focusDictationField(field);
+    const target = captureDictationTarget();
+    terminal.focus();
+    expect(insertDictation(target, "and the tests")).toBe(true);
+    expect(field.value).toBe("Fix the build and the tests");
+    expect(terminal.value).toBe("");
   });
 });

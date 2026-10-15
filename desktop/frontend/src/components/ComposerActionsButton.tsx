@@ -13,6 +13,9 @@ import { VoiceToTextInstallModal } from "./VoiceToTextInstallModal";
 import { ContextMenuItem } from "./ui/ContextMenuItem";
 import { Tooltip } from "./ui/Tooltip";
 import { COMPOSER_TOOLTIP_DELAY_MS } from "../composerText";
+import { useDictationHost } from "../hooks/useDictationHost";
+import { DictationSpinner } from "./dictation/DictationSpinner";
+import { DictationStrip } from "./dictation/DictationStrip";
 
 // Count key for the free-form "Ask AI to rewrite" field, which has no action id.
 const CUSTOM_KEY = "__custom__";
@@ -61,6 +64,21 @@ export function ComposerActionsButton({
   const [counts, setCounts] = useState<Record<string, number>>({});
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { toggle: toggleDictation, active: dictating, installOpen, setInstallOpen } = useVoiceDictation();
+  // The instruction field records in place: its own controls make way for the
+  // recorder while the words go into it, whatever had focus when the mic was
+  // pressed.
+  const fieldRef = useRef<HTMLDivElement>(null);
+  const fieldDictation = useDictationHost(fieldRef);
+  const fieldRecording = fieldDictation !== null && fieldDictation !== "error";
+  const dictateIntoField = () => void toggleDictation(inputRef.current);
+  const micLabel =
+    fieldDictation === "recording"
+      ? "Stop and insert"
+      : fieldDictation === "transcribing"
+        ? "Transcribing…"
+        : dictating
+          ? "Stop dictation"
+          : "Dictate";
   // Portaled and fixed-positioned: the composer's rounded footer and any
   // scrolling host (e.g. a modal body) would otherwise clip the panel. It opens
   // above the trigger where there's room and flips below when there isn't.
@@ -68,7 +86,11 @@ export function ComposerActionsButton({
   // install modal this popover hosts doesn't also close the popover.
   const { triggerRef, panelRef, style } = useAnchoredPanel<HTMLDivElement, HTMLDivElement>({
     open,
-    onClose: () => setOpen(false),
+    // A click elsewhere mid-take must not take the field the words are going
+    // into away with the popover; the recorder's own buttons end the take.
+    onClose: () => {
+      if (!fieldRecording) setOpen(false);
+    },
     width: PANEL_WIDTH,
     side: "above",
     align,
@@ -255,22 +277,35 @@ export function ComposerActionsButton({
             )}
 
             <div className="shrink-0 border-t border-[var(--border)] p-2">
-              <div className="group flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)]/50 px-2 py-1.5 transition-colors focus-within:border-[var(--accent-cyan)]/40 focus-within:bg-[var(--bg-secondary)]">
-                {DICTATION_AVAILABLE && (
+              <div
+                ref={fieldRef}
+                data-dictation-scope
+                data-dictation-host
+                className="group flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)]/50 px-2 py-1.5 transition-colors focus-within:border-[var(--accent-cyan)]/40 focus-within:bg-[var(--bg-secondary)]"
+              >
+                {DICTATION_AVAILABLE && fieldDictation !== "error" && (
                   <button
                     type="button"
                     onMouseDown={keepEditorFocus}
-                    onClick={() => void toggleDictation()}
-                    title={dictating ? "Stop dictation" : "Dictate"}
-                    aria-label={dictating ? "Stop dictation" : "Dictate"}
+                    onClick={dictateIntoField}
+                    title={micLabel}
+                    aria-label={micLabel}
                     aria-pressed={dictating}
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                      dictating
-                        ? "bg-[var(--accent-red)]/12 text-[var(--accent-red)]"
-                        : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-colors [&>svg]:h-3.5 [&>svg]:w-3.5 ${
+                      fieldRecording
+                        ? "bg-[var(--accent-red)] text-[var(--bg-primary)] hover:brightness-110"
+                        : dictating
+                          ? "bg-[var(--accent-red)]/12 text-[var(--accent-red)]"
+                          : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                     }`}
                   >
-                    <MicIcon size={14} />
+                    {fieldDictation === "transcribing" ? (
+                      <DictationSpinner />
+                    ) : fieldRecording ? (
+                      <StopIcon />
+                    ) : (
+                      <MicIcon size={14} />
+                    )}
                   </button>
                 )}
                 <textarea
@@ -285,8 +320,18 @@ export function ComposerActionsButton({
                   autoCorrect="off"
                   autoCapitalize="off"
                   spellCheck={false}
-                  className="block min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-1 text-[12.5px] leading-relaxed text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+                  className={`block min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-1 text-[12.5px] leading-relaxed text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] ${
+                    fieldDictation === "error" ? "hidden" : ""
+                  }`}
                 />
+                {fieldDictation ? (
+                  <div
+                    className={`dictation-tone-app flex min-w-0 ${fieldDictation === "error" ? "flex-1" : "w-[150px] shrink-0"}`}
+                  >
+                    <DictationStrip />
+                  </div>
+                ) : (
+                  <>
                 <div className="relative h-6 w-[69px] shrink-0">
                   <CountStepper
                     value={countFor(CUSTOM_KEY)}
@@ -314,6 +359,8 @@ export function ComposerActionsButton({
                 >
                   <ArrowUp size={14} strokeWidth={2.5} />
                 </button>
+                  </>
+                )}
               </div>
             </div>
 

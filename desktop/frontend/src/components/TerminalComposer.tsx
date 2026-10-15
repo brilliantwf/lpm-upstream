@@ -2286,6 +2286,7 @@ export function TerminalComposer({ terminalId, historyKey, projectName, shown, f
       <div
         ref={containerRef}
         data-composer-box
+        data-dictation-scope
         onDragOver={(e) => {
           if (Array.from(e.dataTransfer?.types ?? []).includes("Files")) {
             e.preventDefault();
@@ -2372,6 +2373,7 @@ export function TerminalComposer({ terminalId, historyKey, projectName, shown, f
         <SendLaterStrip historyKey={historyKey} />
         <ComposerToolbar
           boxRef={containerRef}
+          editorRef={editorRef}
           history={{
             terminalId: historyKey,
             projectName,
