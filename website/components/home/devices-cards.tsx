@@ -1,12 +1,6 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  Laptop,
-  Server,
-  Smartphone,
-  type LucideIcon,
-} from "lucide-react";
-import { FEATURES_PATH, LINUX_HOST_PATH, MOBILE_PATH } from "@/lib/links";
+import { ArrowRight, Laptop, Server, type LucideIcon } from "lucide-react";
+import { FEATURES_PATH, LINUX_HOST_PATH } from "@/lib/links";
 
 const CARDS: {
   icon: LucideIcon;
@@ -14,12 +8,6 @@ const CARDS: {
   title: string;
   body: string;
 }[] = [
-  {
-    icon: Smartphone,
-    href: MOBILE_PATH,
-    title: "lpm link for iPhone",
-    body: "Live terminals, the prompt composer, git review and notifications, on iPhone and iPad.",
-  },
   {
     icon: Laptop,
     href: `${FEATURES_PATH}#devices`,
@@ -36,7 +24,7 @@ const CARDS: {
 
 export function DevicesCards() {
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className="grid gap-4 md:grid-cols-2">
       {CARDS.map(({ icon: Icon, href, title, body }) => (
         <Link
           key={href}

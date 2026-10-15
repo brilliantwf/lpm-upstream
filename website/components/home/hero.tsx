@@ -1,4 +1,5 @@
 import { HeroCta } from "./hero-cta";
+import { HeroPoints } from "./hero-points";
 import { ProofStrip } from "./proof-strip";
 
 // The interactive demo sits directly below and has to reach the first
@@ -18,20 +19,17 @@ export function Hero() {
               aria-hidden="true"
               className="mr-2 -mt-px inline-block h-1.5 w-1.5 rounded-full bg-emerald-500/90 align-middle dark:bg-emerald-400/90"
             />
-            Free desktop app for AI Agents (Claude Code &amp; Codex..)
+            Free desktop app for Claude Code, Codex &amp; other AI agents
           </span>{" "}
           Every project. Every agent.
           <br />
           One window.
         </h1>
-        <p className="mx-auto mt-5 max-w-3xl text-pretty text-base leading-relaxed text-gray-600 sm:text-[17px] dark:text-gray-400">
-          lpm puts your dev projects and AI coding agents in one place. Start
-          every service in one click, run Claude Code and Codex side by side,{" "}
-          <span className="font-medium text-gray-900 dark:text-gray-100">
-            see which agent is working, done, or waiting on you
-          </span>
-          , and duplicate a project for each agent.
+        <p className="mx-auto mt-5 max-w-3xl text-balance text-base leading-relaxed text-gray-600 sm:text-[17px] dark:text-gray-400">
+          lpm runs your dev servers and AI coding agents side by side, so you
+          stop juggling terminals.
         </p>
+        <HeroPoints />
 
         <div className="mx-auto mt-[clamp(1.25rem,3vh,1.75rem)] max-w-3xl">
           <HeroCta appStoreSource="home-hero" />
