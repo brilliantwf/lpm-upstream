@@ -6,8 +6,9 @@
 //! started from here: no daemon means no sessions, which is the honest answer
 //! to "what is running", and a read must not create processes to find that out.
 //!
-//! Panes are listed in creation order, so pane N is service N — the convention
-//! the app writes them in.
+//! Panes are listed in creation order. The app labels each service pane with
+//! its service; creation order follows the started profile and `dependsOn`,
+//! not declaration order, so the label — not the index — names the service.
 
 use crate::config::Ctx;
 use crate::statussock;
@@ -46,6 +47,10 @@ pub struct Pane {
     pub id: String,
     #[serde(default)]
     pub pid: i64,
+    /// The service the app started in this pane; empty for panes it didn't
+    /// label (older daemons, plain terminals).
+    #[serde(default)]
+    pub service: String,
     #[serde(default, rename = "command")]
     pub current_command: String,
     #[serde(default, rename = "path")]

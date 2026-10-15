@@ -2086,6 +2086,11 @@ fn load_repo_yaml(root: &str) -> ProjectYaml {
         .unwrap_or_default()
 }
 
+/// The services a folder's own <root>/.lpm.yml declares, by name.
+pub fn repo_service_names(root: &str) -> Vec<String> {
+    load_repo_yaml(root).services.into_keys().collect()
+}
+
 /// Merge repo <root>/.lpm.yml services + profiles UNDER the given maps (project
 /// wins; empty service fields fall back to repo). No-op for remote/empty root.
 /// `root` must already be expanded. Shared by spawn_info + to_project_info.

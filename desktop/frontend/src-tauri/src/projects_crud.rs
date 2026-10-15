@@ -44,11 +44,18 @@ fn dev_services() -> Yaml {
     Yaml::Mapping(svcs)
 }
 
-/// The folder's own services when its manifests name any, else the placeholder.
-fn services_for(root: &Path) -> (Yaml, Vec<String>) {
+/// The services to write for an adopted folder, and the names to report. None
+/// when its repo `.lpm.yml` declares services: the project runs those, and a
+/// placeholder in the project file would run beside them. Otherwise the
+/// folder's manifests, else the placeholder.
+fn services_for(root: &Path) -> (Option<Yaml>, Vec<String>) {
+    let repo = config::repo_service_names(&root.to_string_lossy());
+    if !repo.is_empty() {
+        return (None, repo);
+    }
     let found = crate::detect::detect_services(root);
     if found.is_empty() {
-        return (dev_services(), vec![]);
+        return (Some(dev_services()), vec![]);
     }
     let mut svcs = Mapping::new();
     for service in &found {
@@ -63,7 +70,7 @@ fn services_for(root: &Path) -> (Yaml, Vec<String>) {
         svcs.insert(Yaml::from(service.name.as_str()), Yaml::Mapping(m));
     }
     let names = found.into_iter().map(|s| s.name).collect();
-    (Yaml::Mapping(svcs), names)
+    (Some(Yaml::Mapping(svcs)), names)
 }
 
 // ---- create -----------------------------------------------------------------
@@ -94,7 +101,9 @@ pub fn create_project(
     write_project_yaml(&name, |m| {
         yset(m, "name", name.as_str());
         yset(m, "root", config::collapse_home(&root).as_str());
-        m.insert(Yaml::from("services"), services);
+        if let Some(services) = services {
+            m.insert(Yaml::from("services"), services);
+        }
     })?;
     let _ = app.emit("projects-changed", ());
     Ok(AdoptedProject {
@@ -269,7 +278,9 @@ fn run_clone(
             "root",
             config::collapse_home(&dest.to_string_lossy()).as_str(),
         );
-        m.insert(Yaml::from("services"), services);
+        if let Some(services) = services {
+            m.insert(Yaml::from("services"), services);
+        }
     });
     if let Err(e) = write {
         clone_cleanup(dest);
@@ -1677,6 +1688,26 @@ fn map_clone_error(msg: &str) -> String {
 mod tests {
     use super::*;
     use std::process::Command;
+
+    #[test]
+    fn adopting_a_folder_with_repo_services_writes_no_placeholder() {
+        let tmp = tempfile::tempdir().unwrap();
+        write_file(
+            &tmp.path().join(".lpm.yml"),
+            "services:\n  serve: python3 -m http.server 4330\n  api: node api.js\n",
+        );
+        let (services, names) = services_for(tmp.path());
+        assert!(services.is_none());
+        assert_eq!(names, vec!["api".to_string(), "serve".to_string()]);
+    }
+
+    #[test]
+    fn adopting_a_bare_folder_writes_the_placeholder() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (services, names) = services_for(tmp.path());
+        assert!(services.is_some());
+        assert!(names.is_empty());
+    }
 
     fn write_file(path: &Path, contents: &str) {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();

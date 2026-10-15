@@ -1,6 +1,8 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { XIcon, CheckIcon } from "../icons";
 import { SpinnerIcon, ErrorCircleIcon } from "./icons";
+import { AnsiLine } from "../AnsiLine";
+import { useEventListener } from "../../hooks/useEventListener";
 import type { ActionRunCapture } from "../../hooks/actionRunCapture";
 
 interface ActionTerminalProps {
@@ -10,12 +12,20 @@ interface ActionTerminalProps {
 }
 
 export function ActionTerminal({ label, run, onClose }: ActionTerminalProps) {
-  const { lines, done } = useSyncExternalStore(run.subscribe, run.snapshot);
+  const { lines, done, dropped } = useSyncExternalStore(run.subscribe, run.snapshot);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({ block: "end" });
   }, [lines]);
+
+  useEventListener(
+    "keydown",
+    (e) => {
+      if (e.key === "Escape") onClose();
+    },
+    document,
+  );
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
@@ -44,8 +54,15 @@ export function ActionTerminal({ label, run, onClose }: ActionTerminalProps) {
           {lines.length === 0 && !done && (
             <span className="text-[var(--text-muted)]">Running...</span>
           )}
+          {dropped ? (
+            <div className="mb-1 text-[var(--text-muted)]">
+              {dropped.toLocaleString()} earlier lines not shown
+            </div>
+          ) : null}
           {lines.map((line, i) => (
-            <div key={i} className="whitespace-pre-wrap break-all">{line || "\u00A0"}</div>
+            <div key={(dropped ?? 0) + i} className="whitespace-pre-wrap break-all">
+              {line ? <AnsiLine text={line} /> : "\u00A0"}
+            </div>
           ))}
           {done?.error && (
             <div className="mt-2 text-[var(--accent-red)]">{done.error}</div>

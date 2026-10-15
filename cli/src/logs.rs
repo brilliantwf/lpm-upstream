@@ -1,7 +1,9 @@
 //! `lpm logs [service] [--project <name>] [-n <lines>] [--pane <idx>] [--json]`
-//! — dump a running service pane's recent scrollback. Panes are created in
-//! service-declaration order (pane N == service N), so a service name maps to
-//! its index in `project.services`. `--pane <idx>` addresses a pane directly.
+//! — dump a running service pane's recent scrollback. A service name maps to the
+//! pane the app labelled with it; panes are created in run order (profile, then
+//! `dependsOn`), which needn't match declaration order. Unlabelled panes (an
+//! older daemon) fall back to the declaration-order index. `--pane <idx>`
+//! addresses a pane directly.
 
 use crate::config::{self, Ctx};
 use crate::error::{resolve_or_infer, RunError};
@@ -56,6 +58,16 @@ fn select_service(names: &[String], service: Option<&str>) -> Result<usize, Stri
     }
 }
 
+/// The pane running service `name`: the one labelled with it, `None` when the
+/// panes are labelled and none is (the service isn't running). Unlabelled panes
+/// can only be matched by `ordinal`, the service's declaration-order index.
+fn pane_index(labels: &[&str], name: &str, ordinal: usize) -> Option<usize> {
+    if labels.is_empty() || labels.iter().any(|l| l.is_empty()) {
+        return Some(ordinal);
+    }
+    labels.iter().position(|l| *l == name)
+}
+
 /// Last `n` lines of `text`. `capture-pane -S -<n>` returns the visible pane
 /// plus `n` scrollback lines, so the raw capture can exceed the requested count.
 fn tail_lines(text: &str, n: i64) -> String {
@@ -87,7 +99,12 @@ pub fn run(
         None => {
             let names: Vec<String> = p.services.iter().map(|s| s.name.clone()).collect();
             let i = select_service(&names, service).map_err(RunError::NotFound)?;
-            if panes.len() != names.len() {
+            let name = names[i].clone();
+            let labels: Vec<&str> = panes.iter().map(|p| p.service.as_str()).collect();
+            let idx = pane_index(&labels, &name, i).ok_or_else(|| {
+                RunError::NotFound(format!("service {name:?} is not running in {file_name:?}"))
+            })?;
+            if labels.iter().any(|l| l.is_empty()) && panes.len() != names.len() {
                 eprintln!(
                     "lpm: warning: session has {} pane(s) for {} declared service(s) — \
 the service-to-pane mapping may be off",
@@ -95,7 +112,7 @@ the service-to-pane mapping may be off",
                     names.len()
                 );
             }
-            (i, Some(names[i].clone()))
+            (idx, Some(name))
         }
     };
 
@@ -161,6 +178,28 @@ mod tests {
         assert_eq!(tail_lines("a\nb\nc\nd", 2), "c\nd");
         assert_eq!(tail_lines("a\nb", 5), "a\nb");
         assert_eq!(tail_lines("", 3), "");
+    }
+
+    #[test]
+    fn labelled_panes_resolve_by_service_not_declaration_order() {
+        // Started as profile [web, api, worker]; declared (sorted) as api, web, worker.
+        let labels = ["web", "api", "worker"];
+        assert_eq!(pane_index(&labels, "web", 1), Some(0));
+        assert_eq!(pane_index(&labels, "api", 0), Some(1));
+        assert_eq!(pane_index(&labels, "worker", 2), Some(2));
+    }
+
+    #[test]
+    fn labelled_subset_reports_a_stopped_service() {
+        // Profile `frontend: [web]` started only web.
+        assert_eq!(pane_index(&["web"], "web", 1), Some(0));
+        assert_eq!(pane_index(&["web"], "api", 0), None);
+    }
+
+    #[test]
+    fn unlabelled_panes_fall_back_to_declaration_order() {
+        assert_eq!(pane_index(&["", ""], "web", 1), Some(1));
+        assert_eq!(pane_index(&[], "web", 1), Some(1));
     }
 
     #[test]

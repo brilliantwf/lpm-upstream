@@ -125,9 +125,11 @@ function fitPaneSession(session: PaneSession): void {
   try { session.fit.fit(); } catch {}
 }
 
+// prevLines stays: the next snapshot still holds everything that was on screen,
+// and diffing against it appends only what arrives after the clear instead of
+// writing the cleared history back.
 function clearPaneSession(session: PaneSession): void {
   session.term.reset();
-  session.prevLines = [];
   session.staleBuffer = false;
   session.onAfterClear?.();
 }
@@ -392,10 +394,13 @@ export function Pane({ label, onLabelClick, labelActions, output, visible = true
         if (session.staleBuffer) term.reset();
         term.write(newLines.join("\n"));
       } else {
-        const lastPrev = prevLines[prevLines.length - 1];
+        // The capture is trimmed as a whole, so its last line loses trailing
+        // spaces it keeps once more output follows; compare without them or a
+        // line ending in a space reads as no overlap and rewrites everything.
+        const lastPrev = prevLines[prevLines.length - 1].trimEnd();
         let overlapIdx = -1;
         for (let i = newLines.length - 1; i >= 0; i--) {
-          if (newLines[i] === lastPrev) {
+          if (newLines[i].trimEnd() === lastPrev) {
             overlapIdx = i;
             break;
           }

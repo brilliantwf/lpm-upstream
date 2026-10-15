@@ -114,7 +114,7 @@ function ServiceMenuItem({ service, running, onClick, onEdit, onContextMenu }: S
           <span className="text-[11px] text-[var(--text-muted)] tabular-nums">{badge}</span>
         )}
       </button>
-      <RowActions onEdit={onEdit} hoverIcon={running ? <StopIcon /> : <PlayIcon />} />
+      <RowActions onEdit={onEdit} onToggle={onClick} running={running} />
     </div>
   );
 }
@@ -153,18 +153,22 @@ function ProfileMenuItem({ profile, running, onClick, onEdit, onContextMenu }: P
           </span>
         </span>
       </button>
-      <RowActions onEdit={onEdit} hoverIcon={running ? <StopIcon /> : <PlayIcon />} alignTop />
+      <RowActions onEdit={onEdit} onToggle={onClick} running={running} alignTop />
     </div>
   );
 }
 
+// The play/stop icon does what clicking the row does; it reads as a button, so
+// it is one.
 function RowActions({
   onEdit,
-  hoverIcon,
+  onToggle,
+  running,
   alignTop = false,
 }: {
   onEdit: () => void;
-  hoverIcon: React.ReactNode;
+  onToggle: () => void;
+  running?: boolean;
   alignTop?: boolean;
 }) {
   return (
@@ -182,9 +186,17 @@ function RowActions({
       >
         <PencilIcon size={12} />
       </button>
-      <span className="text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-60">
-        {hoverIcon}
-      </span>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+        aria-label={running ? "Stop" : "Start"}
+        className="rounded p-1 text-[var(--text-muted)] opacity-0 transition-opacity hover:bg-[var(--bg-active)] hover:text-[var(--text-primary)] group-hover:opacity-100"
+      >
+        {running ? <StopIcon /> : <PlayIcon />}
+      </button>
     </span>
   );
 }

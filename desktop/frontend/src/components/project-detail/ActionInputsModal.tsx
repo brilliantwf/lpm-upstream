@@ -30,7 +30,10 @@ export function ActionInputsModal({ projectName, action, onCancel, onSubmit }: A
     return init;
   });
 
+  // The first field that takes typing gets focus, even after a radio group
+  // (which already has its default picked), so typing lands in it.
   const firstRef = useRef<HTMLInputElement>(null);
+  const firstTextIndex = inputs.findIndex((inp) => !(inp.type === "radio" && inp.options?.length));
   useEffect(() => { firstRef.current?.focus(); }, []);
 
   const canSubmit = inputs.every((inp) => !inp.required || values[inp.key]?.trim());
@@ -98,7 +101,7 @@ export function ActionInputsModal({ projectName, action, onCancel, onSubmit }: A
                 </div>
               ) : (
                 <input
-                  ref={i === 0 ? firstRef : undefined}
+                  ref={i === firstTextIndex ? firstRef : undefined}
                   type={inp.type === "password" ? "password" : "text"}
                   value={values[inp.key] ?? ""}
                   onChange={(e) => set(inp.key, e.target.value)}
