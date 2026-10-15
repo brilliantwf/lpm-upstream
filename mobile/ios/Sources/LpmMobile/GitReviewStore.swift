@@ -515,7 +515,12 @@ final class GitReviewStore {
     func finishPull(_ project: String, error: String?) {
         clearTimeout("pull", project)
         pulling.remove(project)
-        if let error {
+        // A pull that went through but left conflicts says so itself ("Pulled,
+        // but…"), so it isn't called a failure and the new state is fetched.
+        if let error, error.hasPrefix("Pulled") {
+            opError[project] = GitOpError(title: "Pulled with conflicts", message: error)
+            load(project)
+        } else if let error {
             opError[project] = GitOpError(title: "Pull failed", message: error)
         } else {
             announce(project, "Pulled")
@@ -576,6 +581,7 @@ final class GitReviewStore {
         } else {
             checkoutTick[project, default: 0] += 1
             load(project)
+            loadBranches(project)
             client?.requestProjects()
             client?.requestSidebar()
         }
@@ -592,6 +598,7 @@ final class GitReviewStore {
             Haptics.success()
             checkoutTick[project, default: 0] += 1
             load(project)
+            loadBranches(project)
             client?.requestProjects()
             client?.requestSidebar()
         }

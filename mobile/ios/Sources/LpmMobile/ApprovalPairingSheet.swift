@@ -15,7 +15,12 @@ struct ApprovalPairingSheet: View {
     // which clips the waiting and failure states on a small iPhone.
     @State private var contentHeight: CGFloat = 0
 
-    private var macLabel: String { macName.isEmpty ? "your Mac" : macName }
+    /// The name kept on one line: wrapped text would break it at a hyphen.
+    private var macLabel: String {
+        guard !macName.isEmpty else { return "your Mac" }
+        return macName.replacingOccurrences(of: "-", with: "\u{2011}")
+            .replacingOccurrences(of: " ", with: "\u{00A0}")
+    }
 
     var body: some View {
         VStack(spacing: 24) {

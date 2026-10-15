@@ -82,7 +82,8 @@ struct MacSwitcherMenu: View {
     }
 
     /// A machine of the live Mac's that isn't on this phone yet. Tappable only
-    /// when tapping can help: to retry a failure or re-add a removed one.
+    /// when tapping can help: to retry a failure, re-add a removed one, or pair
+    /// on a machine that removed this phone.
     @ViewBuilder
     private func pendingMachine(_ row: MachineImporter.Row) -> some View {
         let (detail, icon, tappable): (String, String, Bool) = {
@@ -90,12 +91,13 @@ struct MacSwitcherMenu: View {
             case .adding: return ("Adding…", "arrow.triangle.2.circlepath", false)
             case .failed(let why): return ("\(why) Tap to try again.", "exclamationmark.triangle", true)
             case .removed: return ("Tap to add", "plus.circle", true)
+            case .revoked: return ("Removed this \(ThisDevice.noun). Pair on it to add it.", "iphone.slash", true)
             case .offline: return ("Offline", row.machine.isLinuxHost ? "server.rack" : "desktopcomputer", false)
             case .needsUpdate: return ("Update lpm on it to add it here", "arrow.up.circle", false)
             }
         }()
         Button {
-            model.machineImporter.add(row.machine.slug)
+            if row.status == .revoked { model.beginAddMac() } else { model.machineImporter.add(row.machine.slug) }
         } label: {
             Text(row.machine.name)
             Text(detail)

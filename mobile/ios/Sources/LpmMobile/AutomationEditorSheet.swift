@@ -156,9 +156,9 @@ struct AutomationEditorSheet: View {
     }
 
     private var validationError: String? {
-        if draft.label.trimmed.isEmpty { return "Give this job a name." }
+        if draft.label.trimmed.isEmpty { return "Give this automation a name." }
         if isStandalone && draft.runMode == "action" {
-            return "Standalone jobs can't run an action."
+            return "Standalone automations can't run an action."
         }
         if draft.keptSchedule == nil, draft.scheduleMode == "time" {
             guard let at = parseTimeMinutes(draft.time) else { return "Pick a valid time." }
@@ -195,13 +195,13 @@ struct AutomationEditorSheet: View {
         NavigationStack {
             Group {
                 if loading {
-                    ProgressView("Loading job…")
+                    ProgressView("Loading automation…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     form
                 }
             }
-            .navigationTitle(context.isEditing ? "Edit job" : "New job")
+            .navigationTitle(context.isEditing ? "Edit Automation" : "New Automation")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -237,7 +237,7 @@ struct AutomationEditorSheet: View {
         } message: {
             Text(model.jobConfigError ?? "")
         }
-        .confirmationDialog("Delete this job?", isPresented: $confirmDelete, titleVisibility: .visible) {
+        .confirmationDialog("Delete this automation?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { remove() }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -262,7 +262,7 @@ struct AutomationEditorSheet: View {
 
     private var nameSection: some View {
         Section {
-            TextField("Name this job", text: $draft.label)
+            TextField("Name this automation", text: $draft.label)
             TextField("Emoji (optional)", text: $draft.emoji)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
@@ -518,7 +518,7 @@ struct AutomationEditorSheet: View {
         } header: {
             Text("Only when there's work (optional)")
         } footer: {
-            Text("A command that decides whether the job has anything to do — it runs only when this succeeds. Leave blank to run every time.")
+            Text("A command that decides whether the automation has anything to do — it runs only when this succeeds. Leave blank to run every time.")
         }
         if draft.runMode != "action" {
             Section {
@@ -529,7 +529,7 @@ struct AutomationEditorSheet: View {
             } header: {
                 Text("Check the work afterwards (optional)")
             } footer: {
-                Text("Runs where the job ran, once the run finishes. If it fails, the run is reported as needing a look instead of done. Leave blank and the run isn't checked.")
+                Text("Runs where the automation ran, once the run finishes. If it fails, the run is reported as needing a look instead of done. Leave blank and the run isn't checked.")
             }
         }
     }
@@ -545,7 +545,7 @@ struct AutomationEditorSheet: View {
             } label: {
                 HStack {
                     Spacer()
-                    Text("Delete job")
+                    Text("Delete automation")
                     Spacer()
                 }
             }

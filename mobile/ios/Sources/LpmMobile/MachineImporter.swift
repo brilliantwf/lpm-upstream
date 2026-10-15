@@ -11,7 +11,8 @@ import UIKit
 /// saved machine that the phone reaches on its own, with the Mac asleep.
 ///
 /// A machine the user removed from the phone is never re-added on its own; it
-/// stays listed with an Add button instead. A failure isn't retried
+/// stays listed with an Add button instead. Nor is one that removed this phone:
+/// only pairing on it lets the phone back in. A failure isn't retried
 /// automatically until `retryAfter` has passed, so an unreachable server doesn't
 /// have a fresh code armed on it on every reconnect.
 @MainActor
@@ -21,6 +22,8 @@ final class MachineImporter {
         case adding
         case failed(String)
         case removed
+        /// The machine removed this phone, so a code the Mac arms on it is refused.
+        case revoked
         case offline
         case needsUpdate
     }
@@ -66,6 +69,7 @@ final class MachineImporter {
     @ObservationIgnored private var relists = 0
 
     private static let ledgerKey = "lpm.machineImports"
+    private static let revokedKey = "lpm.machineImportsRevoked"
     private static let retryAfter: TimeInterval = 10 * 60
     private static let offerTimeout: TimeInterval = 30
     private static let pairTimeout: TimeInterval = 25
@@ -83,6 +87,7 @@ final class MachineImporter {
         return machines.compactMap { m in
             if isOnPhone(m, source: sourceId, macs: macs) { return nil }
             if adding.contains(m.slug) { return Row(machine: m, status: .adding) }
+            if Self.revoked().contains(Self.key(sourceId, m.slug)) { return Row(machine: m, status: .revoked) }
             if let f = failures[Self.key(sourceId, m.slug)] { return Row(machine: m, status: .failed(f.message)) }
             if wasRemoved(m, source: sourceId, macs: macs) { return Row(machine: m, status: .removed) }
             switch m.state {
@@ -105,6 +110,8 @@ final class MachineImporter {
         if source != sourceId { detach() }
         sourceId = source
         machines = list
+        // Paired on the machine itself since: whatever it refused before is over.
+        Self.forgetRevoked(list.filter { isOnPhone($0, source: source, macs: macs) }.map { Self.key(source, $0.slug) })
         for m in list where m.state == .ready && shouldAdd(m, source: source, macs: macs) {
             enqueue(m.slug)
         }
@@ -162,7 +169,7 @@ final class MachineImporter {
 
     private func shouldAdd(_ m: RemoteMachine, source: String, macs: [MacRecord]) -> Bool {
         if isOnPhone(m, source: source, macs: macs) || wasRemoved(m, source: source, macs: macs) { return false }
-        if adding.contains(m.slug) { return false }
+        if adding.contains(m.slug) || Self.revoked().contains(Self.key(source, m.slug)) { return false }
         if let f = failures[Self.key(source, m.slug)], Date().timeIntervalSince(f.at) < Self.retryAfter {
             return false
         }
@@ -193,6 +200,10 @@ final class MachineImporter {
         switch outcome {
         case .success(let paired):
             save(paired, source: source, slug: slug)
+        case .revoked:
+            var revoked = Self.revoked()
+            revoked.insert(Self.key(source, slug))
+            UserDefaults.standard.set(Array(revoked), forKey: Self.revokedKey)
         case .failure(let message):
             // Leaving the Mac mid-way is not the machine's failure; retry it on return.
             guard generation == gen else { return }
@@ -210,6 +221,7 @@ final class MachineImporter {
 
     private enum Outcome {
         case success(Paired)
+        case revoked
         case failure(String)
     }
 
@@ -231,6 +243,8 @@ final class MachineImporter {
                           fingerprint: offer.fingerprint, timeout: Self.pairTimeout) { cont.resume(returning: $0) }
         }
         switch result {
+        case .failed(LpmClient.revokedError):
+            return .revoked
         case .failed(let reason):
             return .failure(Self.pairFailure(reason, port: offer.port))
         case .paired(let p):
@@ -292,6 +306,17 @@ final class MachineImporter {
     }
 
     private static func key(_ source: String, _ slug: String) -> String { "\(source)/\(slug)" }
+
+    /// Ledger keys of machines that refused this phone because they removed it.
+    private static func revoked() -> Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: revokedKey) ?? [])
+    }
+
+    private static func forgetRevoked(_ keys: [String]) {
+        let revoked = revoked()
+        let kept = revoked.subtracting(keys)
+        if kept.count != revoked.count { UserDefaults.standard.set(Array(kept), forKey: revokedKey) }
+    }
 }
 
 /// One pairing connection to a machine the Mac handed over: redeems the code,

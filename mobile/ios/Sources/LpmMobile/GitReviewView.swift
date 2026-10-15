@@ -79,10 +79,12 @@ struct GitReviewView: View {
                     }
                 }
             }
+            // The watch only reports changes from here on, so whatever changed
+            // since the last snapshot is fetched now.
             .onAppear {
                 isVisible = true
-                if snapshot == nil { model.git.load(name) }
                 model.git.watch(name)
+                model.git.refreshWatched(name)
             }
             .onDisappear {
                 isVisible = false
@@ -136,6 +138,17 @@ struct GitReviewView: View {
         }
     }
 
+    /// The desktop's ConflictNotice: which files still have merge conflicts.
+    private var conflictNotice: String? {
+        let paths = (snapshot?.files ?? []).filter { $0.status == "conflicted" }.map(\.path)
+        if paths.isEmpty { return nil }
+        let shown = 3
+        let named = paths.count > shown
+            ? paths.prefix(shown).joined(separator: ", ") + " and \(paths.count - shown) more"
+            : paths.joined(separator: ", ")
+        return "\(named) \(paths.count == 1 ? "has" : "have") merge conflicts. Resolve the conflict markers (<<<<<<< … >>>>>>>) before committing."
+    }
+
     private func reviewedCount(_ s: GitSnapshot) -> Int {
         s.files.filter { model.git.isViewed(name, path: $0.path) }.count
     }
@@ -152,6 +165,7 @@ struct GitReviewView: View {
         } label: {
             Image(systemName: "list.bullet")
         }
+        .accessibilityLabel("Jump to file")
     }
 
     private func jumpSymbol(_ status: String) -> String {
@@ -160,6 +174,7 @@ struct GitReviewView: View {
         case "deleted": return "minus.circle"
         case "renamed": return "arrow.right.circle"
         case "untracked": return "questionmark.circle"
+        case "conflicted": return "exclamationmark.triangle"
         default: return "pencil.circle"
         }
     }
@@ -193,6 +208,7 @@ struct GitReviewView: View {
             HStack(spacing: 12) {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
+                    .accessibilityHidden(true)
                 Text("No changes")
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -203,6 +219,11 @@ struct GitReviewView: View {
 
     private var commitSection: some View {
         Section {
+            if let notice = conflictNotice {
+                Text(notice)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
             TextField("Commit message", text: $message, axis: .vertical)
                 .lineLimit(3...8)
 
@@ -395,6 +416,8 @@ private struct GitFileSection: View {
                     .foregroundStyle(selected ? Color.accentColor : Color.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Include in commit")
+            .accessibilityValue(selected ? "On" : "Off")
 
             Button {
                 withAnimation(.easeInOut(duration: 0.15)) { collapsed.toggle() }
@@ -403,6 +426,13 @@ private struct GitFileSection: View {
                     Image(systemName: collapsed ? "chevron.right" : "chevron.down")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    if file.status == "conflicted" {
+                        Text("!")
+                            .font(.system(size: 13, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.red)
+                            .accessibilityLabel("Merge conflict")
+                    }
                     Text(file.path)
                         .font(.system(size: 13, design: .monospaced))
                         .lineLimit(1)
@@ -416,6 +446,7 @@ private struct GitFileSection: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityValue(collapsed ? "Collapsed" : "Expanded")
 
             Button {
                 let nowViewed = !viewed
@@ -427,6 +458,8 @@ private struct GitFileSection: View {
                     .foregroundStyle(viewed ? Color.green : Color.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Viewed")
+            .accessibilityValue(viewed ? "On" : "Off")
 
             Menu {
                 askButton
@@ -437,6 +470,7 @@ private struct GitFileSection: View {
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
             }
+            .accessibilityLabel("More")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

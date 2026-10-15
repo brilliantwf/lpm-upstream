@@ -58,23 +58,6 @@ private enum ActionRunIn: String, CaseIterable, Identifiable {
     }
 }
 
-private struct OptionDraft: Identifiable {
-    let id = UUID()
-    var value = ""
-    var label = ""
-}
-
-private struct InputDraft: Identifiable {
-    let id = UUID()
-    var key = ""
-    var label = ""
-    var type = ""          // "" (text) | "select"
-    var required = false
-    var placeholder = ""
-    var defaultValue = ""
-    var options: [OptionDraft] = []
-}
-
 private struct ChildDraft: Identifiable {
     let id = UUID()
     /// The item's YAML key on disk, kept so `primary` and saved choices still
@@ -107,7 +90,7 @@ private struct ActionDraft {
     /// explicit `header`, since it overrides a footer or zone display from
     /// another file.
     var seededPlacement: ActionPlacement = .header
-    var inputs: [InputDraft] = []
+    var inputs: [ActionInputDraft] = []
     var children: [ChildDraft] = []
     var color = ""
     var primary: PrimaryChoice = .menu
@@ -153,6 +136,7 @@ struct ActionEditorSheet: View {
         switch draft.kind {
         case .command:
             if draft.cmd.trimmed.isEmpty { return "Enter a command to run." }
+            if let problem = ActionInputsYaml.problem(draft.inputs) { return problem }
         case .menu:
             if !draft.children.contains(where: { !$0.cmd.trimmed.isEmpty }) {
                 return "Add at least one item with a command."
@@ -225,7 +209,7 @@ struct ActionEditorSheet: View {
             kindSection
             if draft.kind == .command {
                 commandSection
-                inputsSection
+                ActionInputsSection(inputs: $draft.inputs)
             } else {
                 childrenSection
                 primarySection
@@ -294,63 +278,6 @@ struct ActionEditorSheet: View {
             Toggle("Ask before running", isOn: $draft.confirm)
         } footer: {
             Text(runInHint)
-        }
-    }
-
-    private var inputsSection: some View {
-        Group {
-            ForEach($draft.inputs) { $input in
-                Section {
-                    inputFields($input)
-                    Button("Remove input", role: .destructive) {
-                        draft.inputs.removeAll { $0.id == input.id }
-                    }
-                } header: {
-                    Text(input.key.trimmed.isEmpty ? "Input" : input.key.trimmed)
-                }
-            }
-            Section {
-                Button {
-                    draft.inputs.append(InputDraft())
-                } label: {
-                    Label("Add input", systemImage: "plus")
-                }
-            } footer: {
-                Text("Values you're asked for before the action runs, filled into the command.")
-            }
-        }
-    }
-
-    @ViewBuilder private func inputFields(_ input: Binding<InputDraft>) -> some View {
-        TextField("Name", text: input.key)
-            .autocorrectionDisabled()
-            .textInputAutocapitalization(.never)
-            .font(.system(.callout, design: .monospaced))
-        TextField("Label (optional)", text: input.label)
-        Picker("Kind", selection: input.type) {
-            Text("Text").tag("")
-            Text("Choice").tag("select")
-        }
-        Toggle("Required", isOn: input.required)
-        if input.wrappedValue.type == "select" {
-            ForEach(input.options) { $option in
-                HStack(spacing: 8) {
-                    TextField("Value", text: $option.value)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                    Divider()
-                    TextField("Label (optional)", text: $option.label)
-                }
-            }
-            .onDelete { offsets in input.wrappedValue.options.remove(atOffsets: offsets) }
-            Button {
-                input.wrappedValue.options.append(OptionDraft())
-            } label: {
-                Label("Add choice", systemImage: "plus")
-            }
-        } else {
-            TextField("Placeholder (optional)", text: input.placeholder)
-            TextField("Default value (optional)", text: input.defaultValue)
         }
     }
 
@@ -493,9 +420,7 @@ struct ActionEditorSheet: View {
         d.placement = ActionPlacement(display: body["display"] as? String ?? "",
                                       layer: body["layer"] as? String, zones: project.zones)
         d.seededPlacement = d.placement
-        if let inputs = body["inputs"] as? [[String: Any]] {
-            d.inputs = inputs.map(inputDraft)
-        }
+        d.inputs = ActionInputsYaml.drafts(from: body["inputs"])
         if let children = body["actions"] as? [String: Any], !children.isEmpty {
             d.kind = .menu
             d.children = childDrafts(from: children)
@@ -508,25 +433,6 @@ struct ActionEditorSheet: View {
             d.primary = .child(child.id)
         }
         draft = d
-    }
-
-    private func inputDraft(_ o: [String: Any]) -> InputDraft {
-        var input = InputDraft()
-        input.key = o["key"] as? String ?? ""
-        input.label = o["label"] as? String ?? ""
-        input.type = (o["type"] as? String) == "select" ? "select" : ""
-        input.required = (o["required"] as? Bool) == true
-        input.placeholder = o["placeholder"] as? String ?? ""
-        input.defaultValue = o["default"] as? String ?? ""
-        if let options = o["options"] as? [[String: Any]] {
-            input.options = options.map { opt in
-                var option = OptionDraft()
-                option.value = opt["value"] as? String ?? ""
-                option.label = opt["label"] as? String ?? ""
-                return option
-            }
-        }
-        return input
     }
 
     private func childDrafts(from map: [String: Any]) -> [ChildDraft] {
@@ -566,8 +472,7 @@ struct ActionEditorSheet: View {
             setOrRemove(&p, "reuse", (draft.runIn == .terminal && draft.reuse) ? true : nil)
             setOrRemove(&p, "confirm", draft.confirm ? true : nil)
             p.removeValue(forKey: "actions")
-            let inputs = buildInputs()
-            setOrRemove(&p, "inputs", inputs.isEmpty ? nil : inputs)
+            setOrRemove(&p, "inputs", inputsValue)
         case .menu:
             let (children, keys) = buildChildMap()
             p["actions"] = children
@@ -591,28 +496,11 @@ struct ActionEditorSheet: View {
         }
     }
 
-    private func buildInputs() -> [[String: Any]] {
-        draft.inputs.compactMap { input in
-            let key = input.key.trimmed
-            if key.isEmpty { return nil }
-            var m: [String: Any] = ["key": key]
-            if !input.label.trimmed.isEmpty { m["label"] = input.label.trimmed }
-            if input.type == "select" { m["type"] = "select" }
-            if input.required { m["required"] = true }
-            if !input.placeholder.trimmed.isEmpty { m["placeholder"] = input.placeholder.trimmed }
-            if !input.defaultValue.trimmed.isEmpty { m["default"] = input.defaultValue.trimmed }
-            if input.type == "select" {
-                let options = input.options.compactMap { opt -> [String: Any]? in
-                    let value = opt.value.trimmed
-                    if value.isEmpty { return nil }
-                    var om: [String: Any] = ["value": value]
-                    if !opt.label.trimmed.isEmpty { om["label"] = opt.label.trimmed }
-                    return om
-                }
-                if !options.isEmpty { m["options"] = options }
-            }
-            return m
-        }
+    /// The inputs mapping, or an empty one once every input saved before has
+    /// been removed: the Mac keeps an `inputs` the payload leaves out.
+    private var inputsValue: [String: Any]? {
+        if let map = ActionInputsYaml.map(from: draft.inputs) { return map }
+        return seedBody?["inputs"] == nil ? nil : [:]
     }
 
     /// The menu's items keyed for YAML, and the key each draft item got. An item

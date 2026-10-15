@@ -116,7 +116,7 @@ struct ProjectConfigView: View {
     }
 
     private var actionsSection: some View {
-        Section("Actions") {
+        Section {
             ForEach(live.actions) { action in
                 Button {
                     route = .editAction(action.name)
@@ -134,6 +134,12 @@ struct ProjectConfigView: View {
                 }
             }
             addRow(title: "Add Action") { route = .addAction }
+        } header: {
+            Text("Actions")
+        } footer: {
+            if !live.actionErrors.isEmpty {
+                ActionErrorsNotice(errors: live.actionErrors)
+            }
         }
     }
 

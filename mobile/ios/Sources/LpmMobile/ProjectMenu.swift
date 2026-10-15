@@ -20,6 +20,8 @@ struct ProjectRunControl: View {
     let onCreatePr: () -> Void
     let onAuto: (_ kind: GitAutoKind) -> Void
     let onDiscard: () -> Void
+    // On a terminal's screen Rename names that tab, not the project.
+    let renamesTab: Bool
     let onRename: () -> Void
     let onTerminalSettings: () -> Void
     let onConfigure: () -> Void
@@ -99,7 +101,7 @@ struct ProjectRunControl: View {
 
             Divider()
             Button(action: onRename) {
-                Label("Rename…", systemImage: "pencil")
+                Label(renamesTab ? "Rename Tab…" : "Rename…", systemImage: "pencil")
             }
             Button(action: onConfigure) {
                 Label("Configure…", systemImage: "slider.horizontal.3")
@@ -196,6 +198,8 @@ struct ProjectRunControl: View {
 struct ProjectMenuHost: ViewModifier {
     @Environment(AppModel.self) private var model
     let project: Project
+    // The terminal whose screen hosts the menu, if any.
+    let terminal: TerminalInfo?
     // Run a terminal action and switch to the terminal it spawns.
     let onSpawnedTerminal: ((TerminalInfo) -> Void)?
 
@@ -219,6 +223,7 @@ struct ProjectMenuHost: ViewModifier {
     // Rename flow: the text field's draft, seeded from the current label.
     @State private var renaming = false
     @State private var renameText = ""
+    @State private var renamingTab: TabRename?
     @State private var noteFor: WorkStatusChoice?
     @State private var claudeConsent: ClaudeConsentRequest?
 
@@ -293,6 +298,7 @@ struct ProjectMenuHost: ViewModifier {
                 ProjectConfigView(project: project).environment(model)
             }
             .projectActionsSheet(project: project, isPresented: $showActions, onRun: beginRun)
+            .tabRenameAlert($renamingTab)
             .alert("Rename project", isPresented: $renaming) {
                 TextField("Project name", text: $renameText)
                 Button("Cancel", role: .cancel) {}
@@ -327,7 +333,8 @@ struct ProjectMenuHost: ViewModifier {
                                           showAutoSheet = true
                                       },
                                       onDiscard: { confirmingDiscard = true },
-                                      onRename: { renameText = project.label; renaming = true },
+                                      renamesTab: terminal != nil,
+                                      onRename: rename,
                                       onTerminalSettings: { showTerminalSettings = true },
                                       onConfigure: { showingConfig = true },
                                       noteFor: $noteFor,
@@ -341,6 +348,15 @@ struct ProjectMenuHost: ViewModifier {
                 if !project.isRemote { model.loadClaudeAccounts() }
             }
             .onDisappear { isVisible = false }
+    }
+
+    private func rename() {
+        if let terminal {
+            renamingTab = TabRename(terminal)
+        } else {
+            renameText = project.label
+            renaming = true
+        }
     }
 
     // Action run flow — mirrors the desktop gauntlet (inputs → confirm → dispatch).
@@ -385,8 +401,8 @@ struct ProjectMenuHost: ViewModifier {
 }
 
 extension View {
-    func projectMenuToolbar(project: Project,
+    func projectMenuToolbar(project: Project, terminal: TerminalInfo? = nil,
                             onSpawnedTerminal: ((TerminalInfo) -> Void)? = nil) -> some View {
-        modifier(ProjectMenuHost(project: project, onSpawnedTerminal: onSpawnedTerminal))
+        modifier(ProjectMenuHost(project: project, terminal: terminal, onSpawnedTerminal: onSpawnedTerminal))
     }
 }

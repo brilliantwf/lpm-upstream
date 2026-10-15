@@ -17,29 +17,32 @@ enum Wire {
     /// retire — a re-pair after the Mac lost this phone's credential, which would
     /// otherwise leave the dead record authorized forever. Omitted when absent, so
     /// older Macs (which ignore unknown keys) behave exactly as before.
-    static func pair(code: String, name: String, replaces: String? = nil) -> String {
-        var obj: [String: Any] = ["t": "pair", "code": code, "name": name]
+    ///
+    /// Every first frame carries `phoneId`, this install's own id, so a Mac can
+    /// refuse a phone it removed whichever credential or Mac it comes through.
+    static func pair(code: String, name: String, phoneId: String, replaces: String? = nil) -> String {
+        var obj: [String: Any] = ["t": "pair", "code": code, "name": name, "phoneId": phoneId]
         if let replaces, !replaces.isEmpty { obj["replaces"] = replaces }
         return json(obj)
     }
     /// Request approve-on-Mac pairing: no code, the Mac shows an Allow dialog with a
     /// match code the phone also displays. Sent as the first frame in that mode.
-    static func pairRequest(name: String, replaces: String? = nil) -> String {
-        var obj: [String: Any] = ["t": "pairRequest", "name": name]
+    static func pairRequest(name: String, phoneId: String, replaces: String? = nil) -> String {
+        var obj: [String: Any] = ["t": "pairRequest", "name": name, "phoneId": phoneId]
         if let replaces, !replaces.isEmpty { obj["replaces"] = replaces }
         return json(obj)
     }
-    static func auth(deviceId: String, token: String) -> String {
-        json(["t": "auth", "deviceId": deviceId, "token": token])
+    static func auth(deviceId: String, token: String, phoneId: String) -> String {
+        json(["t": "auth", "deviceId": deviceId, "token": token, "phoneId": phoneId])
     }
     /// Sign in to the Mac and ask it to carry this connection to one of the
     /// machines it connects to; the machine then answers as itself.
-    static func relay(deviceId: String, token: String, slug: String) -> String {
-        json(["t": "relay", "deviceId": deviceId, "token": token, "slug": slug])
+    static func relay(deviceId: String, token: String, slug: String, phoneId: String) -> String {
+        json(["t": "relay", "deviceId": deviceId, "token": token, "slug": slug, "phoneId": phoneId])
     }
     /// Ask the Mac to forget this phone: the user removed it here.
-    static func unpair(deviceId: String, token: String) -> String {
-        json(["t": "unpair", "deviceId": deviceId, "token": token])
+    static func unpair(deviceId: String, token: String, phoneId: String) -> String {
+        json(["t": "unpair", "deviceId": deviceId, "token": token, "phoneId": phoneId])
     }
     static func projects() -> String { json(["t": "projects"]) }
     static func sidebar() -> String { json(["t": "sidebar"]) }
@@ -253,6 +256,15 @@ enum Wire {
     static func stop(name: String) -> String { json(["t": "stop", "name": name]) }
     static func toggleService(name: String, service: String) -> String {
         json(["t": "toggleService", "name": name, "service": service])
+    }
+    /// Stop a service's process if it still runs and start it again; also brings
+    /// back one that ended. Only for a Mac whose `features` has "serviceRestart".
+    static func restartService(name: String, service: String) -> String {
+        json(["t": "restartService", "name": name, "service": service])
+    }
+    /// Stop one service whatever its state; never starts one that ended.
+    static func stopService(name: String, service: String) -> String {
+        json(["t": "stopService", "name": name, "service": service])
     }
     static func ping() -> String { json(["t": "ping"]) }
     /// Register (or refresh) this device's push identity. `key` is the base64
@@ -572,6 +584,7 @@ enum Wire {
         // A runAction/newTerminal request the Mac couldn't execute (e.g. the
         // app isn't open there). Success acks carry nothing and stay .unknown.
         case actionFailed(project: String, error: String)
+        case serviceOp(error: String?)
         case projectsChanged
         case statusChanged(project: String)
         // Git review replies. Each carries the project it belongs to; `error` is
@@ -870,6 +883,9 @@ enum Wire {
                     error: ok ? nil : (obj["error"] as? String ?? "Couldn't update folders."))
             case "fileChunk":
                 return .fileChunk(FileChunk(obj))
+            case "restartService", "stopService":
+                let ok = obj["ok"] as? Bool ?? false
+                return .serviceOp(error: ok ? nil : (obj["error"] as? String ?? "Couldn't change the service."))
             case "runAction", "newTerminal":
                 if obj["ok"] as? Bool ?? true { return .unknown }
                 return .actionFailed(project: obj["project"] as? String ?? "",
@@ -1417,6 +1433,8 @@ struct Project: Identifiable {
     let profiles: [Profile]
     let activeProfile: String
     let actions: [Action]
+    /// Actions the Mac left out for a config problem, each naming its problem.
+    let actionErrors: [String]
     let zones: [Zone]
     /// Why the Mac couldn't read the project's YAML; nil while it parses. The rest
     /// of the entry is then empty, so the phone shows the error instead.
@@ -1443,6 +1461,7 @@ struct Project: Identifiable {
         profiles = (o["profiles"] as? [[String: Any]] ?? []).map(Profile.init)
         activeProfile = o["activeProfile"] as? String ?? ""
         actions = (o["actions"] as? [[String: Any]] ?? []).map(Action.init)
+        actionErrors = o["actionErrors"] as? [String] ?? []
         zones = (o["zones"] as? [[String: Any]] ?? []).map(Zone.init)
         configError = (o["configError"] as? String).flatMap { $0.isEmpty ? nil : $0 }
     }
@@ -1450,14 +1469,14 @@ struct Project: Identifiable {
     private init(name: String, label: String, running: Bool, isRemote: Bool, parentName: String,
                  worktree: Bool, workStatus: WorkStatus?, autoPull: Bool?, claude: ClaudeOwnChoice,
                  statusEntries: [StatusEntry], services: [Service], allServices: [Service],
-                 profiles: [Profile], activeProfile: String, actions: [Action], zones: [Zone],
-                 configError: String?) {
+                 profiles: [Profile], activeProfile: String, actions: [Action], actionErrors: [String],
+                 zones: [Zone], configError: String?) {
         self.name = name; self.label = label; self.running = running; self.isRemote = isRemote
         self.parentName = parentName; self.worktree = worktree; self.workStatus = workStatus
         self.autoPull = autoPull; self.claude = claude
         self.statusEntries = statusEntries; self.services = services; self.allServices = allServices
         self.profiles = profiles; self.activeProfile = activeProfile; self.actions = actions
-        self.zones = zones
+        self.actionErrors = actionErrors; self.zones = zones
         self.configError = configError
     }
 
@@ -1467,7 +1486,7 @@ struct Project: Identifiable {
         Project(name: name, label: label, running: running, isRemote: isRemote, parentName: parentName,
                 worktree: worktree, workStatus: workStatus, autoPull: autoPull, claude: claude,
                 statusEntries: entries, services: services, allServices: allServices, profiles: profiles,
-                activeProfile: activeProfile, actions: actions, zones: zones,
+                activeProfile: activeProfile, actions: actions, actionErrors: actionErrors, zones: zones,
                 configError: configError)
     }
 
@@ -1478,7 +1497,7 @@ struct Project: Identifiable {
         Project(name: name, label: label, running: running, isRemote: isRemote, parentName: parentName,
                 worktree: worktree, workStatus: status, autoPull: autoPull, claude: claude,
                 statusEntries: statusEntries, services: services, allServices: allServices, profiles: profiles,
-                activeProfile: activeProfile, actions: actions, zones: zones,
+                activeProfile: activeProfile, actions: actions, actionErrors: actionErrors, zones: zones,
                 configError: configError)
     }
 
@@ -1488,7 +1507,7 @@ struct Project: Identifiable {
         Project(name: name, label: label, running: running, isRemote: isRemote, parentName: parentName,
                 worktree: worktree, workStatus: workStatus, autoPull: value, claude: claude,
                 statusEntries: statusEntries, services: services, allServices: allServices,
-                profiles: profiles, activeProfile: activeProfile, actions: actions, zones: zones,
+                profiles: profiles, activeProfile: activeProfile, actions: actions, actionErrors: actionErrors, zones: zones,
                 configError: configError)
     }
 
@@ -1498,7 +1517,7 @@ struct Project: Identifiable {
         Project(name: name, label: label, running: running, isRemote: isRemote, parentName: parentName,
                 worktree: worktree, workStatus: workStatus, autoPull: autoPull, claude: own,
                 statusEntries: statusEntries, services: services, allServices: allServices,
-                profiles: profiles, activeProfile: activeProfile, actions: actions, zones: zones,
+                profiles: profiles, activeProfile: activeProfile, actions: actions, actionErrors: actionErrors, zones: zones,
                 configError: configError)
     }
 }
@@ -1671,10 +1690,16 @@ struct ProjectFolder: Identifiable {
 struct Service: Identifiable {
     let name: String
     let port: Int
+    // A started service whose command ended; `exitCode` is nil when the shell
+    // couldn't say how.
+    let exited: Bool
+    let exitCode: Int?
     var id: String { name }
     init(_ o: [String: Any]) {
         name = o["name"] as? String ?? ""
         port = o["port"] as? Int ?? 0
+        exited = o["exited"] as? Bool ?? false
+        exitCode = o["exitCode"] as? Int
     }
 }
 
@@ -1860,6 +1885,9 @@ struct GitSnapshot {
     let ahead: Int
     let behind: Int
     let defaultBranch: String
+    // Commits on HEAD that aren't on the default branch, sent only for a
+    // branch with no upstream; nil from a Mac that doesn't count them.
+    let aheadOfDefault: Int?
     let ghCli: Bool
     let files: [GitFile]
     let autoPulled: AutoPulled?
@@ -1872,6 +1900,7 @@ struct GitSnapshot {
         ahead = o["ahead"] as? Int ?? 0
         behind = o["behind"] as? Int ?? 0
         defaultBranch = o["defaultBranch"] as? String ?? ""
+        aheadOfDefault = o["aheadOfDefault"] as? Int
         ghCli = o["ghCli"] as? Bool ?? false
         files = (o["files"] as? [[String: Any]] ?? []).map(GitFile.init)
         autoPulled = AutoPulled(o["autoPulled"])
@@ -1949,6 +1978,9 @@ struct ServiceInfo: Identifiable {
     let running: Bool
     let cmd: String
     let port: Int
+    // Ended while the project runs: the pane, and so its logs, stay.
+    let exited: Bool
+    let exitCode: Int?
 
     var id: String { name }
 
@@ -1958,6 +1990,8 @@ struct ServiceInfo: Identifiable {
         running = o["running"] as? Bool ?? false
         cmd = o["cmd"] as? String ?? ""
         port = o["port"] as? Int ?? 0
+        exited = o["exited"] as? Bool ?? false
+        exitCode = o["exitCode"] as? Int
     }
 }
 

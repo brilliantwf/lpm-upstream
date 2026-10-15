@@ -46,7 +46,12 @@ struct IssueContent: View {
     var hidesDetails = false
     var onAction: ((IssueAction) -> Void)? = nil
 
-    private var copy: IssueCopy { issue.copy(mac: style == .bar ? model.link.macNoun : model.link.macLabel) }
+    // A machine that removed this phone is named even in the bar: it can be one
+    // opened through another Mac, which "your Mac" would read as.
+    private var copy: IssueCopy {
+        let named = style == .card || issue == .removedOnMac
+        return issue.copy(mac: named ? model.link.macLabel : model.link.macNoun)
+    }
 
     /// The bar leaves Details to the line under the Mac's name, which opens them.
     private var actions: [IssueAction] {

@@ -181,6 +181,21 @@ final class ComposerStore: ObservableObject {
         pruneFileSources()
     }
 
+    /// Take over the prompts typed for another terminal, the tab lpm reopened in
+    /// this one's place, unless something is typed here already. Attachments
+    /// still uploading went with the old tab's link.
+    func adoptDraft(of other: ComposerStore) {
+        guard tabs.allSatisfy({ $0.text.isEmpty && $0.attachments.isEmpty }) else { return }
+        tabs = other.tabs.map { old in
+            var tab = ComposerTab()
+            tab.text = old.text
+            tab.attachments = old.attachments.filter { $0.macPath != nil }
+            return tab
+        }
+        activeIndex = min(other.activeIndex, tabs.count - 1)
+        if !text.isEmpty { model?.sendComposerDraft(termId, text: text) }
+    }
+
     /// After a successful send: close the sent tab if others remain, else clear it
     /// in place (mirrors the desktop's "sent prompt closes its tab, else resets").
     func afterSend() {

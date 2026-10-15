@@ -268,7 +268,13 @@ struct ProjectsView: View {
                 }
             } footer: {
                 if listAge != nil {
-                    Text("Projects open read-only until your Mac is back. Start and Stop wait for it, for up to 2 minutes.")
+                    // A Mac that revoked this device is up; it just won't take
+                    // anything from it, so there is nothing to wait for.
+                    if model.needsRepair || model.link.identityRejected {
+                        Text("Projects open read-only until this \(ThisDevice.noun) is paired with \(model.link.macLabel) again.")
+                    } else {
+                        Text("Projects open read-only until your Mac is back. Start and Stop wait for it, for up to 2 minutes.")
+                    }
                 }
             }
             if !listIsEmpty {
@@ -438,7 +444,11 @@ struct ProjectsView: View {
             Button("Remove", role: .destructive) { Haptics.warning(); model.removeProject(p); removing = nil }
             Button("Cancel", role: .cancel) { removing = nil }
         } message: { p in
-            Text("This deletes “\(p.label)” and its folder from disk. This can't be undone.")
+            Text(CopyRemoval.message(for: p, snapshot: model.git.snapshots[p.name],
+                                     checking: model.git.loading.contains(p.name)))
+        }
+        .onChange(of: removing?.name) { _, name in
+            if let name { model.git.load(name) }
         }
         .modifier(SessionAlerts())
         .sheet(item: $duplicating) { p in
@@ -757,7 +767,7 @@ struct ProjectRow: View {
                     Circle().fill(.red).frame(width: 8, height: 8)
                         .accessibilityLabel("Config error")
                 } else {
-                    RunningDot(running: project.running, stale: stale)
+                    RunningDot(running: project.isUp, stale: stale, crashed: project.crashSummary)
                 }
             }
             .frame(width: 14)
@@ -792,15 +802,22 @@ struct ProjectRow: View {
 }
 
 /// The green (running) / grey (stopped) status dot, shared across the projects
-/// list and the project detail header.
+/// list and the project detail header. Red when a service it started crashed.
 struct RunningDot: View {
     let running: Bool
     var size: CGFloat = 8
     /// Last known, not live: a running project shows as a ring, not a lit dot.
     var stale: Bool = false
+    /// Which started services crashed ("web exited with code 1"); nil when none.
+    var crashed: String? = nil
 
     var body: some View {
-        if stale && running {
+        if let crashed, !stale {
+            Circle()
+                .fill(.red)
+                .frame(width: size, height: size)
+                .accessibilityLabel(crashed)
+        } else if stale && running {
             Circle()
                 .strokeBorder(Color.secondary, lineWidth: 1.5)
                 .frame(width: size, height: size)
@@ -840,128 +857,6 @@ struct QueuedActionLine: View {
         }
         .font(.caption)
         .foregroundStyle(action.expired ? Color.red : Color.orange)
-    }
-}
-
-/// A single terminal: xterm.js (in a WKWebView) renders output the client streams
-/// in and posts keystrokes back — the same emulator the desktop uses, so rendering
-/// matches and scrollback works. The nav bar floats translucently over the top.
-struct TerminalScreen: View {
-    @Environment(AppModel.self) private var model
-    let term: TerminalInfo
-    let project: Project
-    @StateObject private var keyboard = KeyboardObserver()
-    @State private var textExtent = TextExtent()
-    // Flips when the first screen snapshot renders, hiding the loading spinner.
-    @State private var hasContent = false
-    // A terminal spawned by running an action from this screen — pushed on top.
-    @State private var switched: TerminalInfo?
-    // A file path tapped in the terminal, open in the preview sheet.
-    @State private var preview: FilePreviewTarget?
-    // Top of the navigation stack, so a touch on a screen pushed over it isn't
-    // taken as looking at this terminal.
-    @State private var onScreen = false
-    // Phone-local terminal preferences (Settings → Terminal).
-    @AppStorage(TerminalPrefs.fontSizeKey) private var fontSize = TerminalPrefs.defaultFontSize
-    @AppStorage(TerminalPrefs.themeKey) private var themeRaw = TerminalPrefs.defaultTheme.rawValue
-
-    private var theme: TerminalTheme { TerminalPrefs.theme(themeRaw) }
-    private var liveProject: Project { model.projects.first(where: { $0.name == term.project }) ?? project }
-
-    var body: some View {
-        // A terminal is shown live in exactly one place at a time. When the
-        // desktop (or another phone) owns it, show a "take control" placeholder
-        // instead of a second, mis-sized copy — but keep the web view MOUNTED
-        // underneath so this phone stays subscribed (a presenter / candidate
-        // owner) and takes over instantly on claim.
-        let controlled = model.isControlled(term.id)
-        let ended = model.endedTerminals[term.id]
-        // The terminal sits WITHIN the safe area (below the nav bar), so its top
-        // rows aren't hidden under the title; the composer sits below it and rides
-        // above the keyboard when it opens.
-        return VStack(spacing: 0) {
-            ZStack {
-                // Resizing the web view every keyboard frame reflowed xterm and sent
-                // the Mac a PTY resize each time; it slides instead and refits once.
-                KeyboardSteadyFrame(keyboard: keyboard, extent: textExtent) { hidden in
-                    WebTerminalView(term: term, onFirstContent: {
-                        withAnimation(.easeOut(duration: 0.2)) { hasContent = true }
-                    }, hiddenInsets: hidden, textExtent: textExtent, fontSize: fontSize, theme: theme, onOpenPath: { paths, line in
-                        Haptics.tap()
-                        preview = FilePreviewTarget(project: term.project, paths: paths, line: line)
-                    })
-                        .environment(model)
-                }
-                if controlled && !hasContent && ended == nil {
-                    TerminalLoadingView(background: theme.backgroundColor)
-                }
-                if !controlled && ended == nil {
-                    ControlHandoffView(ownerLabel: model.controlOwnerLabel(term.id),
-                                       background: theme.backgroundColor) {
-                        model.claimControl(term.id)
-                    }
-                }
-                // Without this the terminal just freezes silently while the link
-                // is down — keystrokes and scroll are live traffic, dropped by
-                // design, so the user needs to see WHY nothing responds.
-                if model.connection != .ready {
-                    TerminalConnectionBanner()
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                } else if let ended {
-                    TerminalEndedBanner(ending: ended)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .padding(.top, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .animation(.easeOut(duration: 0.2), value: model.connection == .ready)
-            .animation(.easeOut(duration: 0.2), value: ended)
-            if controlled && ended == nil {
-                TerminalComposer(store: model.composerStore(for: term.id, project: term.project, label: term.label),
-                                 terminalBackground: theme.backgroundColor)
-                    .environment(model)
-            }
-        }
-            .background(theme.backgroundColor.ignoresSafeArea(.all, edges: .all))
-            .navigationTitle(term.label)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) { TerminalTitle(term: term) }
-            }
-            .projectMenuToolbar(project: liveProject, onSpawnedTerminal: { t in
-                // The new terminal is owned by the desktop that opened it; claim it
-                // for this phone before pushing so the pushed screen renders live
-                // instead of a "take control" placeholder.
-                model.claimControl(t.id)
-                switched = t
-            })
-            .navigationDestination(item: $switched) { TerminalScreen(term: $0, project: liveProject) }
-            .sheet(item: $preview) { FilePreviewSheet(target: $0).environment(model) }
-            // Opening the terminal is the tap that sees it; a finish that lands while
-            // it is already open waits for the next touch, as on the desktop.
-            .background(WindowTouchObserver {
-                if onScreen { model.markTerminalSeen(project: term.project, paneId: term.id) }
-            })
-            .onAppear {
-                onScreen = true
-                model.markTerminalSeen(project: term.project, paneId: term.id)
-            }
-            .onDisappear { onScreen = false }
-            // Fallback: never leave the spinner up if no snapshot ever arrives
-            // (e.g. the link drops mid-open).
-            .task {
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
-                withAnimation { hasContent = true }
-            }
-            // Solid bar matching the terminal ground, scoped to this screen — the
-            // terminal sits below it (safe area), so the bar reads as one continuous
-            // surface with the terminal instead of letting the light background show
-            // through. `.dark` keeps title/back white (every theme has a dark bg).
-            .toolbarBackground(theme.backgroundColor, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
     }
 }
 

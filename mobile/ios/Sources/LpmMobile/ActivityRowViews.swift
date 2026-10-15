@@ -232,12 +232,12 @@ private struct ActivityChipButton: View {
                     ProgressView().controlSize(.mini)
                 } else {
                     Circle()
-                        .fill(chip.running ? Color.green : Color(.systemGray3))
+                        .fill(chip.running ? Color.green : chip.crashed ? Color.red : Color(.systemGray3))
                         .frame(width: 5, height: 5)
                 }
                 Text(chip.name)
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(chip.running ? Color.green : Color.secondary)
+                    .foregroundStyle(chip.running ? Color.green : chip.crashed ? Color.red : Color.secondary)
                     .lineLimit(1)
             }
             .padding(.horizontal, 9)
@@ -246,6 +246,8 @@ private struct ActivityChipButton: View {
         }
         .buttonStyle(.borderless)
         .disabled(pending)
-        .accessibilityLabel("\(chip.running ? "Stop" : "Start") the \(chip.name) \(chip.noun)")
+        .accessibilityLabel(chip.crashed && !chip.running
+                            ? "\(chip.name) crashed. Restart it"
+                            : "\(chip.running ? "Stop" : "Start") the \(chip.name) \(chip.noun)")
     }
 }

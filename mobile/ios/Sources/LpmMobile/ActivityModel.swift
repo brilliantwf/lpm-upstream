@@ -159,6 +159,8 @@ struct ActivityChip: Identifiable, Equatable {
     var kind: Kind
     var name: String
     var running: Bool
+    /// A started service whose command failed; its chip restarts it.
+    var crashed = false
 
     var id: String { (kind == .profile ? "profile/" : "service/") + name }
     var noun: String { kind == .profile ? "profile" : "service" }

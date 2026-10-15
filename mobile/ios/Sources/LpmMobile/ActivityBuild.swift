@@ -117,12 +117,14 @@ private func markDismissable(_ rows: inout [ActivityRow]) {
 /// Collapse services into profile shortcuts only while a profile matches the
 /// running set exactly. A custom mix needs individual service chips so every
 /// running process remains visible and independently controllable.
-private func chips(of project: Project, started: Set<String>) -> [ActivityChip] {
+private func chips(of project: Project, started: Set<String>, crashed: Set<String>) -> [ActivityChip] {
     let profiles = project.profiles
     let activeProfile = profiles.first { $0.name == project.activeProfile }
-    if activeProfile == nil && !started.isEmpty {
+    // A lit profile would hide which of its services crashed.
+    if (activeProfile == nil || !crashed.isEmpty) && !(started.isEmpty && crashed.isEmpty) {
         return project.allServices.map {
-            ActivityChip(kind: .service, name: $0.name, running: started.contains($0.name))
+            ActivityChip(kind: .service, name: $0.name, running: started.contains($0.name),
+                         crashed: crashed.contains($0.name))
         }
     }
 
@@ -139,14 +141,15 @@ private func chips(of project: Project, started: Set<String>) -> [ActivityChip] 
 
 private func serviceGroup(_ project: Project, _ identity: ActivityIdentity) -> ActivityServiceGroup? {
     guard project.running else { return nil }
-    let running = project.services.map(\.name)
+    let running = project.services.filter { !$0.exited }.map(\.name)
     let started = Set(running)
+    let crashed = Set(project.services.filter(\.crashed).map(\.name))
     let declared = project.allServices.map(\.name).filter { !started.contains($0) }
     if running.isEmpty && declared.isEmpty { return nil }
     var ports: [String: Int] = [:]
     for service in project.allServices where service.port > 0 { ports[service.name] = service.port }
     return ActivityServiceGroup(project: identity, running: running, declared: declared,
-                                ports: ports, chips: chips(of: project, started: started))
+                                ports: ports, chips: chips(of: project, started: started, crashed: crashed))
 }
 
 /// `terminalTitles` is project -> terminal id -> that tab's name; only projects

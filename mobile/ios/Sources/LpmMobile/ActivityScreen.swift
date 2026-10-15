@@ -187,7 +187,7 @@ struct ActivityScreen: View {
                 .onEnded { _ in scheduleRelease() }
         )
         .overlay {
-            if empty { emptyState }
+            if empty { emptyState(activity) }
         }
     }
 
@@ -224,7 +224,7 @@ struct ActivityScreen: View {
     // An empty list here means "nothing is running" only when the Mac is actually
     // answering; while it refuses this device there is nothing to report on.
     @ViewBuilder
-    private var emptyState: some View {
+    private func emptyState(_ activity: Activity) -> some View {
         if model.needsRepair || model.link.identityRejected {
             ContentUnavailableView {
                 Label("Not connected to \(model.link.macLabel)", systemImage: "macbook.and.iphone")
@@ -232,14 +232,20 @@ struct ActivityScreen: View {
                 Text("Its activity shows again once it's paired.")
             }
         } else {
-            let narrowed = !query.trimmingCharacters(in: .whitespaces).isEmpty || kind != .all
+            let searching = !query.trimmingCharacters(in: .whitespaces).isEmpty
+            // A filter over nothing at all still means nothing is running.
+            let narrowed = (searching || kind != .all) && !(activity.rows.isEmpty && activity.services.isEmpty)
             ContentUnavailableView {
                 Label(narrowed ? "Nothing matches" : "Nothing is running",
                       systemImage: narrowed ? "magnifyingglass" : "moon.zzz")
             } description: {
-                Text(narrowed
-                     ? "Try a different search, or switch back to All."
-                     : "Start a supported agent in an open project, or run an automation. Terminal sessions aren't tracked.")
+                if !narrowed {
+                    Text("Start a supported agent in an open project, or run an automation. Terminal sessions aren't tracked.")
+                } else if !searching {
+                    Text("No \(kind.label.lowercased()) are running. Switch back to All to see the rest.")
+                } else {
+                    Text(kind == .all ? "Try a different search." : "Try a different search, or switch back to All.")
+                }
             }
         }
     }
@@ -295,7 +301,8 @@ struct ActivityScreen: View {
     /// stopping it is stopping the project.
     private func runChip(_ project: String, _ chip: ActivityChip) {
         if chip.kind == .service {
-            model.toggleService(project, service: chip.name)
+            if chip.crashed && !chip.running { model.restartService(project, service: chip.name) }
+            else { model.toggleService(project, service: chip.name) }
             return
         }
         guard let p = model.projects.first(where: { $0.name == project }) else { return }

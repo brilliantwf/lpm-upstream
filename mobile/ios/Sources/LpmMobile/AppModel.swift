@@ -859,6 +859,13 @@ final class AppModel {
         (visitHost ?? self).repairMac(target, reason: reason)
     }
 
+    /// Pair the active machine itself after it removed this phone: the Mac it was
+    /// opened through can't bring it back, only pairing on the machine can.
+    func repairRemovedMac() {
+        guard !demoMode, let target = activeRecord?.localId else { return }
+        (visitHost ?? self).repairMac(target, reason: .removed)
+    }
+
     func repairMac(_ target: UUID, reason: RepairReason) {
         pendingRepairMacId = target
         link.repairMacId = target
@@ -1614,19 +1621,50 @@ final class AppModel {
             // A wait for the Mac can outlast the list it was tapped on; the wire
             // verb toggles, so only send it while it still moves the right way.
             guard let self, self.serviceRunning(project, service) != desired else { return }
-            self.pendingServiceToggle[project, default: [:]][service] = desired
-            DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self] in
-                if self?.pendingServiceToggle[project]?[service] == desired {
-                    self?.pendingServiceToggle[project]?[service] = nil
-                }
+            self.markServicePending(project, service, desired: desired)
+            // A Mac that has `stopService` stops without the toggle's guessing.
+            if !desired && self.canRestartServices { c.stopService(project, service: service) }
+            else { c.toggleService(project, service: service) }
+        }
+    }
+
+    /// Run a service again: one that ended, or one still running. A Mac without
+    /// `restartService` starts an ended service through the toggle instead.
+    func restartService(_ project: String, service: String) {
+        whenConnected("Restart \(service)", project: project) { [weak self] c in
+            guard let self else { return }
+            self.markServicePending(project, service, desired: true)
+            if self.canRestartServices { c.restartService(project, service: service) }
+            else if !self.serviceRunning(project, service) { c.toggleService(project, service: service) }
+        }
+    }
+
+    /// Stop a service whatever its state, clearing one that ended.
+    func stopService(_ project: String, service: String) {
+        whenConnected("Stop \(service)", project: project) { [weak self] c in
+            guard let self, self.canRestartServices else { return }
+            self.markServicePending(project, service, desired: false)
+            c.stopService(project, service: service)
+        }
+    }
+
+    /// The Mac answers `restartService` and `stopService` and reports services
+    /// that ended.
+    var canRestartServices: Bool {
+        client?.hostFeatures.contains(LpmClient.serviceRestartFeature) == true
+    }
+
+    private func markServicePending(_ project: String, _ service: String, desired: Bool) {
+        pendingServiceToggle[project, default: [:]][service] = desired
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self] in
+            if self?.pendingServiceToggle[project]?[service] == desired {
+                self?.pendingServiceToggle[project]?[service] = nil
             }
-            c.toggleService(project, service: service)
         }
     }
 
     private func serviceRunning(_ project: String, _ service: String) -> Bool {
-        let proj = projects.first(where: { $0.name == project })
-        return (proj?.running ?? false) && (proj?.services.contains(where: { $0.name == service }) ?? false)
+        projects.first(where: { $0.name == project })?.liveServiceNames.contains(service) ?? false
     }
     func loadTerminals(_ project: String) { client?.requestTerminals(project: project) }
 
@@ -2064,9 +2102,11 @@ final class AppModel {
         backgroundRuns[runId] = nil
     }
     func newTerminal(_ project: String) {
-        client?.newTerminal(project: project)
-        markTerminalCreating(project)
-        reloadTerminalsSoon(project)
+        whenConnected("New tab", project: project) { [weak self] c in
+            c.newTerminal(project: project)
+            self?.markTerminalCreating(project)
+            self?.reloadTerminalsSoon(project)
+        }
     }
     /// Show a placeholder terminal row until a terminals response contains an id
     /// that wasn't there at request time, or a timeout gives up (e.g. a run task
@@ -2145,6 +2185,12 @@ final class AppModel {
         let s = ComposerStore(termId: id, project: project, label: label, model: self)
         composerStores[id] = s
         return s
+    }
+
+    /// Hand what was typed for a tab to the tab lpm reopened in its place.
+    func carryComposerDraft(from old: String, to new: TerminalInfo) {
+        guard let draft = composerStores.removeValue(forKey: old) else { return }
+        composerStore(for: new.id, project: new.project, label: new.label).adoptDraft(of: draft)
     }
 
     func loadComposerActions() { client?.requestComposerActions() }
@@ -2463,7 +2509,10 @@ final class AppModel {
             self.identityMismatch = mismatch
             // Same shape: the Mac no longer holds a record for this device, so the
             // UI must offer re-pairing instead of a retry. Any other state clears it.
-            self.needsRepair = { if case .failed(LpmClient.unauthorizedError) = s { return true }; return false }()
+            self.needsRepair = {
+                guard case .failed(let reason) = s else { return false }
+                return reason == LpmClient.unauthorizedError || reason == LpmClient.revokedError
+            }()
             self.connection = s
             self.repickHostIfStale(s, from: c)
             self.startRecoveryIfStale(s, from: c)
@@ -2471,6 +2520,7 @@ final class AppModel {
             // The live socket dropped: any request awaiting a reply is now dead
             // (the reply can't survive the reconnect). Reset in-flight bookkeeping.
             if self.wasReady && !nowReady {
+                self.noteTerminalsLostWithLink()
                 self.handleConnectionReset()
                 self.noteLeavingActiveMac(asOf: c.lastHeard ?? Date())
             }
@@ -2561,7 +2611,7 @@ final class AppModel {
             }
             for proj in p {
                 guard let pending = self.pendingServiceToggle[proj.name], !pending.isEmpty else { continue }
-                let runningNow = proj.running ? Set(proj.services.map(\.name)) : []
+                let runningNow = proj.liveServiceNames
                 for (svc, desired) in pending where runningNow.contains(svc) == desired {
                     self.pendingServiceToggle[proj.name]?[svc] = nil
                 }
@@ -2801,7 +2851,7 @@ final class AppModel {
         c.onOutput = { [weak self] id, data in self?.terminalScreens.current(id)?.output(data) }
         c.onControl = { [weak self] id, owner in self?.setControlOwner(id, owner) }
         c.onExit = { [weak self] id, code, gone in
-            self?.endedTerminals[id] = TerminalEnding(code: code, gone: gone)
+            self?.recordEnding(id, code: code, gone: gone)
         }
     }
 

@@ -5,7 +5,7 @@ private let actionKeyOrder = ["label", "emoji", "cmd", "cwd", "type", "reuse", "
                               "display", "layer", "inputs", "actions"]
 private let zoneKeyOrder = ["rows", "label", "display", "position", "collapsed", "layers"]
 private let inputKeyOrder = ["key", "label", "type", "required", "placeholder", "default",
-                             "options", "value"]
+                             "persist", "options", "value", "position"]
 
 /// Demo handlers for config editing — raw-YAML read/write per layer and structured
 /// service/profile/action edits — plus the harmless `apnsToken` ack. Reads reply
@@ -214,6 +214,9 @@ extension DemoServer {
             var entry = o["payload"] as? [String: Any] ?? [:]
             entry["name"] = key
             entry.removeValue(forKey: "children")
+            if let inputs = entry["inputs"] as? [String: Any] {
+                entry["inputs"] = inputs.isEmpty ? nil : self.wireInputs(inputs)
+            }
             if let children = entry["actions"] as? [String: Any] {
                 entry["children"] = self.actionInfoChildren(parent: key, children)
             }
@@ -317,7 +320,27 @@ extension DemoServer {
         body.removeValue(forKey: "name")
         body.removeValue(forKey: "children")
         if let template = body.removeValue(forKey: "configLabel") { body["label"] = template }
+        if let inputs = body["inputs"] as? [[String: Any]] {
+            body["inputs"] = ActionInputsYaml.map(from: ActionInputsYaml.drafts(from: inputs))
+        }
         return body
+    }
+
+    /// An `inputs` mapping as the projects list carries it: in prompt order, each
+    /// input with its key and every choice as a label and value.
+    private func wireInputs(_ map: [String: Any]) -> [[String: Any]] {
+        ActionInputsYaml.ordered(map.mapValues { $0 as? [String: Any] ?? [:] }).map { entry in
+            var input = entry.body
+            input["key"] = entry.key
+            input.removeValue(forKey: "position")
+            if let options = entry.body["options"] as? [Any] {
+                input["options"] = options.compactMap { option -> [String: Any]? in
+                    if let value = option as? String { return ["label": value, "value": value] }
+                    return option as? [String: Any]
+                }
+            }
+            return input
+        }
     }
 
     private func actionInfoChildren(parent: String, _ map: [String: Any]) -> [[String: Any]] {
@@ -423,6 +446,12 @@ extension DemoServer {
         }
         if let rows = value as? [[String: Any]] {
             return "\(pad)\(key):\n" + rows.map { yamlListItem($0, indent: indent + 2) }.joined()
+        }
+        if let items = value as? [Any] {
+            return "\(pad)\(key):\n" + items.map { item in
+                if let row = item as? [String: Any] { return yamlListItem(row, indent: indent + 2) }
+                return "\(pad)  - \(yamlScalarString(item) ?? "\(item)")\n"
+            }.joined()
         }
         if let map = value as? [String: Any] {
             let order = key == "actions" ? actionKeyOrder : inputKeyOrder

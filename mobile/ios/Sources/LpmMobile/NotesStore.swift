@@ -105,7 +105,8 @@ final class NotesStore {
         armTimeout("chats", project, seconds: 25) { [weak self] in
             guard let self, self.chatsLoading.remove(project) != nil else { return }
             if self.chats[project] == nil {
-                self.chatsError[project] = "Couldn't reach your Mac. Pull to refresh."
+                self.chatsError[project] = self.unanswered.map { $0 + " Pull to refresh." }
+                    ?? "Couldn't reach your Mac. Pull to refresh."
             }
         }
     }
@@ -178,7 +179,9 @@ final class NotesStore {
             self.pendingPage[k] = nil
             self.messagesLoading.remove(k)
             self.pagingKeys.remove(k)
-            if self.messages[k] == nil { self.messagesError[k] = "Couldn't load these notes. Try again." }
+            if self.messages[k] == nil {
+                self.messagesError[k] = self.unanswered ?? "Couldn't load these notes. Try again."
+            }
         }
     }
 
@@ -348,6 +351,13 @@ final class NotesStore {
             }
             messages[mk]?[i] = NoteMessage(o)
         }
+    }
+
+    /// A read that timed out while the link is up: the Mac is there but its
+    /// notebook hasn't answered, as when it waits on a Keychain prompt.
+    private var unanswered: String? {
+        guard let model, model.link.isReady else { return nil }
+        return "No answer from \(model.link.macLabel) yet. It may be waiting on a prompt on its screen, such as Keychain access."
     }
 
     private func armTimeout(_ op: String, _ key: String, seconds: Double, _ fire: @escaping () -> Void) {

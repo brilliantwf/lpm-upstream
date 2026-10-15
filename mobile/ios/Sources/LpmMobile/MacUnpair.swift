@@ -12,7 +12,7 @@ enum MacUnpair {
         // Without a pin, whoever answers at the address could be anyone; the token
         // isn't handed to them.
         guard let pin else { return }
-        let frame = Wire.unpair(deviceId: credential.deviceId, token: credential.token)
+        let frame = Wire.unpair(deviceId: credential.deviceId, token: credential.token, phoneId: Keychain.phoneId)
         Task.detached {
             for host in hosts where !host.isEmpty {
                 if await deliver(frame, host: host, port: port, pin: pin) { return }

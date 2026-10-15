@@ -8,8 +8,8 @@ import UIKit
 struct ProjectDetail: View {
     @Environment(AppModel.self) private var model
     let project: Project
-    @State private var renaming: TerminalInfo?
-    @State private var renameText = ""
+    @State private var renaming: TabRename?
+    @State private var closing: TerminalInfo?
     @State private var openTerminal: TerminalInfo?
     @State private var activeBgRun: BackgroundRunInfo?
     @State private var logsForService: Service?
@@ -19,14 +19,19 @@ struct ProjectDetail: View {
     // the one we were pushed with.
     private var live: Project { model.projects.first(where: { $0.name == project.name }) ?? project }
     private var terminals: [TerminalInfo] { model.terminals[project.name] ?? [] }
-    // nil vs [] tells "still loading" apart from "no terminals".
-    private var terminalsLoaded: Bool { model.terminals[project.name] != nil }
+    // nil vs [] tells "still loading" apart from "no terminals". While the Mac
+    // is away an empty list is no answer either: lpm may be restarting, and it
+    // brings the tabs back once it's up.
+    private var terminalsLoaded: Bool {
+        guard let list = model.terminals[project.name] else { return false }
+        return !list.isEmpty || model.demoMode || model.link.isReady
+    }
+    private var queued: [QueuedAction] { model.link.queued(for: project.name) }
     private var creating: Bool { model.creatingTerminals.contains(project.name) }
     private var bgRuns: [BackgroundRunInfo] { model.backgroundRunList(for: project.name) }
-    // `services` is the resolved running list; display gates on `running`.
-    private var runningServices: Set<String> {
-        live.running ? Set(live.services.map(\.name)) : []
-    }
+    // `services` is the resolved running list; display gates on `running`, and
+    // one that ended keeps its place there until restarted or stopped.
+    private var runningServices: Set<String> { live.liveServiceNames }
     private var agentRows: [ProjectAgentRow] {
         projectAgentRows(live, now: Int(Date().timeIntervalSince1970 * 1000), tabTitles: [:])
     }
@@ -50,93 +55,31 @@ struct ProjectDetail: View {
         // One inset-grouped list, so tabs, services and runs read alike and keep
         // native drag-to-reorder via `.onMove`.
         List {
+            if !queued.isEmpty {
+                Section {
+                    ForEach(queued) { QueuedActionLine(action: $0) }
+                }
+            }
             if !terminalsLoaded {
-                Section {
-                    ForEach(0..<3, id: \.self) { _ in
-                        TerminalRowSkeleton()
-                            .compactRow()
-                    }
-                } header: {
-                    SectionTitle(text: "Tabs")
-                }
+                ProjectTabsLoadingSection()
             } else if !isEmpty {
-                Section {
-                    ForEach(terminals) { t in
-                        TabRow(term: t, agent: agentByTerminal[t.id],
-                               onOpen: { openTerminal = t })
-                        .tabMenu(term: t, agent: agentByTerminal[t.id]) {
-                            Button {
-                                model.pinTerminal(project.name, id: t.id)
-                            } label: {
-                                Label(t.pinned ? "Unpin" : "Pin",
-                                      systemImage: t.pinned ? "pin.slash" : "pin")
-                            }
-                            Button {
-                                renameText = t.label
-                                renaming = t
-                            } label: {
-                                Label("Rename", systemImage: "pencil")
-                            }
-                            Button(role: .destructive) {
-                                Haptics.warning()
-                                model.closeTerminal(project.name, id: t.id)
-                            } label: {
-                                Label("Close", systemImage: "xmark")
-                            }
-                        }
-                        .compactRow()
-                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                            Button {
-                                model.pinTerminal(project.name, id: t.id)
-                            } label: {
-                                Label(t.pinned ? "Unpin" : "Pin",
-                                      systemImage: t.pinned ? "pin.slash" : "pin")
-                            }
-                            .tint(.orange)
-                        }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                Haptics.warning()
-                                model.closeTerminal(project.name, id: t.id)
-                            } label: {
-                                Label("Close", systemImage: "xmark")
-                            }
-                            Button {
-                                renameText = t.label
-                                renaming = t
-                            } label: {
-                                Label("Rename", systemImage: "pencil")
-                            }
-                            .tint(.gray)
-                        }
-                    }
-                    .onMove(perform: moveTerminals)
-                    if creating {
-                        TerminalRowSkeleton()
-                            .compactRow()
-                    }
-                    Button {
-                        model.newTerminal(project.name)
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "plus")
-                            Text("New tab")
-                        }
-                    }
-                    .disabled(creating)
-                    .compactRow()
-                } header: {
-                    SectionTitle(text: "Tabs")
-                }
+                ProjectTabsSection(project: project.name, terminals: terminals, agents: agentByTerminal,
+                                   creating: creating, renaming: $renaming, closing: $closing,
+                                   onOpen: { openTerminal = $0 })
             }
 
             if !live.allServices.isEmpty {
                 Section {
+                    let ended = live.endedServices
                     ForEach(live.allServices) { s in
                         ServiceRow(service: s,
                                    running: runningServices.contains(s.name),
+                                   ended: ended[s.name],
                                    pending: model.pendingServiceToggle[project.name]?[s.name] != nil,
+                                   canStop: model.canRestartServices,
                                    onToggle: { model.toggleService(live.name, service: s.name) },
+                                   onRestart: { model.restartService(live.name, service: s.name) },
+                                   onStop: { model.stopService(live.name, service: s.name) },
                                    onOpen: { logsForService = s })
                             .compactRow()
                     }
@@ -185,23 +128,19 @@ struct ProjectDetail: View {
         .animation(.default, value: terminalsLoaded)
         .animation(.default, value: creating)
         .connectionTitle(title, otherwise: live.configError != nil ? "Invalid configuration"
-                         : live.running ? "Running" : "Stopped")
+                         : live.crashSummary ?? (live.isUp ? "Running" : "Stopped"))
         .navigationBarTitleDisplayMode(.inline)
         .topBar { ConnectionStatusBar() }
         .navigationDestination(item: $openTerminal) { TerminalScreen(term: $0, project: live) }
-        .alert("Rename terminal", isPresented: Binding(
-            get: { renaming != nil },
-            set: { if !$0 { renaming = nil } }
-        )) {
-            TextField("Name", text: $renameText)
-            Button("Cancel", role: .cancel) { renaming = nil }
-            Button("Rename") {
-                let name = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-                if let t = renaming, !name.isEmpty {
-                    model.renameTerminal(project.name, id: t.id, label: name)
-                }
-                renaming = nil
-            }
+        .tabRenameAlert($renaming)
+        .confirmationDialog(closing.map { "Close “\($0.label)”?" } ?? "",
+                            isPresented: Binding(get: { closing != nil },
+                                                 set: { if !$0 { closing = nil } }),
+                            titleVisibility: .visible, presenting: closing) { t in
+            Button("Close Tab", role: .destructive) { model.closeTerminal(project.name, id: t.id) }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("Whatever is running in it stops.")
         }
         .sheet(item: $activeBgRun) { run in
             BackgroundRunSheet(run: run).environment(model)
@@ -217,6 +156,9 @@ struct ProjectDetail: View {
         .onAppear {
             model.loadTerminals(project.name)
             model.loadBackgroundRuns(project.name)
+        }
+        .onChange(of: model.link.isReady) { _, ready in
+            if ready { model.reloadTerminalsAfterReconnect(project.name) }
         }
         // Keep the background-runs section fresh while it's on screen: poll any run
         // still marked running (or not yet polled) every 3s.
@@ -234,21 +176,17 @@ struct ProjectDetail: View {
             }
         }
     }
-
-    private func moveTerminals(from source: IndexSet, to destination: Int) {
-        var order = terminals.map(\.id)
-        order.move(fromOffsets: source, toOffset: destination)
-        model.reorderTerminals(project.name, order: order)
-    }
 }
 
-private extension View {
+extension View {
     /// A row with the list's horizontal insets but less of iOS 26's vertical
     /// padding, so rows sit as tight as the rest of the system's grouped lists.
     func compactRow() -> some View {
         listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
     }
+}
 
+private extension View {
     /// A bar over the top of the list. On iOS 26 the list scrolls under it with
     /// the system's scroll edge effect, the way it does under the nav bar.
     @ViewBuilder
@@ -271,7 +209,7 @@ private extension View {
 }
 
 /// A section header in the small all-caps style, whatever the OS's default.
-private struct SectionTitle: View {
+struct SectionTitle: View {
     let text: String
 
     var body: some View {
@@ -300,43 +238,6 @@ private struct ServicesHeader: View {
                     .disabled(stopping)
             }
         }
-    }
-}
-
-/// One configured service: its name and port, with a switch that starts or
-/// stops it (a spinner while a toggle is in flight). Tapping the row opens its
-/// logs.
-private struct ServiceRow: View {
-    let service: Service
-    let running: Bool
-    let pending: Bool
-    let onToggle: () -> Void
-    let onOpen: () -> Void
-
-    var body: some View {
-        HStack(spacing: 8) {
-            // The logs tap target stops short of the switch: a row-wide tap
-            // gesture would take the switch's taps for itself.
-            HStack(spacing: 8) {
-                Text(service.name).lineLimit(1)
-                if service.port > 0 {
-                    Text(":\(String(service.port))")
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 8)
-            }
-            .frame(maxHeight: .infinity)
-            .contentShape(Rectangle())
-            .onTapGesture(perform: onOpen)
-            if pending {
-                ProgressView().controlSize(.small)
-            } else {
-                Toggle(service.name, isOn: Binding(get: { running }, set: { _ in onToggle() }))
-                    .labelsHidden()
-            }
-        }
-        .frame(minHeight: 44)
     }
 }
 

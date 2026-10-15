@@ -29,7 +29,7 @@ struct PairedSummary: Identifiable, Equatable {
 }
 
 /// Why the pairing screen was opened for a Mac that's already saved.
-enum RepairReason: Equatable { case notRecognized, identity, chosen }
+enum RepairReason: Equatable { case notRecognized, removed, identity, chosen }
 
 /// A sign-in page for Built-in Tailscale, opened over the screen that asked.
 struct TailscalePage: Identifiable, Equatable {

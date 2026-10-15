@@ -172,6 +172,8 @@ struct PairingView: View {
         switch model.link.repairReason {
         case .notRecognized?:
             return "It no longer recognizes this \(ThisDevice.noun). Approve it on the Mac — its name and addresses stay as they are."
+        case .removed?:
+            return "This \(ThisDevice.noun) was removed on it. Pair on that Mac itself: approve it there, or use its QR code or pairing code."
         case .identity?:
             return "Pairing again confirms it's your Mac. Approve it on the Mac — its name and addresses stay as they are."
         case .chosen?:

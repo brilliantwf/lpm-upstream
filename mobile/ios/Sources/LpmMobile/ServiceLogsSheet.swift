@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// A service's recent pane output while the service runs — the mobile counterpart
-/// of the desktop's service pane. The Mac pushes it as it changes
-/// (`serviceLogsWatch`); one that predates that is polled every 3s instead. The
-/// toolbar carries the service's Start/Stop toggle.
+/// A service's recent pane output while the service runs, or after its command
+/// ended while its pane is still open — the mobile counterpart of the desktop's
+/// service pane. The Mac pushes it as it changes (`serviceLogsWatch`); one that
+/// predates that is polled every 3s instead. The toolbar carries the service's
+/// Start/Stop toggle, or Restart once it ended.
 struct ServiceLogsSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -11,10 +12,8 @@ struct ServiceLogsSheet: View {
     let service: Service
 
     private var live: Project? { model.projects.first(where: { $0.name == project }) }
-    private var running: Bool {
-        guard let p = live, p.running else { return false }
-        return p.services.contains(where: { $0.name == service.name })
-    }
+    private var running: Bool { live?.liveServiceNames.contains(service.name) ?? false }
+    private var ended: Service? { live?.endedServices[service.name] }
     private var pending: Bool { model.pendingServiceToggle[project]?[service.name] != nil }
     // Pane index from the last `services` discovery; nil until it loads (or while
     // the service is stopped), so the poll loop keeps re-discovering.
@@ -23,7 +22,9 @@ struct ServiceLogsSheet: View {
     }
     private var key: String? { paneIndex.map { model.serviceLogsKey(project, $0) } }
     private var text: String { key.flatMap { model.serviceLogsResult[$0] } ?? "" }
-    private var feed: Feed { Feed(running: running, paneIndex: paneIndex, ready: model.connection == .ready) }
+    private var feed: Feed {
+        Feed(hasPane: running || ended != nil, paneIndex: paneIndex, ready: model.connection == .ready)
+    }
     private var fetchError: String? { key.flatMap { model.serviceLogsError[$0] } }
 
     var body: some View {
@@ -38,7 +39,7 @@ struct ServiceLogsSheet: View {
                     } else if text.isEmpty {
                         HStack(spacing: 8) {
                             if running { ProgressView().controlSize(.small) }
-                            Text(running ? "Waiting for output…" : "This service isn't running.")
+                            Text(running ? "Waiting for output…" : ended != nil ? "No output." : "This service isn't running.")
                                 .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -62,6 +63,8 @@ struct ServiceLogsSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     if pending {
                         ProgressView().controlSize(.small)
+                    } else if ended != nil {
+                        Button("Restart") { model.restartService(project, service: service.name) }
                     } else if running {
                         Button("Stop", role: .destructive) { model.toggleService(project, service: service.name) }
                     } else {
@@ -76,7 +79,7 @@ struct ServiceLogsSheet: View {
         // Restarts as the service starts or stops, its pane is found, or the link
         // comes back — the Mac forgets a dropped connection's watch.
         .task(id: feed) {
-            guard feed.running, feed.ready else { return }
+            guard feed.hasPane, feed.ready else { return }
             guard let paneIndex = feed.paneIndex else {
                 while !Task.isCancelled {
                     model.loadServices(project)
@@ -101,7 +104,7 @@ struct ServiceLogsSheet: View {
     }
 
     private struct Feed: Equatable {
-        let running: Bool
+        let hasPane: Bool
         let paneIndex: Int?
         let ready: Bool
     }
@@ -125,10 +128,12 @@ struct ServiceLogsSheet: View {
 
     private var statusColor: Color {
         if pending { return .blue }
+        if let ended { return ended.crashed ? .red : Color(.systemGray3) }
         return running ? .green : Color(.systemGray3)
     }
     private var statusText: String {
         if pending { return running ? "Stopping…" : "Starting…" }
+        if let ended { return ended.exitText.prefix(1).uppercased() + ended.exitText.dropFirst() }
         return running ? "Running" : "Stopped"
     }
 }

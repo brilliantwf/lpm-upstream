@@ -26,6 +26,9 @@ enum ConnectionIssue: Equatable {
     case lpmNotRunning
     case secureFailed
     case notRecognized
+    /// The machine removed this phone. A Mac it was opened through, or a code
+    /// another Mac armed, can't bring it back; only pairing on it can.
+    case removedOnMac
     case identityChanged
     case identityRejected
     case farewell(Farewell)
@@ -148,6 +151,10 @@ extension ConnectionIssue {
             return IssueCopy(title: "\(Mac) no longer recognizes this \(ThisDevice.noun)",
                              message: "Pair again to keep using it here.",
                              icon: "macbook.and.iphone", tone: .problem, actions: [.pairAgain])
+        case .removedOnMac:
+            return IssueCopy(title: "This \(ThisDevice.noun) was removed on \(mac)",
+                             message: "Pair it on that Mac itself to use it here again.",
+                             icon: "iphone.slash", tone: .problem, actions: [.pairAgain])
         case .identityChanged:
             return IssueCopy(title: "Check that it's \(mac)",
                              message: "It has a new security identity. Compare a short code before connecting.",
@@ -234,6 +241,7 @@ extension ConnectionIssue {
         if case .ready = f.state { return nil }
         if f.identityRejected { return .identityRejected }
         if f.identityMismatch { return .identityChanged }
+        if case .failed(LpmClient.revokedError) = f.state { return .removedOnMac }
         if f.needsRepair || f.credentialMissing { return .notRecognized }
         if !f.online { return .phoneOffline }
         if case .failed(let raw) = f.state {
@@ -324,6 +332,7 @@ struct LinkStatusLine: Equatable {
         case .awayNeedsTailscale(.app): return LinkStatusLine(text: "Can't reach it over Tailscale", tone: .problem)
         case .phoneOffline: return LinkStatusLine(text: "\(ThisDevice.noun) is offline", tone: .problem)
         case .notRecognized, .identityRejected: return LinkStatusLine(text: "Not paired", tone: .problem)
+        case .removedOnMac: return LinkStatusLine(text: "Removed on that Mac", tone: .problem)
         case .identityChanged: return LinkStatusLine(text: "Check its identity", tone: .problem)
         case .relayOffline(let via): return LinkStatusLine(text: "Not connected to \(via)", tone: .problem)
         case .relayUnsupported: return LinkStatusLine(text: "Needs an lpm update", tone: .problem)

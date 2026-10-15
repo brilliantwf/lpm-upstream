@@ -75,7 +75,7 @@ struct GitBranchSheet: View {
                 Text(model.git.branchError[name] ?? "")
             }
         }
-        .onAppear { if branches == nil { model.git.loadBranches(name) } }
+        .onAppear { model.git.loadBranches(name) }
         .onChange(of: model.git.checkoutTick[name]) { _, _ in dismiss() }
     }
 
@@ -103,6 +103,7 @@ struct GitBranchSheet: View {
                 Image(systemName: isCurrent ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 18))
                     .foregroundStyle(isCurrent ? Color.accentColor : Color.secondary)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(branch.name)
@@ -133,7 +134,10 @@ struct GitBranchSheet: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(isCurrent || checkingOut != nil)
+        // Until the refresh lands the check mark can be on the branch it was
+        // the last time the sheet opened.
+        .disabled(isCurrent || checkingOut != nil || loading)
+        .accessibilityAddTraits(isCurrent ? .isSelected : [])
     }
 
     private var loadingState: some View {

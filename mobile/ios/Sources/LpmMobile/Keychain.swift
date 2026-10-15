@@ -12,6 +12,8 @@ import Security
 enum Keychain {
     private static let service = "cx.lpm.mobile"
     private static let legacyAccount = "device-credential"
+    private static let phoneIdAccount = "phone-id"
+    private static let phoneIdDefaultsKey = "lpm.phoneId"
 
     private static func account(for localId: UUID) -> String {
         "device-credential.\(localId.uuidString)"
@@ -75,6 +77,54 @@ enum Keychain {
 
     static func deletePin(for localId: UUID) {
         deleteCredential(account: pinAccount(for: localId))
+    }
+
+    // MARK: phone id
+
+    private static var cachedPhoneId: String?
+    private static let phoneIdLock = NSLock()
+
+    /// This install's own id, sent in every connection's first frame so a Mac
+    /// knows the phone behind any credential, its own or another Mac's. Minted
+    /// once and never rotated; UserDefaults holds it only when the Keychain
+    /// wouldn't take it.
+    static var phoneId: String {
+        phoneIdLock.lock()
+        defer { phoneIdLock.unlock() }
+        if let cachedPhoneId { return cachedPhoneId }
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching([
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: phoneIdAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ] as CFDictionary, &result)
+        if status == errSecSuccess, let data = result as? Data,
+           let id = String(data: data, encoding: .utf8), !id.isEmpty {
+            cachedPhoneId = id
+            return id
+        }
+        if let id = UserDefaults.standard.string(forKey: phoneIdDefaultsKey) {
+            cachedPhoneId = id
+            return id
+        }
+        let id = UUID().uuidString.lowercased()
+        // Before the first unlock the Keychain may still hold the id: use a
+        // fresh one for now but keep nothing, so the stored one isn't replaced.
+        if status == errSecInteractionNotAllowed { return id }
+        let add: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: phoneIdAccount,
+            kSecValueData as String: Data(id.utf8),
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+        ]
+        if status != errSecItemNotFound || SecItemAdd(add as CFDictionary, nil) != errSecSuccess {
+            UserDefaults.standard.set(id, forKey: phoneIdDefaultsKey)
+        }
+        cachedPhoneId = id
+        return id
     }
 
     // MARK: legacy single-item (pre multi-Mac) — migration only

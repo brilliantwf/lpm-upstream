@@ -51,6 +51,7 @@ struct MachineHeader: View {
         case .adding?: return "Adding to this \(ThisDevice.noun)…"
         case .failed(let why)?: return why
         case .removed?: return section.throughMac ? "Opens through this Mac" : "Not on this \(ThisDevice.noun)"
+        case .revoked?: return "Removed this \(ThisDevice.noun). Pair on it to use it here."
         case .needsUpdate?: return "Update lpm on it to open it here"
         case .offline?, nil: return nil
         }

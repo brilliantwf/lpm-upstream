@@ -118,6 +118,8 @@ extension AppModel {
         Haptics.tap()
         switch action {
         case .retry: retryConnection()
+        case .pairAgain where issue == .removedOnMac:
+            repairRemovedMac()
         case .pairAgain:
             let identity = issue == .identityChanged || issue == .identityRejected
             repairActiveMac(reason: identity ? .identity : nil)

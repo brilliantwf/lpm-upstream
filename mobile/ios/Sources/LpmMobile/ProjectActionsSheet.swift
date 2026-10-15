@@ -15,6 +15,9 @@ struct ProjectActionsSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    if !project.actionErrors.isEmpty {
+                        ActionErrorsNotice(errors: project.actionErrors)
+                    }
                     section("Header", rows.header, compact: false)
                     section("Footer", rows.footer, compact: true)
                     section("Menu", rows.menu.map(ActionRowItem.action), compact: false)

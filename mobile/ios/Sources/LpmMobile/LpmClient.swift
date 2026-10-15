@@ -235,6 +235,7 @@ final class LpmClient: NSObject {
     /// What the Mac said it answers in its `paired`/`ready` frame.
     private(set) var hostFeatures = Set<String>()
     static let serviceLogsWatchFeature = "serviceLogsWatch"
+    static let serviceRestartFeature = "serviceRestart"
 
     // Requests made while the link is down or half-dead, delivered on the next
     // `ready`. iOS kills the socket seconds after backgrounding and the
@@ -311,6 +312,11 @@ final class LpmClient: NSObject {
     // succeed. Mapped to user-facing copy by the model, which turns it into a
     // "pair again" prompt.
     static let unauthorizedError = "device-unauthorized"
+
+    // Sentinel for a Mac that removed this phone, answering a pairing code
+    // another Mac armed for it or a connection carried through another Mac. Only
+    // pairing on that Mac itself lets the phone back in.
+    static let revokedError = "device-revoked"
 
     // Failures the Mac reports in an `error` frame during pairing, and the one
     // this client raises when it has nothing to authenticate with.
@@ -589,14 +595,16 @@ final class LpmClient: NSObject {
         // after resume: on a slow path (cellular via Tailscale) a send issued
         // while the TLS handshake is still in flight can fail and tear down a
         // connection that was about to succeed — the exact away-from-home case.
+        let phoneId = Keychain.phoneId
         if let name = pairRequestName {
-            pendingHandshakeFrame = Wire.pairRequest(name: name, replaces: replacesDeviceId)
+            pendingHandshakeFrame = Wire.pairRequest(name: name, phoneId: phoneId, replaces: replacesDeviceId)
         } else if let code = pairingCode {
-            pendingHandshakeFrame = Wire.pair(code: code, name: deviceName, replaces: replacesDeviceId)
+            pendingHandshakeFrame = Wire.pair(code: code, name: deviceName, phoneId: phoneId,
+                                              replaces: replacesDeviceId)
         } else if let c = credential, let slug = relaySlug {
-            pendingHandshakeFrame = Wire.relay(deviceId: c.deviceId, token: c.token, slug: slug)
+            pendingHandshakeFrame = Wire.relay(deviceId: c.deviceId, token: c.token, slug: slug, phoneId: phoneId)
         } else if let c = credential {
-            pendingHandshakeFrame = Wire.auth(deviceId: c.deviceId, token: c.token)
+            pendingHandshakeFrame = Wire.auth(deviceId: c.deviceId, token: c.token, phoneId: phoneId)
         } else {
             return fatal(Self.noCredentialError)
         }
@@ -958,6 +966,8 @@ final class LpmClient: NSObject {
     func startProject(_ name: String, profile: String = "") { send(Wire.start(name: name, profile: profile)) }
     func stopProject(_ name: String) { send(Wire.stop(name: name)) }
     func toggleService(_ name: String, service: String) { send(Wire.toggleService(name: name, service: service)) }
+    func restartService(_ name: String, service: String) { send(Wire.restartService(name: name, service: service)) }
+    func stopService(_ name: String, service: String) { send(Wire.stopService(name: name, service: service)) }
 
     // Project creation / discovery + config editing requests. The reads
     // (listDirs/listSshHosts/readConfig/serviceBody/actionBody) reply quickly; the
@@ -1307,10 +1317,14 @@ final class LpmClient: NSObject {
             case .error(let e) where e == Self.relayOfflineError:
                 self.relayUnavailable()
             case .error(let e):
-                // The Mac dropped this device's record: retrying the same
-                // credential is pointless, so stop and report it as the sentinel
-                // the model turns into a "pair again" prompt.
-                self.fatal(e == "unauthorized" ? Self.unauthorizedError : e)
+                // The Mac dropped this device's record (or removed this phone
+                // outright): retrying is pointless, so stop and report it as the
+                // sentinel the model turns into a "pair again" prompt.
+                switch e {
+                case "unauthorized": self.fatal(Self.unauthorizedError)
+                case "revoked": self.fatal(Self.revokedError)
+                default: self.fatal(e)
+                }
             case .projects(let p, let statuses, let order, let autoPullMode):
                 self.onProjects?(p)
                 self.onWorkStatusPalette?(statuses, order)
@@ -1377,6 +1391,8 @@ final class LpmClient: NSObject {
             case .fileChunk(let chunk): self.onFileChunk?(chunk)
             case .actionFailed(let project, let error):
                 self.onActionFailed?(project, error)
+            case .serviceOp(let error):
+                if let error { self.onActionError?(error) } else { self.onProjectsChanged?() }
             case .projectsChanged: self.onProjectsChanged?()
             case .statusChanged(let proj): self.onStatusChanged?(proj)
             case .git(let proj, let snapshot, let error):
