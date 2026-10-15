@@ -32,7 +32,7 @@ node scripts/shots.js cleanup      # clear status bars, shut down simulators it 
 
 Output: `~/Pictures/lpm-link-app-store/<version>/` with `iphone-6.3/NN-name.png`,
 `ipad-13/NN-name.png`, `sheet-iphone.png`, `sheet-ipad.png` and `source/raw/`. The version
-comes from `mobile/project.yml`; `--version <v>` writes elsewhere (use it to try changes
+comes from `mobile/ios/project.yml`; `--version <v>` writes elsewhere (use it to try changes
 without replacing a set the user already has).
 
 **shots.json**: `devices` (simulator name, folder, size) and `shots` in store order, each with
@@ -43,7 +43,7 @@ Route steps, joined by ` > `, are pushed in order:
 `usage` · `stats` · `activity` · `automations` · `automation:<project>/<jobId>`.
 Demo names: projects `storefront`, `api-gateway`, `analytics`, `mobile-app`, `blog`, …;
 terminal `demo-storefront-claude`; automation `nightly-tests`
-(`mobile/Sources/LpmMobile/DemoWorld.swift`, `DemoJobs`).
+(`mobile/ios/Sources/LpmMobile/DemoWorld.swift`, `DemoJobs`).
 
 **After a run**
 1. Read both contact sheets and one image per device at full size: every screen is the one its

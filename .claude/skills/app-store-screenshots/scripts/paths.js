@@ -18,9 +18,9 @@ function config() {
 }
 
 function appVersion() {
-  const yml = fs.readFileSync(path.join(REPO, "mobile/project.yml"), "utf8");
+  const yml = fs.readFileSync(path.join(REPO, "mobile/ios/project.yml"), "utf8");
   const m = yml.match(/MARKETING_VERSION:\s*"([^"]+)"/);
-  if (!m) throw new Error("MARKETING_VERSION not found in mobile/project.yml");
+  if (!m) throw new Error("MARKETING_VERSION not found in mobile/ios/project.yml");
   return m[1];
 }
 

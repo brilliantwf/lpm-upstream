@@ -1,0 +1,11 @@
+appId: cx.lpm.mobile
+name: 08-automations
+tags: [demo, automations]
+---
+- runFlow: subflows/enter-demo.yaml
+- runFlow: subflows/open-more-menu.yaml
+- tapOn: "Automations.*"
+- waitForAnimationToEnd:
+    timeout: 3000
+- assertVisible: "Nightly tests"
+- takeScreenshot: 1-automations

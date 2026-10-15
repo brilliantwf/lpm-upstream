@@ -1,0 +1,11 @@
+appId: cx.lpm.mobile
+name: 10-usage
+tags: [demo, usage]
+---
+- runFlow: subflows/enter-demo.yaml
+- runFlow: subflows/open-more-menu.yaml
+- tapOn: "Usage.*"
+- waitForAnimationToEnd:
+    timeout: 3000
+- assertVisible: "Usage"
+- takeScreenshot: 1-usage

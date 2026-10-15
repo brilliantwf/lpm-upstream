@@ -28,7 +28,7 @@ function flags(argv) {
 }
 
 function mobileVersion() {
-  const yml = fs.readFileSync(path.join(session.REPO, "mobile/project.yml"), "utf8");
+  const yml = fs.readFileSync(path.join(session.REPO, "mobile/ios/project.yml"), "utf8");
   return /MARKETING_VERSION:\s*"?([\d.]+)/.exec(yml)?.[1] || "dev";
 }
 

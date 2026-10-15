@@ -1,0 +1,8 @@
+# The Projects toolbar "…" menu. Its label gains a suffix ("More — an agent
+# needs you") when something wants attention, hence the regex.
+appId: cx.lpm.mobile
+---
+- tapOn: "More.*"
+- extendedWaitUntil:
+    visible: "Settings"
+    timeout: 5000

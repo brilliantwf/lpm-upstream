@@ -1,0 +1,12 @@
+appId: cx.lpm.mobile
+name: 11-settings
+tags: [demo, settings]
+---
+- runFlow: subflows/enter-demo.yaml
+- runFlow: subflows/open-more-menu.yaml
+- tapOn: "Settings.*"
+- waitForAnimationToEnd:
+    timeout: 3000
+- assertVisible: "Theme"
+- assertVisible: "Done"
+- takeScreenshot: 1-settings

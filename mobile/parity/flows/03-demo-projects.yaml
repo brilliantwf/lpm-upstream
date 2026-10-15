@@ -1,0 +1,10 @@
+appId: cx.lpm.mobile
+name: 03-demo-projects
+tags: [demo, projects]
+---
+- runFlow: subflows/enter-demo.yaml
+- assertVisible: "Demo — sample projects"
+- assertVisible: "api-gateway"
+- assertVisible: "mobile-app"
+- assertVisible: "Client Work"
+- takeScreenshot: 1-projects

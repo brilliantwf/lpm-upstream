@@ -1,0 +1,19 @@
+appId: cx.lpm.mobile
+name: 02-enter-code
+tags: [pairing]
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Pair for this Wi-Fi only"
+    timeout: 15000
+- tapOn: "Pair for this Wi-Fi only"
+- extendedWaitUntil:
+    visible: "Enter a code"
+    timeout: 5000
+- tapOn: "Enter a code"
+- extendedWaitUntil:
+    visible: "Enter a Code"
+    timeout: 5000
+- assertVisible: "Pair"
+- takeScreenshot: 1-enter-code

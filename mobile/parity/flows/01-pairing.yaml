@@ -1,0 +1,21 @@
+appId: cx.lpm.mobile
+name: 01-pairing
+tags: [pairing]
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Connect to your Mac"
+    timeout: 15000
+- assertVisible: "Use lpm anywhere"
+- assertVisible: "Set up Built-in Tailscale"
+- assertVisible: "I use the Tailscale app"
+- assertVisible: "Pair for this Wi-Fi only"
+- assertVisible: "No Mac nearby? Try the demo"
+- takeScreenshot: 1-connect
+- tapOn: "Pair for this Wi-Fi only"
+- extendedWaitUntil:
+    visible: "Scan QR code"
+    timeout: 5000
+- assertVisible: "Enter a code"
+- takeScreenshot: 2-wifi-only

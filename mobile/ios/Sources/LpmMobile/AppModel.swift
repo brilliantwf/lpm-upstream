@@ -1,0 +1,3118 @@
+import Foundation
+import SwiftUI
+import UIKit
+import UserNotifications
+
+/// Top-level observable state: the connection, the project list, and per-project
+/// status. Views observe this; the client drives it.
+@Observable @MainActor
+final class AppModel {
+    var connection: LpmClient.State = .idle {
+        didSet { if connection != oldValue { link.noteState(connection, from: oldValue) } }
+    }
+    // The connection as the UI explains it: the issue, the status line, address
+    // checks, queued actions and the sheets around them.
+    let link = LinkStore()
+    var projects: [Project] = []
+    // False until the first projects list arrives, so the UI can tell an empty
+    // list apart from "still loading" and show a spinner instead of "No projects".
+    var projectsLoaded = false
+    var terminals: [String: [TerminalInfo]] = [:] // project -> terminals
+    var slashCommands: [String: [SlashCommand]] = [:] // terminal id -> commands
+    var mentions: [String: [MentionEntry]] = [:] // project -> @-mention targets
+    var history: [String: [HistoryRow]] = [:] // project -> recent sent prompts
+    var automations: [AutomationJob] = []
+    var automationsLoaded = false
+    var automationHistory: [String: [AutomationHistoryEntry]] = [:]
+    var automationHistoryLoading: Set<String> = []
+    var automationLiveOutput: [String: AutomationLiveOutput] = [:]
+    var automationPending: Set<String> = []
+    var automationError: String?
+    var automationFollowupError: [String: String] = [:]
+    // Automation authoring (create/edit/delete from the phone editor sheet).
+    // `jobConfigBody` holds the raw YAML body fetched for an edit; the loading key
+    // marks which job it belongs to. A save/delete sets `jobMutationInFlight` (Save
+    // spinner) and, on success, bumps `jobMutationDoneToken` so the open sheet
+    // dismisses. A guarded timeout surfaces an error if the Mac never replies.
+    var jobConfigBody: [String: Any]?
+    var jobConfigError: String?
+    var jobConfigLoadingKey: String?
+    var jobMutationInFlight = false
+    var jobMutationError: String?
+    var jobMutationDoneToken = 0
+    @ObservationIgnored private let jobMutationTimeout = GenerationTimeout<String>()
+
+    // MARK: project creation / discovery + config editing
+    //
+    // Seed state for the add-project + config-editor forms, plus ONE shared
+    // mutation cluster reused by every config write (create/clone/ssh project,
+    // raw-YAML save, and the structured service/profile/action save+delete). A
+    // write sets `configMutationInFlight` (Save spinner) and, on success, bumps
+    // `configMutationDoneToken` so the open sheet dismisses; a failure sets
+    // `configMutationError`. A guarded timeout surfaces an error if the Mac never
+    // replies. Mirrors the job cluster above.
+
+    // Mac folder browser (loadDirs). `dirListing` is the current level.
+    var dirListing: DirListing?
+    var dirListingError: String?
+    var dirListingLoading = false
+    // SSH hosts from the Mac's ~/.ssh/config (loadSshHosts). `sshHostsLoaded` is
+    // true once the first reply lands, so the picker distinguishes empty vs loading.
+    var sshHosts: [SshHostInfo] = []
+    var sshHostsLoaded = false
+    var sshHostsError: String?
+    // Raw YAML editor seed (readConfig). `configText` is the layer's current text;
+    // `configAvailable` is false for the repo layer of an SSH/rootless project.
+    var configText: String?
+    var configAvailable = true
+    var configTextError: String?
+    var configTextLoading = false
+    // Structured service-form seed (loadServiceBody): the normalized mapping and
+    // which layer owns it.
+    var serviceBody: [String: Any]?
+    var serviceBodyError: String?
+    var serviceBodyLoading = false
+    var serviceBodySource = ""
+    // Structured action-form seed (loadActionBody): the normalized mapping plus
+    // which section (actions|terminals) and layer own it.
+    var actionBody: [String: Any]?
+    var actionBodyError: String?
+    var actionBodyLoading = false
+    var actionBodySection = "actions"
+    var actionBodySource = ""
+    // Shared config-write mutation cluster (see note above). `configSavedName` is
+    // the possibly-renamed project a saveConfig success returns, for the editor to
+    // adopt so it keeps editing the right project.
+    var configMutationInFlight = false
+    var configMutationError: String?
+    var configMutationDoneToken = 0
+    var configSavedName: String?
+    // One generation-guarded timeout keyed per request kind ("dirs", "sshHosts",
+    // "readConfig", "serviceBody", "actionBody", "mutation"), so a silent Mac
+    // surfaces an error on each instead of spinning forever.
+    @ObservationIgnored private let configTimeout = GenerationTimeout<String>()
+
+    // Local agent token-usage stats (the desktop Stats page). `stats` is nil until
+    // the first load lands; `statsDays` is the selected period (1/7/30 days, 0 =
+    // all time). `statsActive` re-issues the query after a reconnect.
+    var stats: AgentStats?
+    var statsLoading = false
+    var statsError: String?
+    var statsDays = 30
+    @ObservationIgnored private var statsActive = false
+    // The stats scan replies asynchronously and can arrive out of order (the Mac
+    // scans history files off the socket), so a generation-guarded timeout keeps a
+    // stale timeout from clearing a newer in-flight load.
+    @ObservationIgnored private let statsTimeout = GenerationTimeout<String>()
+
+    // Saved Macs and which one is live. The live session talks to one Mac at a
+    // time; `activeMacId` names it. An empty `macs` list means "not paired with any
+    // Mac" and drives the root gate to the pairing screen.
+    var macs: [MacRecord] = []
+    var activeMacId: UUID?
+    // Drives the "Add a Mac" pairing sheet over the projects list. Cleared once a
+    // pairing succeeds (the new Mac becomes active) or the user cancels.
+    var addingMac = false
+
+    // True while the offline Demo Mode is active: an in-memory "Demo Mac" backed by
+    // a fake in-process server (no network, no pairing, no persistence). Kill and
+    // relaunch lands back on the pairing screen. Gates the persistence/push side
+    // effects that only make sense for a real paired Mac.
+    var demoMode = false
+
+    // Set on a session that opens one of the live Mac's machines alongside it
+    // (AppModel+Visit): it saves nothing and adds nothing to this phone.
+    @ObservationIgnored private(set) weak var visitHost: AppModel?
+    var isVisit: Bool { visitHost != nil }
+    // The machine opened from the projects list, and the timer that closes it
+    // once its screen has been left for a while.
+    var visitSession: AppModel?
+    @ObservationIgnored var visitLinger: DispatchWorkItem?
+
+    // A brief status shown while automatic endpoint recovery is finding the active
+    // Mac on the local network and reconnecting to it ("Found <name>,
+    // reconnecting…"). Nil when idle; cleared once the link comes back.
+    var recoveryStatus: String?
+
+    // Drives the approve-on-Mac pairing flow (tap a nearby Mac → confirm on the
+    // Mac, no code typed). Nil when not pairing this way; a terminal state
+    // (denied/timedOut) stays until the user dismisses or retries; success clears
+    // it via `handlePaired`.
+    var approvalPairing: ApprovalPairingState?
+
+    // True when a reconnect's TLS certificate no longer matches the pinned
+    // identity for the active Mac. Drives a "this Mac's identity has changed"
+    // prompt whose only safe resolution is re-pinning (trustNewIdentity) or
+    // re-pairing. Set from the raw connection state; cleared on any recovery.
+    var identityMismatch = false
+
+    // True when the Mac rejected this device's credential — it no longer has a
+    // paired record for this phone. Retrying can't help, so every surface that
+    // would otherwise offer "Retry" offers re-pairing instead. Set from the raw
+    // connection state; cleared on any recovery.
+    var needsRepair = false
+
+    // MARK: composer parity
+
+    // The user's enabled AI-rewrite actions (global, from composer-actions.json).
+    var composerActions: [ComposerAction] = []
+    // Per-action remembered variant count (1–5) for the AI-rewrite sheet, keyed by
+    // action id (and "__freeform__" for the custom field). Session-scoped.
+    var actionVariantCounts: [String: Int] = [:]
+    // project -> discovered services (for the @-mention "service logs" source).
+    var services: [String: [ServiceInfo]] = [:]
+    var servicesRunning: [String: Bool] = [:]
+    // Captured service-pane output, keyed by serviceLogsKey; one-shot, consumed by
+    // the composer which injects it inline then clears it.
+    var serviceLogsResult: [String: String] = [:]
+    var serviceLogsError: [String: String] = [:]
+
+    // Headless background action runs the phone started (or re-attached to), keyed
+    // by runId. `backgroundRuns` holds the latest polled snapshot; `backgroundRunInfo`
+    // carries project/label/startedAt known at start time so a run shows before its
+    // first poll; `backgroundRunErrors` records a rejected start.
+    var backgroundRuns: [String: ActionBgOutput] = [:]
+    var backgroundRunInfo: [String: BackgroundRunInfo] = [:]
+    var backgroundRunErrors: [String: String] = [:]
+
+    // Rich history screen (historyQuery). The reply carries no echo of its params,
+    // so a per-request generation queue (below) records whether each reply should
+    // replace (first page) or append (next page), and drops superseded replies.
+    var historyItems: [HistoryItem] = []
+    var historyHasMore = false
+    var historyLoading = false
+    var historyLoadingMore = false
+    var historyFolders: [HistoryFolder] = []
+    @ObservationIgnored private var historyQueryParams: (project: String?, search: String?, favoritesOnly: Bool, folder: String?)
+        = (nil, nil, false, nil)
+    // Each request bumps the generation; replies (delivered in request order over
+    // the connection) are matched FIFO, and only the latest generation's reply may
+    // replace/append — a stale reply from a superseded filter/search is dropped.
+    @ObservationIgnored private var historyReqGen = 0
+    @ObservationIgnored private var historyPending: [(gen: Int, paging: Bool)] = []
+    // Whether the history screen is open, so a reconnect re-issues its query fresh.
+    @ObservationIgnored private var historyActive = false
+    // Tracks whether the link was live, so a transition AWAY from ready is detected
+    // as a socket teardown (a transient background→foreground drop goes
+    // .connecting → .ready without ever passing through .failed).
+    @ObservationIgnored private var wasReady = false
+
+    // Per-terminal composer stores (tabs + attachments + transform state), retained
+    // so composer drafts survive leaving/re-entering a terminal. Not observed here:
+    // each store is observed individually by its composer.
+    @ObservationIgnored private var composerStores: [String: ComposerStore] = [:]
+    // Read-aloud playback. Held here rather than in a view so speech keeps going
+    // after leaving the screen that started it.
+    @ObservationIgnored let speech = SpeechStore()
+    // reqId -> terminal id, routing streamed transform replies to the right store.
+    @ObservationIgnored private var transformRoutes: [String: String] = [:]
+
+    // Notification preferences. The per-type toggles keep their stored values even
+    // when the master is off; the effective values sent to the desktop are
+    // `notifyEnabled && notifyX`. Any change re-sends the (idempotent) apnsToken
+    // frame so every paired Mac's per-device prefs stay in sync.
+    var notifyEnabled: Bool = AppModel.loadBoolPref(AppModel.notifyEnabledKey) {
+        didSet { persistNotifyPrefs(); syncPushRegistration() }
+    }
+    var notifyWaiting: Bool = AppModel.loadBoolPref(AppModel.notifyWaitingKey) {
+        didSet { persistNotifyPrefs(); syncPushRegistration() }
+    }
+    var notifyDone: Bool = AppModel.loadBoolPref(AppModel.notifyDoneKey) {
+        didSet { persistNotifyPrefs(); syncPushRegistration() }
+    }
+    var notifyError: Bool = AppModel.loadBoolPref(AppModel.notifyErrorKey) {
+        didSet { persistNotifyPrefs(); syncPushRegistration() }
+    }
+    var notifyAutomationStarted: Bool = AppModel.loadBoolPref(AppModel.notifyAutomationStartedKey,
+                                                              default: false) {
+        didSet { persistNotifyPrefs(); syncPushRegistration() }
+    }
+    var notifyAutomationDone: Bool = AppModel.loadBoolPref(AppModel.notifyAutomationDoneKey) {
+        didSet { persistNotifyPrefs(); syncPushRegistration() }
+    }
+    var notifyAutomationError: Bool = AppModel.loadBoolPref(AppModel.notifyAutomationErrorKey) {
+        didSet { persistNotifyPrefs(); syncPushRegistration() }
+    }
+
+    // Sidebar folders, matching the desktop: `order` interleaves project names and
+    // "group:<id>" tokens; `groups` are the folder defs.
+    var sidebarOrder: [String] = []
+    var groups: [ProjectFolder] = []
+    // The Mac's work-status palette, refreshed with every projects list: the
+    // user's own statuses, and the order they put the Status menu in.
+    var workStatuses: [CustomWorkStatus] = defaultWorkStatusPalette
+    var workStatusOrder: [String] = []
+    // The Mac's Settings › General › Auto pull, refreshed with every projects list.
+    var autoPullMode: AutoPullMode = .off
+    // The Mac's Claude accounts and switching state, for the Claude Account menu.
+    var claudeAccounts: ClaudeAccounts?
+    // terminal id -> current owner. Absent = nobody/unknown (this phone may show
+    // it). A terminal is rendered live in exactly one surface; when the desktop
+    // (or another phone) owns it, this phone shows a "take control" placeholder.
+    var controlOwner: [String: ControlOwner] = [:]
+    // terminal id -> how it ended, for screens still showing it: the last output
+    // stays readable, but the composer goes away.
+    var endedTerminals: [String: TerminalEnding] = [:]
+    // A failed duplicate/remove message to show once (e.g. "cannot duplicate an
+    // SSH project"). The list itself refreshes off the projects-changed push.
+    var actionError: String? {
+        didSet { if actionError != nil { Haptics.error() } }
+    }
+    // The duplicate modal's initial toggle state, mirrored from the desktop's
+    // persisted settings so the phone's modal opens with matching defaults.
+    var duplicateDefaults = DuplicateOptions()
+    // Live progress of an in-flight duplicate batch (nil when idle).
+    var duplicateProgress: DuplicateProgress?
+    // A non-fatal notice to show once (e.g. copies made but a run task needs the
+    // Mac app open). Distinct from actionError, which is a hard failure.
+    var notice: String?
+    var pendingNotificationTarget: NotificationOpenTarget?
+    // Bumped each time a notification tap rebuilds the navigation stack, so a
+    // terminal pushed from the projects list (outside that stack) goes too.
+    var notificationOpens = 0
+    // project -> desired running state while a Start/Stop is in flight, so the UI
+    // can spin until the projects push confirms it (or a timeout gives up).
+    var pendingRun: [String: Bool] = [:]
+    // project -> service -> desired running state while a toggle is in flight,
+    // cleared the same way as pendingRun.
+    var pendingServiceToggle: [String: [String: Bool]] = [:]
+    // Projects with a new-terminal/run-action in flight: the desktop creates the
+    // terminal asynchronously, so show a placeholder row until it appears.
+    var creatingTerminals: Set<String> = []
+    // Terminal ids present when the create was requested; a response containing
+    // an id outside this set means the new terminal has landed.
+    @ObservationIgnored private var creatingBaseline: [String: Set<String>] = [:]
+    @ObservationIgnored private let creatingTimeout = GenerationTimeout<String>()
+    // A pending "switch to the terminal this run spawns" watcher, keyed by project.
+    // Any newer create intent invalidates it (see markTerminalCreating) so a manual
+    // "+" terminal or a later run can't trigger a stale switch.
+    @ObservationIgnored private var spawnCallbacks: [String: (TerminalInfo) -> Void] = [:]
+    // project -> terminal ids with a close in flight. The row is removed
+    // optimistically (the destructive swipe already animated it away) and
+    // filtered from incoming lists until the desktop confirms the close, so a
+    // stale response can't flash the row back. A timeout gives up and reloads,
+    // resurfacing the row if the close actually failed.
+    @ObservationIgnored private var closingTerminals: [String: Set<String>] = [:]
+    @ObservationIgnored private let closingTimeout = GenerationTimeout<String>()
+
+    // Terminal streams go straight to the newest screen showing that terminal; the
+    // emulator holds the buffer, not this model. Seed and live output are kept
+    // separate so the view can reset the emulator before replaying the seed (raw
+    // scrollback) — otherwise a TUI's cursor-positioned redraws overlap. Composer
+    // sends route into the same web view so it can apply the bracketed-paste
+    // wrapping the desktop does.
+    @ObservationIgnored let terminalScreens = TerminalScreens()
+    @ObservationIgnored private(set) var inForeground = true
+    // A prompt queued to submit into a terminal as soon as its web view is mounted
+    // and seeded (used by "Ask agent…", which navigates to a terminal that may not
+    // be on screen yet). Flushed + cleared by WebTerminalView once ready.
+    @ObservationIgnored var pendingAgentPrompt: [String: String] = [:]
+
+    // MARK: git review state
+
+    // Git-review state + operations for every project, reached as `model.git`. Split
+    // into its own store so its ~40 properties observe and reset independently of the
+    // rest of the app.
+    var git = GitReviewStore()
+    // Auto Commit / Auto Create PR runs (`model.gitAuto`), same split.
+    var gitAuto = GitAutoStore()
+
+    // MARK: session memory + notes
+
+    // Per-project work-session logs (`model.memory`) and the encrypted notebook
+    // (`model.notes`), each split into its own store for the same reason as `git`.
+    var memory = MemoryStore()
+    var notes = NotesStore()
+
+    // The agent plan-usage meters (`model.usage`), same split.
+    var usage = UsageStore()
+
+    // lpm on the live Mac and updating it (`model.macUpdate`), same split.
+    var macUpdate = MacUpdateStore()
+
+    // Adds the live Mac's own servers and Macs to this phone.
+    let machineImporter = MachineImporter()
+
+    // Routes byte ranges to the file preview that asked for them.
+    @ObservationIgnored let fileFetches = FileFetchRouter()
+
+    @ObservationIgnored private(set) var client: LpmClient?
+    // The hex APNs device token (once registration succeeds). The token and a live
+    // authed connection can land in either order; whichever is second sends the
+    // apnsToken frame (idempotent, re-sent on every reconnect).
+    @ObservationIgnored private var apnsTokenHex: String?
+    // Registers the same push identity with the saved Macs the live socket doesn't
+    // reach, so notifications arrive from all of them and not just the active one.
+    @ObservationIgnored private let pushRegistrar = PushRegistrar(deviceName: UIDevice.current.name)
+    // The payload of the last registration sent over the live socket, recorded as
+    // registered once that Mac acknowledges it.
+    @ObservationIgnored private var lastSentPushPayload: PushRegistrar.Payload?
+    // Guards the opportunistic host migration in onState against overlapping
+    // re-probes while one is already in flight.
+    @ObservationIgnored private var repicking = false
+    // The host the live client was built for, so migration only rebuilds when a
+    // *different* address becomes reachable.
+    @ObservationIgnored var currentHost: String?
+    // The address probe `connectBest` runs before it dials: bumped by every new
+    // attempt and by a session reset, so a probe that was overtaken never dials.
+    @ObservationIgnored private var probeGeneration = 0
+    @ObservationIgnored private(set) var probing = false
+    // The candidate addresses/port of an in-flight pairing, stamped onto the
+    // saved-Mac record once the `paired` frame lands.
+    @ObservationIgnored private var pendingPairHosts: [String] = []
+    @ObservationIgnored private var pendingPairPort: UInt16 = MacStore.defaultPort
+    // The leaf-cert fingerprint the pairing QR advertised (`f` param), verified
+    // during the pairing TLS handshake. Nil for manual entry or a pre-TLS QR.
+    @ObservationIgnored private var pendingPairFingerprint: String?
+    // Set while the pairing sheet was opened to re-pair a saved Mac (rather than
+    // add a new one): the record whose stale credential the Mac should retire.
+    // Read at the top of pair()/pairViaApproval() — both of which reset the
+    // session, which clears it — and cleared when the sheet is dismissed.
+    @ObservationIgnored private var pendingRepairMacId: UUID?
+
+    // Local-network discovery used only for automatic endpoint recovery: when the
+    // active Mac's saved addresses stop responding, browse for it and reconnect on
+    // the fresh address it advertises. `recovering` gates a single bounded browse;
+    // `recoveryWindow` bounds it in time; `recoveryHandled` dedupes resolves within
+    // one browse so each Mac is chased once.
+    @ObservationIgnored private let discovery = MacDiscovery()
+    @ObservationIgnored private var recovering = false
+    @ObservationIgnored private var recoveryWindow: DispatchWorkItem?
+    @ObservationIgnored private var recoveryHandled: Set<String> = []
+
+    init(visitHost: AppModel? = nil) {
+        self.visitHost = visitHost
+        link.model = self
+        link.network.onChange = { [weak self] from, to in self?.networkChanged(from: from, to: to) }
+        git.model = self
+        gitAuto.model = self
+        memory.model = self
+        notes.model = self
+        usage.model = self
+        macUpdate.model = self
+        pushRegistrar.onIdentity = { [weak self] localId, serverId, serverName, platform in
+            self?.learnIdentity(of: localId, serverId: serverId, serverName: serverName,
+                                platform: platform)
+        }
+        machineImporter.requestMachines = { [weak self] in
+            guard let self, case .ready = self.connection else { return }
+            self.client?.requestMachines()
+        }
+        machineImporter.requestOffer = { [weak self] slug in
+            guard let self, case .ready = self.connection, let client = self.client else { return false }
+            client.requestMachinePair(slug: slug)
+            return true
+        }
+        machineImporter.onPaired = { [weak self] paired in
+            self?.adoptMachine(paired)
+        }
+    }
+
+    func bootstrap() {
+        link.network.start()
+        MacStore.migrateLegacyIfNeeded()
+        macs = MacStore.loadRecords()
+        activeMacId = MacStore.loadActiveId() ?? macs.first?.localId
+        restoreSnapshot()
+        guard let cred = activeCredential() else { return }
+        connectBest(credential: cred)
+    }
+
+    /// The saved Mac the phone is (or should be) connected to.
+    var activeRecord: MacRecord? {
+        guard let id = activeMacId else { return nil }
+        return macs.first { $0.localId == id }
+    }
+
+    /// The saved Mac a record's connection goes to: the record itself, or for a
+    /// machine opened through another Mac, that Mac — whose addresses,
+    /// credential and certificate it uses.
+    func linkRecord(of record: MacRecord) -> MacRecord {
+        guard let via = record.via else { return record }
+        return macs.first { $0.localId == via.macId } ?? record
+    }
+
+    /// `linkRecord(of:)` for the active Mac.
+    var linkRecord: MacRecord? { activeRecord.map(linkRecord(of:)) }
+
+    /// The active Mac's stored credential, if any.
+    func activeCredential() -> LpmClient.Credential? {
+        guard let record = activeRecord else { return nil }
+        return Keychain.load(for: linkRecord(of: record).localId)
+    }
+
+    func persistMacs() {
+        guard !demoMode, !isVisit else { return } // demo state is in-memory only
+        MacStore.saveRecords(macs)
+        MacStore.saveActiveId(activeMacId)
+    }
+
+    /// Probe the remembered addresses and connect to whichever the phone can
+    /// reach right now — the LAN IP at home, the Tailscale IP away from home.
+    func connectBest(credential: LpmClient.Credential) {
+        guard !demoMode else { return } // Demo Mode owns its own in-process client
+        let hosts = savedHosts()
+        let port = savedPort()
+        connection = .connecting
+        probeGeneration += 1
+        let generation = probeGeneration
+        probing = true
+        Task { @MainActor in
+            var (winner, outcomes) = await HostProbe.race(hosts, port: port)
+            link.noteProbe(outcomes)
+            if winner == nil {
+                // On foreground the Tailscale on-demand tunnel may not be up yet;
+                // give it a moment and probe once more before falling back.
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                (winner, outcomes) = await HostProbe.race(hosts, port: port)
+                link.noteProbe(outcomes)
+            }
+            // When nothing answers, prefer the Tailscale (CGNAT) address over the
+            // LAN IP — the LAN IP is unroutable on cellular, so retrying it spins.
+            let host = winner ?? Self.cgnatHost(hosts) ?? hosts.first ?? "127.0.0.1"
+            // A switch, pairing or newer attempt since this probe began owns the
+            // link now.
+            guard generation == probeGeneration else { return }
+            probing = false
+            connect(host: host, port: port, credential: credential)
+        }
+    }
+
+    /// A Tailscale CGNAT address (100.64.0.0/10) from the candidates, if any.
+    private static func cgnatHost(_ hosts: [String]) -> String? {
+        hosts.first(where: isCGNAT)
+    }
+
+    /// True for a Tailscale CGNAT address (100.64.0.0/10): an IPv4 whose first
+    /// octet is 100 and second is in 64...127.
+    private static func isCGNAT(_ host: String) -> Bool {
+        let octets = host.split(separator: ".").compactMap { Int($0) }
+        return octets.count == 4 && octets[0] == 100 && (64...127).contains(octets[1])
+    }
+
+    /// Fold a freshly discovered address into a record's host list: the fresh host
+    /// leads, and everything else keeps its order — except a plain LAN IPv4 literal
+    /// that the fresh address replaces, which is dropped as stale. Tailscale CGNAT
+    /// addresses, hostnames (e.g. `mac.local`, a MagicDNS name), and any IPv6
+    /// address survive as the away-from-home fallback.
+    private static func mergedHosts(existing: [String], fresh: String) -> [String] {
+        mergedHosts(existing: existing, fresh: [fresh])
+    }
+
+    /// The same fold for a pairing, which can bring several addresses at once (a
+    /// QR advertises every address the Mac knows about).
+    private static func mergedHosts(existing: [String], fresh: [String]) -> [String] {
+        var out: [String] = []
+        for h in fresh where !h.isEmpty && !out.contains(h) { out.append(h) }
+        for h in existing where !out.contains(h) {
+            if isIPv4Literal(h) && !isCGNAT(h) { continue }
+            out.append(h)
+        }
+        return out
+    }
+
+    /// Fold a Mac's *advertised* addresses into a record's list without dropping
+    /// anything: the fresh ones lead, in the order the Mac ranked them, then every
+    /// address already saved. Unlike `mergedHosts` this prunes nothing — the Mac
+    /// advertises only what it can see about itself, so a host the phone was given
+    /// by hand (a port-forwarded WAN address, a second NIC, a VPN that isn't
+    /// Tailscale) never appears in `fresh` and may well be the one carrying this
+    /// very connection.
+    private static func unionHosts(existing: [String], fresh: [String]) -> [String] {
+        var out: [String] = []
+        for h in fresh where !h.isEmpty && !out.contains(h) { out.append(h) }
+        for h in existing where !out.contains(h) { out.append(h) }
+        return out
+    }
+
+    /// True for a dotted-quad IPv4 literal (four 0–255 octets).
+    private static func isIPv4Literal(_ host: String) -> Bool {
+        let octets = host.split(separator: ".", omittingEmptySubsequences: false)
+        return octets.count == 4 && octets.allSatisfy { Int($0).map { (0...255).contains($0) } ?? false }
+    }
+
+    /// A live client only ever retries the one host it was built with, so a phone
+    /// that roams (LAN → cellular) keeps hammering an address that's now
+    /// unroutable. Once its retries stop being patient — the client surfaces
+    /// `offlineHint` — re-probe the saved hosts and, if a *different* one is now
+    /// reachable, migrate the live connection to it. Otherwise do nothing: the
+    /// failed state (and Retry button) stays visible, and the client re-emits
+    /// `offlineHint` on each slow retry (~20s), so this re-probes periodically
+    /// with no timer.
+    private func repickHostIfStale(_ s: LpmClient.State, from c: LpmClient) {
+        guard case .failed(let hint) = s, LpmClient.isOfflineHint(hint),
+              c === client, !repicking, let cred = activeCredential() else { return }
+        repicking = true
+        Task { @MainActor in
+            defer { repicking = false }
+            let (winner, outcomes) = await HostProbe.race(savedHosts(), port: savedPort())
+            link.noteProbe(outcomes)
+            guard let winner, winner != currentHost, c === client else { return }
+            if c.deviceId != nil {
+                moveLink(c, to: winner)
+            } else {
+                connect(host: winner, port: savedPort(), credential: cred)
+            }
+        }
+    }
+
+    // MARK: automatic endpoint recovery
+
+    /// The saved addresses have stopped answering (the same stale-link condition
+    /// `repickHostIfStale` reacts to). If the active Mac has a known identity,
+    /// browse the local network for it: a Mac whose LAN address changed (new DHCP
+    /// lease, moved networks) re-appears here under the same identity, and we
+    /// migrate the connection to its fresh address — or reconnect the moment a
+    /// restarted lpm advertises again. Each slow retry's hint extends a short
+    /// window, so the browse spans the wait between retries but never outlives
+    /// them (and stops when the app backgrounds).
+    private func startRecoveryIfStale(_ s: LpmClient.State, from c: LpmClient) {
+        guard case .failed(let hint) = s, LpmClient.isOfflineHint(hint),
+              c === client, !isVisit,
+              let sid = linkRecord?.serverId, !sid.isEmpty else { return }
+        if !recovering {
+            recovering = true
+            recoveryHandled = []
+            discovery.onChange = { [weak self] found in self?.handleDiscovered(found) }
+            discovery.start()
+        }
+        recoveryWindow?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.stopBrowsing()
+            self.recoveryStatus = nil
+        }
+        recoveryWindow = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 25, execute: work)
+    }
+
+    /// Stop the recovery browse (leaves `recoveryStatus` alone — the reconnect it
+    /// kicked off clears that when the link returns, or the window timeout does).
+    private func stopBrowsing() {
+        recoveryWindow?.cancel()
+        recoveryWindow = nil
+        discovery.onChange = nil
+        discovery.stop()
+        recovering = false
+        recoveryHandled = []
+    }
+
+    /// Stop browsing and clear any recovery status — used when the app backgrounds
+    /// or the session is torn down.
+    func suspendRecoveryDiscovery() {
+        stopBrowsing()
+        recoveryStatus = nil
+    }
+
+    /// A batch of discovered Macs arrived during recovery. For any that match a
+    /// saved record by identity, resolve a fresh address and heal the record —
+    /// reconnecting only for the active Mac, updating the rest in place.
+    private func handleDiscovered(_ found: [MacDiscovery.DiscoveredMac]) {
+        for mac in found {
+            guard let sid = mac.serverId, !sid.isEmpty,
+                  !recoveryHandled.contains(sid),
+                  let record = macs.first(where: { $0.serverId == sid && $0.via == nil }) else { continue }
+            recoveryHandled.insert(sid)
+            let localId = record.localId
+            let isActive = localId == linkRecord?.localId
+            Task { @MainActor in
+                guard let resolved = await self.discovery.resolve(mac) else {
+                    // Resolution failed — allow a later batch to retry this Mac.
+                    self.recoveryHandled.remove(sid)
+                    return
+                }
+                self.applyRecovered(localId: localId, host: resolved.host,
+                                    port: resolved.port, name: mac.name, reconnect: isActive)
+            }
+        }
+    }
+
+    /// Fold a freshly resolved address into a saved record and persist it. For the
+    /// active Mac (and only while it's still offline), rebuild the client on the
+    /// fresh address and reconnect.
+    private func applyRecovered(localId: UUID, host: String, port: UInt16, name: String, reconnect: Bool) {
+        guard let idx = macs.firstIndex(where: { $0.localId == localId }) else { return }
+        macs[idx].hosts = Self.mergedHosts(existing: macs[idx].hosts, fresh: host)
+        macs[idx].port = port
+        if !name.isEmpty, macs[idx].isAddressName { macs[idx].name = name }
+        persistMacs()
+        guard reconnect else { return }
+        // A parallel path (repickHostIfStale, a manual retry) may have already
+        // reconnected — don't tear down a live link.
+        if case .ready = connection { stopBrowsing(); recoveryStatus = nil; return }
+        stopBrowsing()
+        recoveryStatus = "Found \(macs[idx].displayName), reconnecting…"
+        if let cred = activeCredential() {
+            connect(host: host, port: Int(port), credential: cred)
+        }
+    }
+
+    func connect(host: String, port: Int, credential: LpmClient.Credential) {
+        guard !demoMode else { return } // never dial a socket while in Demo Mode
+        client?.disconnect()
+        currentHost = host
+        link.host = host
+        link.pairing = false
+        identityMismatch = false
+        needsRepair = false
+        // Enforce the stored pin for this Mac, read fresh on each TLS handshake so
+        // a just-completed TOFU pin takes effect on the next reconnect. A nil pin
+        // (never pinned, or migration) is accepted, then pinned after auth.
+        let localId = linkRecord?.localId
+        let c = LpmClient(endpoint: .init(host: host, port: port),
+                          credential: credential,
+                          deviceName: UIDevice.current.name,
+                          pinProvider: { localId.map { Keychain.loadPin(for: $0) } ?? nil },
+                          relay: activeRecord?.via?.slug)
+        wire(c)
+        client = c
+        c.connect()
+    }
+
+    /// True when the Mac now being paired is plausibly the one the saved record
+    /// belongs to, judged by it answering at an address that record already knows.
+    /// Gates `replaces` only — a pairing sheet opened by "Pair Again" can end up
+    /// scanning a *different* Mac's QR, and that Mac must never be handed this
+    /// phone's credential id for another one.
+    private func isRepairTarget(_ macId: UUID?, pairingAt hosts: [String]) -> Bool {
+        guard let macId, let record = macs.first(where: { $0.localId == macId }) else { return false }
+        let known = Set(record.hosts.map { $0.lowercased() })
+        return hosts.contains { known.contains($0.lowercased()) }
+    }
+
+    /// The device id a re-pair asks the Mac to retire — but only for a genuine
+    /// repair target. That id identifies this phone to exactly one Mac, so it must
+    /// never be handed to another. Omitting the id only costs the cleanup: the dead
+    /// record lingers until it's removed on the Mac, exactly as before this existed.
+    private func staleDeviceId(of macId: UUID?, pairingAt hosts: [String]) -> String? {
+        guard let macId, isRepairTarget(macId, pairingAt: hosts) else { return nil }
+        return Keychain.load(for: macId)?.deviceId
+    }
+
+    /// Begin pairing a Mac — the first Mac, or an additional one from "Add a Mac".
+    /// The saved-Mac record isn't created until the `paired` frame lands (see
+    /// `handlePaired`), which is also where a re-pair of an already-saved Mac is
+    /// deduped by serverId. Tears down any current session first, so pairing a new
+    /// Mac cleanly replaces the live one.
+    /// `replacing` names a saved Mac being re-paired, whose stale credential the
+    /// Mac should retire (see `repairActiveMac` and `staleDeviceId`); it defaults
+    /// to whatever opened the pairing sheet, so the generic "Add a Mac" flow
+    /// passes nothing.
+    func pair(hosts: [String], port: Int, code: String, fingerprint: String? = nil,
+              replacing: UUID? = nil) {
+        let target = replacing ?? pendingRepairMacId
+        let replaces = staleDeviceId(of: target, pairingAt: hosts)
+        resetSessionState()
+        pendingRepairMacId = target
+        pendingPairHosts = hosts
+        pendingPairPort = UInt16(clamping: port)
+        pendingPairFingerprint = fingerprint
+        link.pairing = true
+        link.host = hosts.first
+        connection = .connecting
+        Task { @MainActor in
+            // The probe uses the real WebSocket transport, so if none respond the
+            // live connection wouldn't either — fail fast and report each host's
+            // reason rather than spin on a generic hint for the whole timeout.
+            let (winner, outcomes) = await HostProbe.race(hosts, port: port)
+            link.noteProbe(outcomes)
+            guard let host = winner else {
+                connection = .failed(LpmClient.offlineHint)
+                return
+            }
+            client?.disconnect()
+            currentHost = host
+            link.host = host
+            // No stored pin during pairing; instead verify the observed cert against
+            // the fingerprint the QR advertised (if any). The observed fingerprint is
+            // pinned once the pairing handshake succeeds (handlePaired).
+            let c = LpmClient(endpoint: .init(host: host, port: port),
+                              credential: nil, deviceName: UIDevice.current.name,
+                              expectedFingerprint: fingerprint)
+            wire(c)
+            client = c
+            c.pair(host: host, port: port, code: code, replaces: replaces)
+        }
+    }
+
+    /// Begin approve-on-Mac pairing with a nearby Mac at an already-resolved
+    /// address: send a pair request and wait for the user to confirm on the Mac (no
+    /// code typed). Drives `approvalPairing`; success runs the same `handlePaired`
+    /// flow as code pairing. Tears down any current session first, like `pair`.
+    func pairViaApproval(host: String, port: Int, replacing: UUID? = nil) {
+        let target = replacing ?? pendingRepairMacId
+        let replaces = staleDeviceId(of: target, pairingAt: [host])
+        resetSessionState()
+        pendingRepairMacId = target
+        pendingPairHosts = [host]
+        pendingPairPort = UInt16(clamping: port)
+        pendingPairFingerprint = nil
+        approvalPairing = .requesting
+        currentHost = host
+        link.pairing = true
+        link.host = host
+        // No QR fingerprint and no stored pin for a brand-new Mac: trust-on-first-use,
+        // then pin the observed cert in `handlePaired` (mirrors the code-pair path).
+        let c = LpmClient(endpoint: .init(host: host, port: port),
+                          credential: nil, deviceName: UIDevice.current.name,
+                          expectedFingerprint: nil)
+        wire(c)
+        client = c
+        c.pairRequest(host: host, port: port, replaces: replaces)
+    }
+
+    /// Cancel an in-flight (or finished-but-unacknowledged) approve-on-Mac pairing:
+    /// clear the flow and tear down the never-authenticated pair client, then
+    /// reconnect the previously active Mac if there was one (the Add-a-Mac case).
+    func cancelApprovalPairing() {
+        approvalPairing = nil
+        if let c = client, c.deviceId == nil {
+            c.disconnect()
+            client = nil
+            currentHost = nil
+            pendingPairHosts = []
+            link.pairing = false
+            link.host = nil
+        }
+        if client == nil, let cred = activeCredential() { connectBest(credential: cred) }
+    }
+
+    /// The app came on screen or went away; the Mac sends agent notifications only
+    /// while it's away. Carried over to every new connection in `wire`.
+    func setInForeground(_ active: Bool) {
+        inForeground = active
+        client?.inForeground = active
+        visitSession?.setInForeground(active)
+    }
+
+    func reconnectIfNeeded() {
+        visitSession?.reconnectIfNeeded()
+        guard !link.identityRejected else { return }
+        // Even a `.ready` state can be stale after backgrounding (half-open
+        // socket) — probe it instead of trusting it, so a dead link is noticed
+        // now rather than on the next heartbeat.
+        if case .ready = connection { client?.verifyNow(); return }
+        // The phone may be on a different network than when it went to the
+        // background, so check every saved address rather than redialling the
+        // last one. The live client is kept: it re-subscribes to the terminals
+        // this phone was watching.
+        rehome(reason: nil)
+        link.refreshReach()
+    }
+
+    /// The "Try again" button: check every saved address now and dial the one that
+    /// answers, skipping any backoff.
+    func retryConnection() {
+        guard !link.identityRejected else { return }
+        link.noteTrying()
+        rehome(reason: nil)
+    }
+
+    func savedHosts() -> [String] {
+        let hosts = linkRecord?.hosts ?? []
+        return hosts.isEmpty ? ["127.0.0.1"] : hosts
+    }
+
+    func savedPort() -> Int {
+        Int(linkRecord?.port ?? MacStore.defaultPort)
+    }
+
+    // MARK: saved Macs
+
+    /// Switch the live connection to another saved Mac: tear down the current
+    /// session, reset all cached per-session state, then connect to the target.
+    func switchTo(_ record: MacRecord) {
+        guard record.localId != activeMacId else { return }
+        if case .ready = connection { noteLeavingActiveMac() }
+        resetSessionState()
+        activeMacId = record.localId
+        MacStore.saveActiveId(activeMacId)
+        restoreSnapshot()
+        link.reach[record.localId] = nil
+        link.refreshReach(force: true)
+        if let cred = Keychain.load(for: linkRecord(of: record).localId) {
+            connectBest(credential: cred)
+        }
+    }
+
+    /// Open the "Add a Mac" pairing sheet. Pairing there creates (or, by serverId,
+    /// re-adopts) a saved-Mac record and switches to it on success. In Demo Mode
+    /// there's no Mac to add alongside — leave the demo and land on real pairing.
+    func beginAddMac() {
+        if demoMode { exitDemo(); return }
+        pendingRepairMacId = nil
+        link.repairMacId = nil
+        link.repairReason = nil
+        addingMac = true
+    }
+
+    /// Pair the ACTIVE saved Mac again after it stopped recognizing this phone
+    /// (`needsRepair`). Opens the same pairing sheet, remembering which record is
+    /// being re-paired: the new credential replaces the dead one on the Mac, and
+    /// the `serverId` dedupe in `handlePaired` refreshes the saved record in place
+    /// rather than adding a second entry for the same Mac.
+    func repairActiveMac(reason: RepairReason? = nil) {
+        // A machine opened through another Mac is paired again by pairing that Mac.
+        guard !demoMode, let target = linkRecord?.localId else { return }
+        let reason = reason ?? (needsRepair ? .notRecognized : .chosen)
+        // Only the live session can put up the pairing sheet.
+        (visitHost ?? self).repairMac(target, reason: reason)
+    }
+
+    func repairMac(_ target: UUID, reason: RepairReason) {
+        pendingRepairMacId = target
+        link.repairMacId = target
+        link.repairReason = reason
+        link.sheetOpen = false
+        link.identityCheckOpen = false
+        addingMac = true
+    }
+
+    // MARK: Demo Mode
+
+    /// Enter the offline Demo Mode: a single in-memory "Demo Mac" backed by a fake
+    /// in-process server, wired through the normal client so every screen and store
+    /// runs unchanged. Nothing is persisted, so a relaunch returns to pairing.
+    func enterDemo() {
+        resetSessionState()
+        demoMode = true
+        let record = MacRecord(localId: UUID(), serverId: DemoServer.serverId,
+                               name: DemoServer.serverName, hosts: [], port: MacStore.defaultPort)
+        macs = [record]
+        activeMacId = record.localId
+        let c = LpmClient(demoServer: DemoServer(), deviceName: UIDevice.current.name)
+        wire(c)
+        client = c
+        c.connect()
+    }
+
+    /// Leave Demo Mode: tear down the fake client and clear the in-memory demo Mac,
+    /// then restore whatever real pairing state was on disk (usually none — the demo
+    /// is offered on the fresh pairing screen).
+    func exitDemo() {
+        demoMode = false
+        resetSessionState()
+        macs = MacStore.loadRecords()
+        activeMacId = MacStore.loadActiveId() ?? macs.first?.localId
+        restoreSnapshot()
+        if let cred = activeCredential() { connectBest(credential: cred) }
+    }
+
+    /// Dismiss the "Add a Mac" sheet: reconnect to the Mac that was active before,
+    /// whose session `pair()` tore down. A pairing attempt still in flight (or
+    /// failed) leaves a client that never authenticated — tear it down first so it
+    /// can't later stamp the wrong hosts onto a new record, and so the previous Mac
+    /// actually reconnects. A client that DID authenticate is a pairing that just
+    /// succeeded (this dismissal is the post-`handlePaired` one); its `deviceId` is
+    /// non-nil, so the guard skips it and the fresh connection is left untouched.
+    func cancelAddMac() {
+        addingMac = false
+        pendingRepairMacId = nil
+        link.repairMacId = nil
+        link.repairReason = nil
+        if let client, client.deviceId == nil {
+            client.disconnect()
+            self.client = nil
+            currentHost = nil
+            pendingPairHosts = []
+            link.pairing = false
+            link.host = nil
+        }
+        if let summary = link.pendingSummary {
+            link.pendingSummary = nil
+            link.summary = summary
+        }
+        if client == nil, let cred = activeCredential() {
+            restoreSnapshot()
+            connectBest(credential: cred)
+        }
+    }
+
+    /// Give the active Mac a user-chosen display name. A blank/whitespace name —
+    /// or saving the learned name unchanged — clears it, reverting to (or staying
+    /// on) the learned name, so future serverName updates aren't pinned over. Only
+    /// touches `customName`, which learning/re-pairing never overwrites, so the
+    /// rename survives reconnects.
+    func renameMac(_ id: UUID, to newName: String) {
+        guard let idx = macs.firstIndex(where: { $0.localId == id }) else { return }
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        macs[idx].customName = (trimmed.isEmpty || trimmed == macs[idx].name) ? nil : trimmed
+        persistMacs()
+    }
+
+    /// Replace the active Mac's addresses and port (the manual endpoint editor).
+    /// The saved credential is untouched — this is not a re-pair — so the change
+    /// only affects how the phone reaches the Mac. Re-probes the new addresses and
+    /// reconnects on whichever answers.
+    func updateEndpoint(of id: UUID, hosts: [String], port: UInt16) {
+        guard let idx = macs.firstIndex(where: { $0.localId == id }) else { return }
+        let cleaned = hosts
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !cleaned.isEmpty else { return }
+        let changed = macs[idx].hosts != cleaned || macs[idx].port != port
+        macs[idx].hosts = cleaned
+        macs[idx].port = port
+        persistMacs()
+        if id == activeMacId {
+            if changed, let cred = activeCredential() { connectBest(credential: cred) }
+        } else {
+            link.reach[id] = nil
+            link.refreshReach(force: true)
+        }
+    }
+
+    /// The Mac `removeActiveMac()` would switch to after removing the active one
+    /// (nil if the active Mac is the only one). Shared with the confirmation copy so
+    /// the named fallback can never diverge from the actual behavior.
+    var nextMacAfterRemoval: MacRecord? {
+        macs.first { $0.localId != activeMacId && $0.via?.macId != activeMacId }
+    }
+
+    /// Remove a saved Mac: delete its record + Keychain credential and its saved
+    /// project list. Removing the active one drops its connection and switches to
+    /// another saved Mac if one remains — otherwise back to the pairing screen.
+    func removeMac(_ id: UUID) {
+        if demoMode { exitDemo(); return }
+        // The Mac forgets this phone too. A machine opened through another Mac
+        // connects with that Mac's credential, so removing it sends nothing.
+        if let record = macs.first(where: { $0.localId == id }), record.via == nil,
+           let credential = Keychain.load(for: id) {
+            MacUnpair.send(hosts: record.hosts, port: Int(record.port), credential: credential,
+                           pin: Keychain.loadPin(for: id))
+        }
+        endVisit()
+        // The machines opened through this Mac go with it: they connect as it.
+        let gone = Set([id] + macs.filter { $0.via?.macId == id }.map(\.localId))
+        let wasActive = activeMacId.map(gone.contains) ?? false
+        let next = wasActive ? macs.first { !gone.contains($0.localId) } : nil
+        if wasActive { resetSessionState() }
+        for removed in gone {
+            Keychain.delete(for: removed)
+            PushRegistrar.forget(removed)
+            link.snapshots.remove(removed)
+            link.reach[removed] = nil
+        }
+        macs.removeAll { gone.contains($0.localId) }
+        if wasActive { activeMacId = next?.localId }
+        persistMacs()
+        if wasActive, let next, let cred = Keychain.load(for: linkRecord(of: next).localId) {
+            restoreSnapshot()
+            connectBest(credential: cred)
+        }
+    }
+
+    /// A fresh pairing landed. Persist the credential and create the saved-Mac
+    /// record — or, when the Mac's `serverId` matches one we already have (a
+    /// re-pair), refresh that record in place instead of duplicating it. Either
+    /// way the paired Mac becomes active.
+    private func handlePaired(deviceId: String, token: String, serverId: String?, serverName: String?,
+                              advertisedHosts: [String], platform: String?) {
+        // QR/pending hosts lead (the probe already proved one reachable); the
+        // Mac's advertised candidate list fills in what the QR didn't carry.
+        var hosts = pendingPairHosts.isEmpty ? savedHosts() : pendingPairHosts
+        for h in advertisedHosts where !h.isEmpty && !hosts.contains(h) { hosts.append(h) }
+        let port = pendingPairPort
+        pendingPairHosts = []
+
+        let localId: UUID
+        if let sid = serverId, !sid.isEmpty, let idx = macs.firstIndex(where: { $0.serverId == sid }) {
+            localId = macs[idx].localId
+            // Paired with directly now, so it no longer goes through another Mac.
+            macs[idx].via = nil
+            // Any pairing of an already-saved Mac often resolves only the one
+            // address it reached the Mac at (approve-on-Mac always does; a fresh
+            // "Add a Mac" scan carries only what its QR knew), so overwriting
+            // would drop the Tailscale + manually entered addresses this phone
+            // needs away from home — always fold the new ones in instead.
+            macs[idx].hosts = Self.unionHosts(existing: macs[idx].hosts, fresh: hosts)
+            macs[idx].port = port
+            if let name = serverName, !name.isEmpty { macs[idx].name = name }
+            if let p = platform?.trimmedNonEmpty { macs[idx].platform = p }
+        } else {
+            let record = MacRecord(localId: UUID(), serverId: serverId,
+                                   name: serverName?.trimmedNonEmpty ?? hosts.first ?? "My Mac",
+                                   hosts: hosts, port: port,
+                                   platform: platform?.trimmedNonEmpty)
+            macs.append(record)
+            localId = record.localId
+        }
+        Keychain.save(deviceId: deviceId, token: token, for: localId)
+        // The Mac minted a new device record for this phone, which holds no push
+        // identity yet — forget what the old one was told so the sweep re-registers.
+        PushRegistrar.forget(localId)
+        // Pairing (re)establishes trust — pin the cert the handshake just accepted
+        // (it already matched the QR's `f` when one was advertised). Overwrites any
+        // prior pin so re-pairing a Mac whose cert changed adopts the new identity.
+        if let fp = client?.observedFingerprint, !fp.isEmpty {
+            Keychain.savePin(fp, for: localId)
+        }
+        pendingPairFingerprint = nil
+        approvalPairing = nil
+        if let idx = macs.firstIndex(where: { $0.localId == localId }) {
+            macs[idx].farewell = nil
+            macs[idx].lastConnected = Date()
+        }
+        activeMacId = localId
+        persistMacs()
+        link.pairing = false
+        link.repairMacId = nil
+        link.repairReason = nil
+        // Shown once the pairing screen has gone, so the two never compete.
+        let summary = PairedSummary(macId: localId)
+        if addingMac {
+            link.pendingSummary = summary
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.link.summary = summary }
+        }
+        addingMac = false
+    }
+
+    /// Save a machine the importer paired with in the background. Unlike
+    /// `handlePaired` it never becomes active — the user is on the Mac that
+    /// listed it. The Mac's own name for it wins, so it reads here as it does
+    /// in that Mac's sidebar.
+    private func adoptMachine(_ p: MachineImporter.Paired) -> UUID {
+        let localId: UUID
+        if let sid = p.serverId, let idx = macs.firstIndex(where: { $0.serverId == sid }) {
+            localId = macs[idx].localId
+            macs[idx].via = nil
+            macs[idx].hosts = Self.unionHosts(existing: macs[idx].hosts, fresh: p.hosts)
+            macs[idx].port = p.port
+        } else {
+            var record = MacRecord(localId: UUID(), serverId: p.serverId,
+                                   name: p.serverName?.trimmedNonEmpty ?? p.label,
+                                   hosts: p.hosts, port: p.port, platform: p.platform)
+            if let label = p.label.trimmedNonEmpty, label != record.name { record.customName = label }
+            macs.append(record)
+            localId = record.localId
+        }
+        Keychain.save(deviceId: p.deviceId, token: p.token, for: localId)
+        if let fp = p.fingerprint { Keychain.savePin(fp, for: localId) }
+        PushRegistrar.forget(localId)
+        persistMacs()
+        schedulePushSweep()
+        return localId
+    }
+
+    /// A reconnect reached `ready` carrying identity: learn/refresh the active
+    /// record's serverId, name, and platform.
+    private func learnIdentity(serverId: String?, serverName: String?, platform: String?) {
+        guard let id = activeMacId, let idx = macs.firstIndex(where: { $0.localId == id }) else { return }
+        var changed = false
+        if let sid = serverId, !sid.isEmpty, macs[idx].serverId != sid {
+            macs[idx].serverId = sid
+            changed = true
+        }
+        if let name = serverName?.trimmedNonEmpty, macs[idx].name != name {
+            macs[idx].name = name
+            changed = true
+        }
+        if let p = platform?.trimmedNonEmpty, macs[idx].platform != p {
+            macs[idx].platform = p
+            changed = true
+        }
+        if changed { persistMacs() }
+    }
+
+    /// A `ready` frame advertised the Mac's current candidate addresses. Fold
+    /// them into the saved record matching the FRAME's serverId — never the
+    /// active record, which a pairing connection hasn't been assigned to yet
+    /// when its `ready` lands (the same stale-`activeMacId` trap the pin
+    /// persistence hit). Absent field / older Mac / unknown serverId: no-op.
+    private func mergeAdvertisedHosts(serverId: String?, hosts: [String]) {
+        guard !demoMode, let sid = serverId, !sid.isEmpty, !hosts.isEmpty,
+              let idx = macs.firstIndex(where: { $0.serverId == sid && $0.via == nil }) else { return }
+        let merged = Self.unionHosts(existing: macs[idx].hosts, fresh: hosts)
+        guard merged != macs[idx].hosts else { return }
+        macs[idx].hosts = merged
+        persistMacs()
+    }
+
+    /// Trust-on-first-use: after a reconnect reaches `ready`, pin the observed
+    /// leaf-cert fingerprint if this Mac has no pin yet (a fresh pair whose pin was
+    /// already written by handlePaired is a no-op; a Mac paired before TLS gets
+    /// pinned here on its first wss:// connect). Never overwrites an existing pin —
+    /// a changed cert is caught by the pin check, not silently re-pinned.
+    private func persistObservedPinIfNeeded() {
+        guard let id = linkRecord?.localId, let fp = client?.observedFingerprint, !fp.isEmpty else { return }
+        if Keychain.loadPin(for: id) == nil { Keychain.savePin(fp, for: id) }
+    }
+
+    /// Accept a changed Mac identity (the "Trust New Identity" action): drop the
+    /// stored pin so the next connect re-pins the current cert via TOFU, then
+    /// reconnect. Only reachable from the explicit mismatch prompt — never silent.
+    func trustNewIdentity() {
+        guard let id = linkRecord?.localId else { return }
+        // Pin exactly the certificate whose code the user compared, so a further
+        // change is caught again instead of trusted on first use.
+        if let fp = link.newFingerprint { Keychain.savePin(fp, for: id) } else { Keychain.deletePin(for: id) }
+        identityMismatch = false
+        link.identityCheckOpen = false
+        link.newFingerprint = nil
+        link.clearFailure()
+        if let cred = activeCredential() { connectBest(credential: cred) }
+    }
+
+    /// The codes didn't match: stop connecting to whatever answered, and leave
+    /// re-pairing as the way back.
+    func rejectNewIdentity() {
+        client?.disconnect()
+        identityMismatch = false
+        link.identityRejected = true
+        link.identityCheckOpen = false
+    }
+
+    /// Tear down the live connection to the current Mac and clear every cached
+    /// per-session value, so switching Macs (or removing one) starts clean. Does
+    /// NOT touch the saved-Mac records or their Keychain credentials.
+    func resetSessionState() {
+        endVisit()
+        client?.disconnect()
+        client = nil
+        probeGeneration += 1
+        probing = false
+        link.resetSession()
+        machineImporter.detach()
+        currentHost = nil
+        stopBrowsing()
+        recoveryStatus = nil
+        approvalPairing = nil
+        identityMismatch = false
+        needsRepair = false
+        // Consumed by pair()/pairViaApproval() before they reset, so a re-pair that
+        // never started can't re-point a later pairing at the wrong saved Mac.
+        pendingRepairMacId = nil
+
+        connection = .idle
+        projects = []
+        projectsLoaded = false
+        terminals = [:]
+        slashCommands = [:]
+        mentions = [:]
+        history = [:]
+        automations = []
+        automationsLoaded = false
+        automationHistory = [:]
+        automationHistoryLoading = []
+        automationLiveOutput = [:]
+        automationPending = []
+        automationError = nil
+        automationFollowupError = [:]
+        jobConfigBody = nil
+        jobConfigError = nil
+        jobConfigLoadingKey = nil
+        jobMutationInFlight = false
+        jobMutationError = nil
+        jobMutationTimeout.cancel("job")
+        dirListing = nil
+        dirListingError = nil
+        dirListingLoading = false
+        sshHosts = []
+        sshHostsLoaded = false
+        sshHostsError = nil
+        configText = nil
+        configAvailable = true
+        configTextError = nil
+        configTextLoading = false
+        serviceBody = nil
+        serviceBodyError = nil
+        serviceBodyLoading = false
+        serviceBodySource = ""
+        actionBody = nil
+        actionBodyError = nil
+        actionBodyLoading = false
+        actionBodySection = "actions"
+        actionBodySource = ""
+        configMutationInFlight = false
+        configMutationError = nil
+        configSavedName = nil
+        configTimeout.cancelAll()
+        stats = nil
+        statsLoading = false
+        statsError = nil
+        statsDays = 30
+        statsActive = false
+        composerActions = []
+        actionVariantCounts = [:]
+        services = [:]
+        servicesRunning = [:]
+        serviceLogsResult = [:]
+        serviceLogsError = [:]
+        backgroundRuns = [:]
+        backgroundRunInfo = [:]
+        backgroundRunErrors = [:]
+        historyItems = []
+        historyHasMore = false
+        historyLoading = false
+        historyLoadingMore = false
+        historyFolders = []
+        historyReqGen = 0
+        historyPending = []
+        historyActive = false
+        wasReady = false
+        composerStores = [:]
+        transformRoutes = [:]
+        sidebarOrder = []
+        groups = []
+        workStatuses = defaultWorkStatusPalette
+        workStatusOrder = []
+        autoPullMode = .off
+        claudeAccounts = nil
+        controlOwner = [:]
+        endedTerminals = [:]
+        actionError = nil
+        pendingRun = [:]
+        pendingServiceToggle = [:]
+        creatingTerminals = []
+        creatingBaseline = [:]
+        creatingTimeout.cancelAll()
+        spawnCallbacks = [:]
+        closingTerminals = [:]
+        closingTimeout.cancelAll()
+        // The whole git-review cluster (state, caches, pending work) resets by
+        // swapping in a fresh store; the discarded one's pending timers no-op
+        // through their weak references.
+        git = GitReviewStore()
+        git.model = self
+        gitAuto = GitAutoStore()
+        gitAuto.model = self
+        // Same for session memory and notes — a fresh store, re-pointed at this
+        // model (a store left without a model can never reach the client again).
+        memory = MemoryStore()
+        memory.model = self
+        notes = NotesStore()
+        notes.model = self
+        // And for the usage meters — their keys name the tool, not the Mac, so
+        // carrying the old map over would show one Mac's numbers under another.
+        usage = UsageStore()
+        usage.model = self
+        macUpdate = MacUpdateStore()
+        macUpdate.model = self
+        fileFetches.cancelAll()
+        pendingAgentPrompt = [:]
+    }
+
+    // MARK: push notifications
+
+    /// The APNs device token arrived (from the app delegate). Store it, then push it
+    /// out to the live Mac and every other saved one.
+    func setApnsDeviceToken(_ hex: String) {
+        apnsTokenHex = hex
+        syncPushRegistration()
+    }
+
+    /// This phone's push identity changed — a token arrived, a pref was toggled, or
+    /// a connection came up. Register it with the live Mac and sweep the rest.
+    ///
+    /// Both halves are needed: a Mac notifies only devices whose APNs token it
+    /// holds, and the live socket reaches one Mac at a time, so without the sweep
+    /// notifications would only ever arrive from the Mac last opened — and a pref
+    /// change would only ever reach that one.
+    private func syncPushRegistration() {
+        sendApnsTokenIfPossible()
+        schedulePushSweep()
+    }
+
+    /// After each `ready`: register for remote notifications once the user has
+    /// allowed them. Asking is left to the moment it has a reason — the check
+    /// after pairing, or Settings → Notifications.
+    private func requestPushRegistration() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard [.authorized, .provisional, .ephemeral].contains(settings.authorizationStatus) else { return }
+            DispatchQueue.main.async { UIApplication.shared.registerForRemoteNotifications() }
+        }
+    }
+
+    /// Ask for notification permission, then register when it's granted.
+    func allowNotifications(_ done: @escaping (Bool) -> Void = { _ in }) {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+            DispatchQueue.main.async {
+                if granted { UIApplication.shared.registerForRemoteNotifications() }
+                done(granted)
+            }
+        }
+    }
+
+    /// Register (or refresh) this device's push identity over the live connection.
+    /// Sent whenever both a token and a live authed connection exist — re-sent after
+    /// every reconnect since the token can rotate and the frame is idempotent.
+    private func sendApnsTokenIfPossible() {
+        // A machine opened through another Mac doesn't know this phone; that Mac
+        // is registered by the sweep instead.
+        guard case .ready = connection, let client, activeRecord?.via == nil,
+              let payload = pushPayload() else { return }
+        lastSentPushPayload = payload
+        client.sendApnsToken(token: payload.token, env: payload.env, key: payload.key,
+                             notifyWaiting: payload.waiting,
+                             notifyDone: payload.done,
+                             notifyError: payload.error,
+                             notifyAutomationStarted: payload.automationStarted,
+                             notifyAutomationDone: payload.automationDone,
+                             notifyAutomationError: payload.automationError)
+    }
+
+    /// What every Mac is told: the APNs token, this build's APNs environment, the
+    /// shared push key, and the effective prefs. Nil until the token has arrived.
+    /// One source for the live frame and the sweep, so the two can't drift.
+    private func pushPayload() -> PushRegistrar.Payload? {
+        guard let hex = apnsTokenHex else { return nil }
+        #if DEBUG
+        let env = "sandbox"
+        #else
+        let env = "production"
+        #endif
+        return PushRegistrar.Payload(
+            token: hex,
+            env: env,
+            key: PushKey.loadOrCreate().base64EncodedString(),
+            waiting: notifyEnabled && notifyWaiting,
+            done: notifyEnabled && notifyDone,
+            error: notifyEnabled && notifyError,
+            automationStarted: notifyEnabled && notifyAutomationStarted,
+            automationDone: notifyEnabled && notifyAutomationDone,
+            automationError: notifyEnabled && notifyAutomationError)
+    }
+
+    /// Register with every saved Mac the live session doesn't cover. Skipped in Demo
+    /// Mode, which has no APNs identity and no relay. The active Mac is always left
+    /// out: it's registered over the live socket the moment that connection is
+    /// ready, so dialing it here would only open a redundant second connection.
+    private func schedulePushSweep() {
+        guard !demoMode else { return }
+        pushRegistrar.schedule { [weak self] in
+            guard let self, !self.demoMode, let payload = self.pushPayload() else { return nil }
+            return PushRegistrar.Context(macs: self.macs,
+                                         liveMacId: self.activeMacId,
+                                         payload: payload)
+        }
+    }
+
+    /// A Mac acknowledged the registration sent over the live socket. Record it as
+    /// registered so switching away doesn't make the sweep immediately re-dial the
+    /// Mac that was just brought up to date.
+    private func notePushRegistered(for macId: UUID?) {
+        guard !demoMode, let macId, let payload = lastSentPushPayload else { return }
+        PushRegistrar.remember(payload, for: macId)
+    }
+
+    /// A sweep connection learned a Mac's identity. Same effect as `learnIdentity`
+    /// for the live session, but for any saved record — a Mac whose `serverId` the
+    /// phone has never learned can't be resolved when its notification is tapped.
+    private func learnIdentity(of localId: UUID, serverId: String?, serverName: String?, platform: String?) {
+        guard let idx = macs.firstIndex(where: { $0.localId == localId }) else { return }
+        var changed = false
+        if let sid = serverId, !sid.isEmpty, macs[idx].serverId != sid {
+            macs[idx].serverId = sid
+            changed = true
+        }
+        if let name = serverName?.trimmedNonEmpty, macs[idx].name != name {
+            macs[idx].name = name
+            changed = true
+        }
+        if let p = platform?.trimmedNonEmpty, macs[idx].platform != p {
+            macs[idx].platform = p
+            changed = true
+        }
+        if changed { persistMacs() }
+    }
+
+    static let notifyEnabledKey = "lpm.notify.enabled"
+    static let notifyWaitingKey = "lpm.notify.waiting"
+    static let notifyDoneKey = "lpm.notify.done"
+    static let notifyErrorKey = "lpm.notify.error"
+    static let notifyAutomationStartedKey = "lpm.notify.automation.started"
+    static let notifyAutomationDoneKey = "lpm.notify.automation.done"
+    static let notifyAutomationErrorKey = "lpm.notify.automation.error"
+
+    // Absent keys default to enabled, so a fresh install opts in to every push type
+    // that reports something the user has to act on. An automation starting isn't
+    // one of those — it's the phone announcing work the user already scheduled — so
+    // that one opts in only when asked for.
+    private static func loadBoolPref(_ key: String, default fallback: Bool = true) -> Bool {
+        UserDefaults.standard.object(forKey: key) as? Bool ?? fallback
+    }
+
+    private func persistNotifyPrefs() {
+        let d = UserDefaults.standard
+        d.set(notifyEnabled, forKey: Self.notifyEnabledKey)
+        d.set(notifyWaiting, forKey: Self.notifyWaitingKey)
+        d.set(notifyDone, forKey: Self.notifyDoneKey)
+        d.set(notifyError, forKey: Self.notifyErrorKey)
+        d.set(notifyAutomationStarted, forKey: Self.notifyAutomationStartedKey)
+        d.set(notifyAutomationDone, forKey: Self.notifyAutomationDoneKey)
+        d.set(notifyAutomationError, forKey: Self.notifyAutomationErrorKey)
+    }
+
+    // Terminal wiring used by TerminalScreen. Every screen subscribes on open, so
+    // a second copy of an open terminal gets its own fresh seed.
+    func openTerminalScreen(_ id: String, key: AnyObject, hooks: TerminalHooks) {
+        terminalScreens.open(id, key: key, hooks: hooks)
+        // Ask again rather than trust an old ending: a terminal lpm had lost while
+        // restarting can be back. The Mac answers with a seed or another `exit`.
+        // Deferred: this runs inside a SwiftUI update.
+        if endedTerminals[id] != nil {
+            DispatchQueue.main.async { [weak self] in self?.endedTerminals[id] = nil }
+        }
+        client?.subscribe(id)
+    }
+    func closeTerminalScreen(_ id: String, key: AnyObject) {
+        switch terminalScreens.close(id, key: key) {
+        case .covered: break
+        // The copy underneath stopped receiving while the newer one was up.
+        case .revealed: client?.subscribe(id)
+        case .last: client?.unsubscribe(id)
+        }
+    }
+    /// Ask the server for a fresh seed on an already-subscribed terminal — used
+    /// when the terminal web view reloads (WebContent process death) and its
+    /// emulator restarts empty. Re-sending `sub` replays the current screen.
+    func reseed(_ id: String) { client?.subscribe(id) }
+    /// Catch a terminal that's still on screen up on the output it missed while
+    /// the app was away, keeping what it already shows.
+    func resync(_ id: String) { client?.resync(id) }
+    func input(_ id: String, _ data: String) { client?.sendInput(id, data) }
+    func resize(_ id: String, cols: Int, rows: Int) {
+        // Only the owner drives the single shared PTY size; a non-owning phone
+        // must not fight the desktop over it (Rust drops it anyway, but don't
+        // even send).
+        guard isControlled(id) else { return }
+        client?.resize(id, cols: cols, rows: rows)
+    }
+
+    /// Whether this phone renders the terminal live (vs. the "take control"
+    /// placeholder): true when it owns the terminal, or while ownership is unknown
+    /// / unclaimed (so a terminal only this phone shows never flips to a placeholder).
+    func isControlled(_ id: String) -> Bool {
+        guard let o = controlOwner[id] else { return true }
+        return o.kind == "mobile" && o.id == client?.deviceId
+    }
+
+    /// The owner's friendly name, for the placeholder ("Active on <name>").
+    func controlOwnerLabel(_ id: String) -> String {
+        guard let owner = controlOwner[id] else { return "another device" }
+        if owner.kind == "window", let mac = activeRecord?.displayName { return mac }
+        return owner.label
+    }
+
+    /// Take control here (the "Take control" button): this phone becomes the owner
+    /// and the previous owner flips to its own placeholder.
+    func claimControl(_ id: String) { client?.claim(id) }
+
+    private func setControlOwner(_ id: String, _ owner: ControlOwner?) {
+        if let owner { controlOwner[id] = owner } else { controlOwner[id] = nil }
+    }
+    /// Send a composed message: the web view wraps it as a bracketed paste (when
+    /// the running program enabled that) and appends a CR to submit. Returns
+    /// false — so the composer keeps the text — when it can't go out now: no live
+    /// link (keystrokes are never replayed later), a link still being checked
+    /// after the app came back, or no screen showing the terminal.
+    func submit(_ id: String, _ text: String) -> Bool {
+        guard connection == .ready, client?.isVerifying != true, endedTerminals[id] == nil,
+              let screen = terminalScreens.current(id) else { return false }
+        screen.submit(text)
+        return true
+    }
+
+    func startProject(_ p: Project, profile: String = "") {
+        Haptics.tap()
+        whenConnected(profile.isEmpty ? "Start" : "Start \(profile)", project: p.name) { [weak self] c in
+            self?.markRunPending(p.name, desired: true)
+            c.startProject(p.name, profile: profile)
+        }
+    }
+    func stopProject(_ p: Project) {
+        Haptics.tap()
+        whenConnected("Stop", project: p.name) { [weak self] c in
+            self?.markRunPending(p.name, desired: false)
+            c.stopProject(p.name)
+        }
+    }
+
+    /// Send now when the Mac is connected; otherwise keep the action waiting in
+    /// plain sight until it is, for at most a couple of minutes.
+    private func whenConnected(_ verb: String, project: String, _ work: @escaping (LpmClient) -> Void) {
+        if case .ready = connection, let client {
+            work(client)
+        } else {
+            link.enqueue(verb, project: project, work)
+        }
+    }
+    /// Show the in-flight spinner until the projects push confirms the desired
+    /// state; give up after a timeout so a lost request can't spin forever.
+    private func markRunPending(_ name: String, desired: Bool) {
+        pendingRun[name] = desired
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self] in
+            if self?.pendingRun[name] == desired { self?.pendingRun[name] = nil }
+        }
+    }
+    /// Clone a project (folder + config) with the chosen duplicate options. Each
+    /// new copy streams in via the projects-changed push; a failure surfaces in
+    /// actionError.
+    func duplicateProject(_ p: Project, options: DuplicateOptions) {
+        duplicateProgress = DuplicateProgress(source: p.label, done: 0, total: options.count)
+        client?.duplicateProject(p.name, options: options)
+    }
+    /// Remove a project — offered only for duplicates, whose folder is deleted from
+    /// disk. The list refreshes off the projects-changed push.
+    func removeProject(_ p: Project) { client?.removeProject(p.name) }
+    /// Rename a project's display label (empty clears it, falling back to the id).
+    /// The list refreshes off the projects-changed push; only a failure surfaces.
+    func renameProject(_ p: Project, name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed != p.label else { return }
+        client?.renameProject(project: p.name, name: trimmed)
+    }
+
+    // The Status menu the phone offers: what the app ships with, then the user's
+    // own, in the order they arranged on the Mac. Qualified because the property
+    // shadows the free function inside the class.
+    var workStatusMenu: [WorkStatusChoice] {
+        LpmMobile.workStatusMenu(palette: workStatuses, order: workStatusOrder)
+    }
+
+    /// Set (or, with a nil input, clear) a duplicate's work status. The row wears
+    /// it immediately; the projects-changed push replaces it with what the Mac
+    /// wrote, and a failure both surfaces and re-asks for the list so the
+    /// optimistic row can't stick.
+    func setWorkStatus(_ project: String, _ input: WorkStatusInput?) {
+        if let idx = projects.firstIndex(where: { $0.name == project }) {
+            let next = nextWorkStatus(current: projects[idx].workStatus,
+                                      input: input,
+                                      now: Int(Date().timeIntervalSince1970 * 1000))
+            projects[idx] = projects[idx].withWorkStatus(next)
+        }
+        Haptics.tap()
+        client?.setWorkStatus(project: project, status: input)
+    }
+
+    // Sidebar folder management. Each op writes the Mac's groups.json + settings and
+    // replies the updated layout (applied in onSidebarMutation); folders are matched
+    // by name, so create/rename/delete/move all key off the folder's display name.
+    func createFolder(name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        client?.sidebarCreateFolder(name: trimmed)
+    }
+    func renameFolder(_ folder: ProjectFolder, newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != folder.name else { return }
+        client?.sidebarRenameFolder(name: folder.name, newName: trimmed)
+    }
+    func deleteFolder(_ folder: ProjectFolder) { client?.sidebarDeleteFolder(name: folder.name) }
+    /// Move a project into `folder` (created if it doesn't exist), or to the top
+    /// level when `folder` is nil.
+    func moveProject(_ project: Project, toFolder folder: String?) {
+        client?.sidebarMoveProject(project: project.name, folder: folder)
+    }
+
+    /// Start/stop one service. Mirrors markRunPending: the row spins until the
+    /// projects push confirms the desired state (or a timeout gives up).
+    func toggleService(_ project: String, service: String) {
+        let desired = !serviceRunning(project, service)
+        whenConnected("\(desired ? "Start" : "Stop") \(service)", project: project) { [weak self] c in
+            // A wait for the Mac can outlast the list it was tapped on; the wire
+            // verb toggles, so only send it while it still moves the right way.
+            guard let self, self.serviceRunning(project, service) != desired else { return }
+            self.pendingServiceToggle[project, default: [:]][service] = desired
+            DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self] in
+                if self?.pendingServiceToggle[project]?[service] == desired {
+                    self?.pendingServiceToggle[project]?[service] = nil
+                }
+            }
+            c.toggleService(project, service: service)
+        }
+    }
+
+    private func serviceRunning(_ project: String, _ service: String) -> Bool {
+        let proj = projects.first(where: { $0.name == project })
+        return (proj?.running ?? false) && (proj?.services.contains(where: { $0.name == service }) ?? false)
+    }
+    func loadTerminals(_ project: String) { client?.requestTerminals(project: project) }
+
+    func loadAutomations() { client?.requestJobs() }
+
+    // MARK: Activity
+
+    /// Project -> terminal id -> that tab's name, for naming the agent rows on the
+    /// Activity screen. Only projects whose terminals have been fetched contribute.
+    var activityTerminalTitles: [String: [String: String]] {
+        terminals.mapValues { list in
+            Dictionary(list.map { ($0.id, $0.label) }, uniquingKeysWith: { _, last in last })
+        }
+    }
+
+    /// Fetch the tab names behind the Activity rows: only projects that actually
+    /// report an agent, so an idle Mac costs nothing.
+    func loadActivityTerminals() {
+        for project in projects where !project.statusEntries.isEmpty {
+            client?.requestTerminals(project: project.name)
+        }
+    }
+
+    /// Pull-to-refresh on Activity: everything the screen reads comes from the
+    /// projects and automations lists plus the terminals behind them.
+    func refreshActivity() async {
+        guard case .ready = connection else {
+            reconnectIfNeeded()
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            return
+        }
+        client?.requestProjects()
+        client?.requestJobs()
+        loadActivityTerminals()
+        try? await Task.sleep(nanoseconds: 500_000_000)
+    }
+
+    /// Dismiss a finished agent status. The Mac clears every entry on that terminal
+    /// holding this value and broadcasts status-changed; the row is dropped locally
+    /// first so the list settles on the tap rather than on the round-trip.
+    func clearAgentStatus(project: String, paneId: String, value: String) {
+        guard !paneId.isEmpty, !value.isEmpty else { return }
+        Haptics.tap()
+        dropAgentStatus(project: project, paneId: paneId, values: [value])
+    }
+
+    /// Retire the finish or problem a terminal shows once the user is looking at
+    /// it, as clicking its tab does on the desktop. A wait stays: the agent is
+    /// still asking for something.
+    func markTerminalSeen(project: String, paneId: String) {
+        let entries = projects.first(where: { $0.name == project })?.statusEntries ?? []
+        let seen = Set(entries.filter { $0.paneID == paneId && ($0.value == "Done" || $0.value == "Error") }
+            .map(\.value))
+        guard !seen.isEmpty else { return }
+        dropAgentStatus(project: project, paneId: paneId, values: seen)
+    }
+
+    private func dropAgentStatus(project: String, paneId: String, values: Set<String>) {
+        if let idx = projects.firstIndex(where: { $0.name == project }) {
+            let kept = projects[idx].statusEntries.filter {
+                !($0.paneID == paneId && values.contains($0.value))
+            }
+            projects[idx] = projects[idx].withStatus(kept)
+        }
+        for value in values {
+            client?.clearStatus(project: project, paneId: paneId, value: value)
+        }
+    }
+
+    /// Load the agent-usage stats for a period (1/7/30 days, 0 = all time). Marks
+    /// the screen active so a reconnect re-issues the query, and dims-not-blanks
+    /// while reloading (the view keeps showing the prior snapshot).
+    func loadStats(days: Int) {
+        statsActive = true
+        statsDays = days
+        statsLoading = true
+        statsError = nil
+        client?.requestStats(days: days)
+        // The scan replies asynchronously; if it never does (an old Mac that doesn't
+        // know this message, or a reply lost while the socket stayed up), give up so
+        // the screen shows an error instead of an endless skeleton. Keep prior data
+        // on a reload timeout — only the first, dataless load surfaces the error.
+        statsTimeout.arm("stats", seconds: 30) { [weak self] in
+            guard let self, self.statsLoading else { return }
+            self.statsLoading = false
+            if self.stats == nil { self.statsError = "Couldn't load stats. Pull to refresh." }
+        }
+    }
+
+    /// Pull-to-refresh on the Stats screen: re-request when live, else reconnect.
+    func refreshStats() async {
+        if case .ready = connection { loadStats(days: statsDays) }
+        else { reconnectIfNeeded() }
+        try? await Task.sleep(nanoseconds: 500_000_000)
+    }
+
+    /// The Stats screen closed: stop treating its query as live so a straggler
+    /// reply (or reconnect) doesn't keep refetching in the background.
+    func statsScreenDidClose() { statsActive = false }
+
+    func refreshAutomations() async {
+        if case .ready = connection { client?.requestJobs() }
+        else { reconnectIfNeeded() }
+        try? await Task.sleep(nanoseconds: 500_000_000)
+    }
+
+    func loadAutomationHistory(project: String, jobId: String) {
+        let key = automationKey(project, jobId)
+        automationHistoryLoading.insert(key)
+        client?.requestJobHistory(project: project, jobId: jobId)
+    }
+
+    func loadAutomationLiveOutput(project: String, jobId: String) {
+        client?.requestJobLiveOutput(project: project, jobId: jobId)
+    }
+
+    /// Run, stop and pause reach every folder the job runs in: a shared job is one
+    /// row on screen but keeps its state — and its runs — per project.
+    func runAutomation(_ job: AutomationJob) {
+        forEachAutomationTarget(job) { $0.runJob(project: $1, jobId: job.id) }
+    }
+
+    func stopAutomation(_ job: AutomationJob) {
+        forEachAutomationTarget(job) { $0.stopJob(project: $1, jobId: job.id) }
+    }
+
+    func setAutomationEnabled(_ job: AutomationJob, enabled: Bool) {
+        forEachAutomationTarget(job) {
+            $0.setJobEnabled(project: $1, jobId: job.id, enabled: enabled)
+        }
+    }
+
+    /// How many automations have runs the user hasn't read — what the menu badge
+    /// counts.
+    var automationsUnread: Int { automations.filter { $0.unread > 0 }.count }
+
+    /// Reading a run reads everything under it, in every folder the automation
+    /// runs in, since the row folds them into one unread count. `upTo` is the run
+    /// that was opened; nil reads the whole automation. Deliberately outside the
+    /// pending set: reading is not an action worth a spinner, and the Mac echoes
+    /// `jobs-changed` when the watermark moves.
+    func markAutomationSeen(_ job: AutomationJob, upTo at: Int? = nil) {
+        guard let client, job.unread > 0 else { return }
+        for target in job.runTargets {
+            client.markJobSeen(project: target, jobId: job.id, at: at)
+        }
+    }
+
+    func markAllAutomationsSeen() { client?.markAllJobsSeen() }
+
+    private func forEachAutomationTarget(_ job: AutomationJob,
+                                         _ send: (LpmClient, String) -> Void) {
+        guard let client else { return }
+        for target in job.runTargets {
+            automationPending.insert(automationKey(target, job.id))
+            send(client, target)
+        }
+    }
+
+    func sendAutomationFollowup(project: String, jobId: String, at: Int, message: String,
+                                agent: String, model: String, effort: String) {
+        let key = automationKey(project, jobId)
+        automationPending.insert(key)
+        automationFollowupError[key] = nil
+        client?.sendJobFollowup(project: project, jobId: jobId, at: at, message: message,
+                                agent: agent, model: model, effort: effort)
+    }
+
+    func automationKey(_ project: String, _ jobId: String) -> String { project + "\n" + jobId }
+
+    /// Fetch a job's raw config body so the editor sheet can seed an edit.
+    func loadJobConfig(project: String, jobId: String, source: String) {
+        jobConfigLoadingKey = automationKey(project, jobId)
+        jobConfigBody = nil
+        jobConfigError = nil
+        client?.requestJobConfig(project: project, jobId: jobId, source: source)
+    }
+
+    /// Create (empty `id`) or overwrite a job. `job` is the full YAML body the
+    /// editor built; the reply bumps `jobMutationDoneToken` (dismiss) or sets
+    /// `jobMutationError`. A timeout surfaces an error if the Mac stays silent.
+    func saveJob(id: String, source: String, project: String, job: [String: Any]) {
+        jobMutationInFlight = true
+        jobMutationError = nil
+        client?.saveJob(id: id, source: source, project: project, job: job)
+        armJobMutationTimeout()
+    }
+
+    func deleteJob(id: String, source: String, project: String, deleteCopies: Bool) {
+        jobMutationInFlight = true
+        jobMutationError = nil
+        client?.deleteJob(id: id, source: source, project: project, deleteCopies: deleteCopies)
+        armJobMutationTimeout()
+    }
+
+    private func armJobMutationTimeout() {
+        jobMutationTimeout.arm("job", seconds: 20) { [weak self] in
+            guard let self, self.jobMutationInFlight else { return }
+            self.jobMutationInFlight = false
+            self.jobMutationError = "The Mac didn't respond. Try again."
+        }
+    }
+
+    // MARK: project creation / discovery + config editing
+
+    /// Browse the Mac's folders one level at a time for the add-project picker.
+    /// An empty/`~` path resolves to $HOME on the Mac.
+    func loadDirs(_ path: String) {
+        dirListingLoading = true
+        dirListingError = nil
+        client?.requestDirs(path: path)
+        configTimeout.arm("dirs", seconds: 20) { [weak self] in
+            guard let self, self.dirListingLoading else { return }
+            self.dirListingLoading = false
+            self.dirListingError = "The Mac didn't respond. Try again."
+        }
+    }
+
+    /// Load the Mac's SSH config hosts for the SSH-project form.
+    func loadSshHosts() {
+        sshHostsError = nil
+        client?.requestSshHosts()
+        configTimeout.arm("sshHosts", seconds: 20) { [weak self] in
+            guard let self, !self.sshHostsLoaded else { return }
+            self.sshHostsLoaded = true
+            self.sshHostsError = "The Mac didn't respond. Try again."
+        }
+    }
+
+    /// Fetch a config layer's raw YAML text so the editor sheet can seed itself.
+    /// Clears the prior text first, like `loadJobConfig`, so a sheet can await it.
+    func readConfig(project: String, layer: String) {
+        configTextLoading = true
+        configText = nil
+        configTextError = nil
+        configAvailable = true
+        client?.requestConfig(project: project, layer: layer)
+        configTimeout.arm("readConfig", seconds: 20) { [weak self] in
+            guard let self, self.configTextLoading else { return }
+            self.configTextLoading = false
+            self.configTextError = "The Mac didn't respond. Try again."
+        }
+    }
+
+    /// Fetch one service's normalized mapping to seed the service form.
+    func loadServiceBody(project: String, key: String) {
+        serviceBodyLoading = true
+        serviceBody = nil
+        serviceBodyError = nil
+        serviceBodySource = ""
+        client?.requestServiceBody(project: project, key: key)
+        configTimeout.arm("serviceBody", seconds: 20) { [weak self] in
+            guard let self, self.serviceBodyLoading else { return }
+            self.serviceBodyLoading = false
+            self.serviceBodyError = "The Mac didn't respond. Try again."
+        }
+    }
+
+    /// Fetch one action's normalized mapping (plus its section + layer) to seed the
+    /// action form. `key` may be a composite `parent:child`.
+    func loadActionBody(project: String, key: String) {
+        actionBodyLoading = true
+        actionBody = nil
+        actionBodyError = nil
+        actionBodySection = "actions"
+        actionBodySource = ""
+        client?.requestActionBody(project: project, key: key)
+        configTimeout.arm("actionBody", seconds: 20) { [weak self] in
+            guard let self, self.actionBodyLoading else { return }
+            self.actionBodyLoading = false
+            self.actionBodyError = "The Mac didn't respond. Try again."
+        }
+    }
+
+    /// Create a new empty project (or adopt an existing folder) rooted at `root`.
+    func createProject(name: String, root: String) {
+        beginConfigMutation()
+        client?.createProject(name: name, root: root)
+    }
+
+    /// Create a project backed by an SSH host. `ssh` is the connection map
+    /// (`host`, `user`, `port`, `key`, `dir`) the form built.
+    func createSshProject(name: String, ssh: [String: Any]) {
+        beginConfigMutation()
+        client?.createSshProject(name: name, ssh: ssh)
+    }
+
+    /// Clone a git repo into a new project. Slow — the Mac clones on a worker
+    /// thread, so arm a generous timeout (120s) instead of the default.
+    func cloneProject(name: String, url: String, branch: String, destParent: String) {
+        beginConfigMutation(seconds: 120)
+        client?.cloneProject(name: name, url: url, branch: branch, destParent: destParent)
+    }
+
+    /// Write a config layer's raw YAML text. On success the reply carries the
+    /// possibly-renamed project (project layer), adopted into `configSavedName`.
+    func saveConfig(project: String, layer: String, content: String) {
+        configSavedName = nil
+        beginConfigMutation()
+        client?.saveConfig(project: project, layer: layer, content: content)
+    }
+
+    /// Create or update a service. `previousKey` (when different) renames it and
+    /// rewrites every reference; `payload` is the managed-fields map.
+    func saveService(project: String, key: String, payload: [String: Any], previousKey: String?) {
+        beginConfigMutation()
+        client?.saveService(project: project, key: key, payload: payload, previousKey: previousKey)
+    }
+
+    func deleteService(project: String, key: String) {
+        beginConfigMutation()
+        client?.deleteService(project: project, key: key)
+    }
+
+    /// Create or update a profile (its ordered service list). `previousName` (when
+    /// different) renames it.
+    func saveProfile(project: String, name: String, services: [String], previousName: String?) {
+        beginConfigMutation()
+        client?.saveProfile(project: project, name: name, services: services, previousName: previousName)
+    }
+
+    func deleteProfile(project: String, name: String) {
+        beginConfigMutation()
+        client?.deleteProfile(project: project, name: name)
+    }
+
+    /// Create or update an action. `payload` is the full action mapping the form
+    /// built; `previousKey` (when different) renames it, preserving `section`.
+    func saveAction(project: String, key: String, payload: [String: Any],
+                    previousKey: String?, section: String?) {
+        beginConfigMutation()
+        client?.saveAction(project: project, key: key, payload: payload,
+                           previousKey: previousKey, section: section)
+    }
+
+    func deleteAction(project: String, key: String) {
+        beginConfigMutation()
+        client?.deleteAction(project: project, key: key)
+    }
+
+    /// Mark a config write in flight and arm its guard timeout. Shared by every
+    /// create/clone/save/delete above (clone passes a longer window).
+    private func beginConfigMutation(seconds: Double = 20) {
+        configMutationInFlight = true
+        configMutationError = nil
+        configTimeout.arm("mutation", seconds: seconds) { [weak self] in
+            guard let self, self.configMutationInFlight else { return }
+            self.configMutationInFlight = false
+            self.configMutationError = "The Mac didn't respond. Try again."
+        }
+    }
+
+    /// Settle a config write reply: cancel the guard, drop the spinner, then either
+    /// surface the error or bump the done-token (dismiss the sheet) and re-request
+    /// the projects list so the edit shows immediately.
+    private func finishConfigMutation(_ error: String?, _ c: LpmClient) {
+        configTimeout.cancel("mutation")
+        configMutationInFlight = false
+        if let error {
+            configMutationError = error
+        } else {
+            configMutationDoneToken += 1
+            c.requestProjects()
+            c.requestSidebar()
+        }
+    }
+
+    /// Pull-to-refresh on the projects list: re-request projects + sidebar when
+    /// live, or kick a reconnect when the link is down. The brief wait lets the
+    /// round-trip land so the refresh control reflects a real update.
+    func refreshProjects() async {
+        if case .ready = connection {
+            client?.requestProjects()
+            client?.requestSidebar()
+        } else {
+            reconnectIfNeeded()
+        }
+        try? await Task.sleep(nanoseconds: 500_000_000)
+    }
+
+    func runAction(_ project: String, action: String,
+                   inputValues: [String: String] = [:], confirmed: Bool = false,
+                   onSpawn: ((TerminalInfo) -> Void)? = nil) {
+        let label = projects.first { $0.name == project }?.actions.flatMap(\.runnableLeaves)
+            .first { $0.name == action }?.label ?? action
+        whenConnected("Run “\(label)”", project: project) { [weak self] c in
+            c.runAction(project: project, action: action, inputValues: inputValues, confirmed: confirmed)
+            self?.markTerminalCreating(project)
+            self?.spawnCallbacks[project] = onSpawn
+            self?.reloadTerminalsSoon(project)
+        }
+    }
+
+    /// Start a non-terminal action headlessly on the Mac and return its runId. The
+    /// run streams into the Mac's background registry; poll `loadBackgroundRunOutput`
+    /// for its live output + status.
+    func startBackgroundAction(project: String, action: String, label: String,
+                               inputValues: [String: String]) -> String {
+        let runId = UUID().uuidString
+        backgroundRunInfo[runId] = BackgroundRunInfo(
+            runId: runId, project: project, label: label,
+            startedAt: Int(Date().timeIntervalSince1970))
+        backgroundRunErrors[runId] = nil
+        client?.runActionBackground(project: project, action: action,
+                                    inputValues: inputValues, runId: runId)
+        return runId
+    }
+    func loadBackgroundRunOutput(project: String, runId: String) {
+        client?.requestActionBgOutput(project: project, runId: runId)
+    }
+    func cancelBackgroundRun(_ runId: String) {
+        client?.cancelActionBackground(runId: runId)
+    }
+    func loadBackgroundRuns(_ project: String) {
+        client?.requestBackgroundRuns(project: project)
+    }
+    /// Background runs for a project, newest first — its own started runs plus any
+    /// re-attached via `backgroundRuns` discovery.
+    func backgroundRunList(for project: String) -> [BackgroundRunInfo] {
+        backgroundRunInfo.values
+            .filter { $0.project == project }
+            .sorted { $0.startedAt > $1.startedAt }
+    }
+
+    /// Drop a run the Mac no longer knows, except: a run started <10s ago with no
+    /// snapshot yet may simply not be registered there yet (the start message spawns
+    /// a worker thread), and a failed-to-start run keeps its error visible.
+    private func pruneBackgroundRun(_ runId: String) {
+        if backgroundRunErrors[runId] != nil { return }
+        if let info = backgroundRunInfo[runId], backgroundRuns[runId] == nil,
+           Int(Date().timeIntervalSince1970) - info.startedAt < 10 {
+            return
+        }
+        backgroundRunInfo[runId] = nil
+        backgroundRuns[runId] = nil
+    }
+    func newTerminal(_ project: String) {
+        client?.newTerminal(project: project)
+        markTerminalCreating(project)
+        reloadTerminalsSoon(project)
+    }
+    /// Show a placeholder terminal row until a terminals response contains an id
+    /// that wasn't there at request time, or a timeout gives up (e.g. a run task
+    /// that needs the Mac app open never spawned one). The give-up refreshes the
+    /// list one last time so the screen converges to the Mac's truth instead of
+    /// going stale-empty.
+    private func markTerminalCreating(_ project: String) {
+        // A newer create intent invalidates any pending spawn-switch watcher.
+        spawnCallbacks[project] = nil
+        creatingBaseline[project] = Set(terminals[project]?.map(\.id) ?? [])
+        creatingTerminals.insert(project)
+        creatingTimeout.arm(project, seconds: 14) { [weak self] in
+            guard let self else { return }
+            self.creatingTerminals.remove(project)
+            self.creatingBaseline[project] = nil
+            self.spawnCallbacks[project] = nil
+            self.loadTerminals(project)
+        }
+    }
+    func closeTerminal(_ project: String, id: String) {
+        closingTerminals[project, default: []].insert(id)
+        terminals[project]?.removeAll { $0.id == id }
+        // Drop the composer draft state for a terminal that's going away.
+        composerStores[id] = nil
+        client?.closeTerminal(project: project, id: id)
+        closingTimeout.arm(id, seconds: 10) { [weak self] in
+            guard let self, self.closingTerminals[project]?.contains(id) == true else { return }
+            self.closingTerminals[project]?.remove(id)
+            self.loadTerminals(project)
+        }
+        reloadTerminalsSoon(project)
+    }
+    func renameTerminal(_ project: String, id: String, label: String) {
+        client?.renameTerminal(project: project, id: id, label: label)
+        reloadTerminalsSoon(project)
+    }
+    func pinTerminal(_ project: String, id: String) {
+        client?.pinTerminal(project: project, id: id)
+        reloadTerminalsSoon(project)
+    }
+    /// Reorder a project's terminal tabs. Applies the new order optimistically so
+    /// the list doesn't snap back before the desktop echoes it via the terminals
+    /// push (which is now emitted in tab-tree order).
+    func reorderTerminals(_ project: String, order: [String]) {
+        if let list = terminals[project] {
+            let byId = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            let reordered = order.compactMap { byId[$0] }
+            if reordered.count == list.count { terminals[project] = reordered }
+        }
+        client?.reorderTerminals(project: project, order: order)
+    }
+    /// The desktop creates the terminal + types its command asynchronously (it
+    /// waits for the shell prompt to settle, which can take several seconds), so
+    /// poll the list until the new terminal shows up.
+    private func reloadTerminalsSoon(_ project: String) {
+        for delay in [0.6, 1.5, 3.0, 5.0, 8.0, 12.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.loadTerminals(project)
+            }
+        }
+    }
+    func loadSlash(_ id: String, project: String) { client?.requestSlash(id: id, project: project) }
+    func loadMentions(_ project: String) { client?.requestMentions(project: project) }
+    func loadHistory(_ project: String, q: String = "") { client?.requestHistory(project: project, q: q) }
+    func recordHistory(project: String, id: String, label: String, text: String) {
+        client?.recordHistory(project: project, id: id, label: label, text: text)
+    }
+
+    // MARK: composer parity
+
+    /// The retained composer store for a terminal, created on first access. Holds
+    /// the terminal's prompt tabs, attachments, and in-flight rewrite state so they
+    /// survive leaving and re-entering the terminal screen.
+    func composerStore(for id: String, project: String, label: String) -> ComposerStore {
+        if let s = composerStores[id] { return s }
+        let s = ComposerStore(termId: id, project: project, label: label, model: self)
+        composerStores[id] = s
+        return s
+    }
+
+    func loadComposerActions() { client?.requestComposerActions() }
+
+    /// This phone's paired device id, used to drop the echo of a draft it sent.
+    var selfDeviceId: String? { client?.deviceId }
+
+    /// Mirror a composer draft to the Mac (which fans it out to the desktop and any
+    /// other paired phones).
+    func sendComposerDraft(_ id: String, text: String) {
+        client?.sendComposerDraft(id, text: text)
+    }
+
+    /// Upload an attachment blob tagged with a per-upload `reqId` the server echoes;
+    /// `name` saves it under its original basename (files).
+    func sendUpload(_ id: String, b64: String, mime: String, name: String?, reqId: String) {
+        client?.uploadBlob(id, b64, mime: mime, name: name, reqId: reqId)
+    }
+
+    /// Drop the transform route for a reqId (on cancel/timeout, so it can't leak).
+    func clearTransformRoute(_ reqId: String?) {
+        if let reqId { transformRoutes[reqId] = nil }
+    }
+
+    /// Kick off an AI rewrite; returns the reqId the store keeps to match replies.
+    func runTransform(termId: String, project: String, instruction: String,
+                      text: String, variants: Int) -> String {
+        let reqId = UUID().uuidString
+        transformRoutes[reqId] = termId
+        client?.runTransform(reqId: reqId, project: project, instruction: instruction,
+                             text: text, variants: variants)
+        return reqId
+    }
+
+    func loadServices(_ project: String) { client?.requestServices(project: project) }
+    func serviceLogsKey(_ project: String, _ paneIndex: Int) -> String { project + "\n" + String(paneIndex) }
+    func fetchServiceLogs(_ project: String, paneIndex: Int, lines: Int = 200) {
+        client?.requestServiceLogs(project: project, paneIndex: paneIndex, lines: lines)
+    }
+    /// The Mac pushes a watched service's output as it changes; an older one only
+    /// answers `serviceLogs` polls.
+    var canWatchServiceLogs: Bool {
+        client?.hostFeatures.contains(LpmClient.serviceLogsWatchFeature) == true
+    }
+    func watchServiceLogs(_ project: String, paneIndex: Int, _ watch: Bool) {
+        client?.setServiceLogsWatch(project: project, paneIndex: paneIndex, watch: watch)
+    }
+    func consumeServiceLogs(_ key: String) {
+        serviceLogsResult[key] = nil
+        serviceLogsError[key] = nil
+    }
+
+    /// Capture the phone's own xterm scrollback for the "terminal output" mention
+    /// (returns empty when the web view isn't registered yet).
+    func captureTerminalOutput(_ id: String, lines: Int, _ done: @escaping (String) -> Void) {
+        guard let screen = terminalScreens.current(id) else { done(""); return }
+        screen.capture(lines, done)
+    }
+
+    // History screen (paged historyQuery).
+
+    func loadHistoryFirst(project: String?, search: String?, favoritesOnly: Bool, folder: String?) {
+        historyActive = true
+        historyLoading = true
+        historyLoadingMore = false
+        historyQueryParams = (project, search, favoritesOnly, folder)
+        historyReqGen += 1
+        historyPending.append((historyReqGen, false))
+        client?.requestHistoryQuery(project: project, search: search,
+                                    favoritesOnly: favoritesOnly, folder: folder, before: nil)
+    }
+    /// The history screen closed: stop treating its query as live and clear any
+    /// in-flight paging bookkeeping so a straggler reply can't spin it.
+    func historyScreenDidClose() {
+        historyActive = false
+        historyPending = []
+        historyLoading = false
+        historyLoadingMore = false
+    }
+
+    /// Shared "the socket was replaced" cleanup: fail every in-flight upload (so a
+    /// lost reply can't leave a chip stuck uploading and Send blocked), and reset
+    /// the history paging queue (so one lost reply can't wedge it off-by-one),
+    /// re-issuing the open history query fresh. Runs on any teardown of a live link;
+    /// requests it issues queue on the client and flush on reconnect.
+    private func handleConnectionReset() {
+        for store in composerStores.values { store.failInFlightUploads() }
+        automationPending = []
+        automationHistoryLoading = []
+        // A stats scan in flight can't survive the reconnect; re-issue it if the
+        // screen is still open, otherwise just drop the spinner.
+        if statsActive { loadStats(days: statsDays) }
+        else { statsLoading = false }
+        // Session memory and notes replay whatever screen is open (or just drop
+        // their spinners); their requests queue on the client until it reconnects.
+        gitAuto.handleConnectionReset()
+        memory.handleConnectionReset()
+        notes.handleConnectionReset()
+        usage.handleConnectionReset()
+        macUpdate.handleConnectionReset()
+        fileFetches.handleConnectionReset()
+        historyPending = []
+        historyLoadingMore = false
+        if historyActive {
+            let p = historyQueryParams
+            loadHistoryFirst(project: p.project, search: p.search,
+                             favoritesOnly: p.favoritesOnly, folder: p.folder)
+        } else {
+            historyLoading = false
+        }
+    }
+    func loadHistoryMore() {
+        guard historyHasMore, !historyLoading, !historyLoadingMore, let last = historyItems.last else { return }
+        historyLoadingMore = true
+        historyReqGen += 1
+        historyPending.append((historyReqGen, true))
+        let p = historyQueryParams
+        client?.requestHistoryQuery(project: p.project, search: p.search,
+                                    favoritesOnly: p.favoritesOnly, folder: p.folder,
+                                    before: (last.at, last.seq))
+    }
+    func loadHistoryFolders() { client?.requestHistoryFolders() }
+    func historySaveDraft(message: String, project: String?, id: String?, label: String?) {
+        client?.historySaveDraft(message: message, project: project, id: id, label: label, images: nil)
+    }
+    func historyToggleFavorite(_ id: String) {
+        if let i = historyItems.firstIndex(where: { $0.id == id }) {
+            let nowFavorite = !historyItems[i].favorite
+            historyItems[i].favorite = nowFavorite
+            // Unfavoriting while viewing the Favorites collection drops the row.
+            if historyQueryParams.favoritesOnly && !nowFavorite { historyItems.remove(at: i) }
+        }
+        client?.historyToggleFavorite(id: id)
+    }
+    func historyDelete(_ id: String) {
+        historyItems.removeAll { $0.id == id }
+        client?.historyDelete(id: id)
+    }
+    func historySetFolder(_ id: String, folder: String?) {
+        if let i = historyItems.firstIndex(where: { $0.id == id }) {
+            historyItems[i].folder = folder
+            // Moving a message out of the folder being viewed drops the row.
+            if let viewing = historyQueryParams.folder, folder != viewing { historyItems.remove(at: i) }
+        }
+        client?.historySetFolder(id: id, folder: folder)
+    }
+    func historyCreateFolder(_ name: String) { client?.historyCreateFolder(name: name) }
+    func historyDeleteFolder(_ id: String) {
+        historyFolders.removeAll { $0.id == id }
+        client?.historyDeleteFolder(id: id, name: nil)
+    }
+
+    /// The projects list arranged exactly like the desktop sidebar (a port of
+    /// Sidebar.tsx's tree build): walk `sidebarOrder`, emitting each folder with
+    /// its members, each loose (non-duplicate, non-member) project, and each
+    /// connected machine's section at its `peer:<slug>` slot, with every
+    /// duplicate nested immediately after its parent. Folders/loose projects/
+    /// machines missing from the order are appended so nothing vanishes. A
+    /// duplicate whose parent is gone counts as top-level (mirrors the desktop's
+    /// `isDuplicate`).
+    var sidebarItems: [SidebarItem] {
+        let byName = Dictionary(projects.map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
+        // project name -> folder id
+        var membership: [String: String] = [:]
+        for g in groups { for m in g.members { membership[m] = g.id } }
+
+        // A duplicate only when its parent is still present — an orphan is loose.
+        func isDup(_ p: Project) -> Bool { !p.parentName.isEmpty && byName[p.parentName] != nil }
+
+        // Duplicates not explicitly placed in a folder nest under their parent,
+        // in project-list order (which the server already sorts by projectOrder).
+        var childrenByParent: [String: [Project]] = [:]
+        for p in projects where isDup(p) && membership[p.name] == nil {
+            childrenByParent[p.parentName, default: []].append(p)
+        }
+        let groupsById = Dictionary(groups.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+
+        var out: [SidebarItem] = []
+        var rendered = Set<String>()
+
+        // A project plus its nested duplicate children, each flagged for indent.
+        func rows(for p: Project) -> [SidebarRow] {
+            rendered.insert(p.name)
+            var r = [SidebarRow(project: p, isChild: false)]
+            for child in childrenByParent[p.name] ?? [] {
+                rendered.insert(child.name)
+                r.append(SidebarRow(project: child, isChild: true))
+            }
+            return r
+        }
+
+        let sections = machineSections
+        var machines = Dictionary(sections.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var seenGroups = Set<String>()
+        func emitGroup(_ g: ProjectFolder) {
+            seenGroups.insert(g.id)
+            let memberRows = g.members.compactMap { byName[$0] }.flatMap { rows(for: $0) }
+            out.append(.folder(g, memberRows))
+        }
+
+        for token in sidebarOrder {
+            if token.hasPrefix("group:") {
+                let gid = String(token.dropFirst("group:".count))
+                if let g = groupsById[gid], !seenGroups.contains(gid) { emitGroup(g) }
+            } else if token.hasPrefix("peer:") {
+                if let section = machines.removeValue(forKey: String(token.dropFirst("peer:".count))) {
+                    out.append(.machine(section))
+                }
+            } else if let p = byName[token], !rendered.contains(token),
+                      !isDup(p), membership[token] == nil {
+                out.append(contentsOf: rows(for: p).map(SidebarItem.project))
+            }
+        }
+        // Folders missing from the order (defensive), then brand-new loose
+        // projects not yet persisted into it — matching the desktop's tail passes.
+        for g in groups where !seenGroups.contains(g.id) { emitGroup(g) }
+        for p in projects where !rendered.contains(p.name) && !isDup(p) && membership[p.name] == nil {
+            out.append(contentsOf: rows(for: p).map(SidebarItem.project))
+        }
+        for section in sections where machines[section.id] != nil {
+            out.append(.machine(section))
+        }
+        return out
+    }
+
+    /// Foreground backstop for notification withdrawal: iOS drops background clear
+    /// pushes for suspended/force-quit apps, so after each projects refresh we prune
+    /// delivered notifications whose status entry no longer exists. Only touches
+    /// notifications for a project that's in this list (leaving unknown projects and
+    /// just-arrived alerts whose status hasn't synced yet alone) and only when the
+    /// project's live status keys no longer include the notification's key.
+    /// Withdraw the active Mac's delivered notifications whose news is over: the
+    /// status is gone, or has moved on from the one announced (a "waiting" whose
+    /// agent got its answer and went back to work).
+    /// Whether the open app is showing this Mac's statuses live right now. A push
+    /// from an old Mac carries no id and is taken to be the live one's.
+    func showsLive(serverId: String?) -> Bool {
+        guard connection == .ready else { return false }
+        guard let serverId, !serverId.isEmpty else { return true }
+        return serverId == activeRecord?.serverId
+    }
+
+    private func reconcileNotifications(_ projects: [Project]) {
+        var live: [String: [String: String]] = [:]
+        for project in projects {
+            live[project.name] = Dictionary(
+                project.statusEntries.map { ($0.key, $0.value) },
+                uniquingKeysWith: { first, _ in first }
+            )
+        }
+        // This projects list belongs to the active Mac, so it may only prune that
+        // Mac's notifications. A notification with a serverId is pruned only when it
+        // matches the active record's serverId; one without a serverId (pre-upgrade,
+        // or posted by an old Mac) is always eligible. When the active record has no
+        // serverId yet, only serverId-less notifications may be pruned.
+        let activeServerId = activeRecord?.serverId
+        let center = UNUserNotificationCenter.current()
+        center.getDeliveredNotifications { delivered in
+            let stale = delivered.compactMap { note -> String? in
+                let info = note.request.content.userInfo
+                // An automation alert has no status key: it reports a finished run,
+                // not a status that can move on, so it stays until it's read.
+                guard let project = info["project"] as? String,
+                      let key = info["statusKey"] as? String, !key.isEmpty,
+                      let entries = live[project]
+                else { return nil }
+                let announced = info["status"] as? String
+                let current = entries[key]
+                if let current, announced == nil || announced == current { return nil }
+                if let noteServerId = info["serverId"] as? String, !noteServerId.isEmpty,
+                   noteServerId != activeServerId {
+                    return nil
+                }
+                return note.request.identifier
+            }
+            if !stale.isEmpty { center.removeDeliveredNotifications(withIdentifiers: stale) }
+        }
+    }
+
+    private func wire(_ c: LpmClient) {
+        c.inForeground = inForeground
+        wireConnection(c)
+        wireProjects(c)
+        wireStats(c)
+        wireUsage(c)
+        wireTerminals(c)
+        wireAutomations(c)
+        wireProjectEvents(c)
+        wireTerminalStreams(c)
+        wireGit(c)
+        wireMemory(c)
+        wireNotes(c)
+        wireComposer(c)
+        wireBackground(c)
+        wireHistory(c)
+        wireConfig(c)
+        wireMachines(c)
+        wireMacUpdate(c)
+        wireAutoPull(c)
+        wireClaudeAccounts(c)
+    }
+
+    private func wireConnection(_ c: LpmClient) {
+        c.onState = { [weak self] s in
+            guard let self else { return }
+            // A pinned-identity mismatch on reconnect (not a QR pairing abort, which
+            // the pairing screen surfaces): flag it so the UI can prompt to trust the
+            // new identity. Any other state clears the flag.
+            let mismatch: Bool = { if case .failed(LpmClient.identityChangedError) = s { return true }; return false }()
+            if mismatch && !self.identityMismatch {
+                // Keep the certificate the Mac presented, so the user can compare its
+                // code with the one the Mac shows before trusting it.
+                self.link.newFingerprint = c.observedFingerprint
+                self.link.identityCheckOpen = true
+            }
+            self.identityMismatch = mismatch
+            // Same shape: the Mac no longer holds a record for this device, so the
+            // UI must offer re-pairing instead of a retry. Any other state clears it.
+            self.needsRepair = { if case .failed(LpmClient.unauthorizedError) = s { return true }; return false }()
+            self.connection = s
+            self.repickHostIfStale(s, from: c)
+            self.startRecoveryIfStale(s, from: c)
+            let nowReady: Bool = { if case .ready = s { return true }; return false }()
+            // The live socket dropped: any request awaiting a reply is now dead
+            // (the reply can't survive the reconnect). Reset in-flight bookkeeping.
+            if self.wasReady && !nowReady {
+                self.handleConnectionReset()
+                self.noteLeavingActiveMac(asOf: c.lastHeard ?? Date())
+            }
+            self.wasReady = nowReady
+            if nowReady {
+                self.noteConnected(c)
+                // The link is back — a recovery browse (if any) has done its job.
+                self.stopBrowsing()
+                self.recoveryStatus = nil
+                // Trust-on-first-use: pin the cert this connection presented, if this
+                // Mac isn't pinned yet (migration / first wss:// connect).
+                self.persistObservedPinIfNeeded()
+                c.requestProjects()
+                c.requestSidebar()
+                c.requestDuplicateDefaults()
+                c.requestJobs()
+                // Demo Mode has no APNs identity and no relay — skip push registration.
+                if !self.demoMode && !self.isVisit {
+                    self.requestPushRegistration()
+                    self.syncPushRegistration()
+                    c.requestMachines()
+                }
+            }
+        }
+        c.onPaired = { [weak self] deviceId, token, serverId, serverName, hosts, platform in
+            self?.handlePaired(deviceId: deviceId, token: token, serverId: serverId,
+                               serverName: serverName, advertisedHosts: hosts, platform: platform)
+        }
+        c.onPairPending = { [weak self] matchCode in
+            self?.approvalPairing = .waiting(matchCode: matchCode)
+        }
+        c.onPairDenied = { [weak self] reason, message in
+            guard let self else { return }
+            switch reason {
+            case "busy": self.approvalPairing = .denied(reason: "busy", message: nil)
+            case LpmClient.badAddressReason:
+                self.approvalPairing = .denied(reason: LpmClient.badAddressReason, message: nil)
+            case "timeout": self.approvalPairing = .timedOut
+            default: self.approvalPairing = .denied(reason: "declined", message: message)
+            }
+        }
+        c.onIdentity = { [weak self] serverId, serverName, platform in
+            self?.learnIdentity(serverId: serverId, serverName: serverName, platform: platform)
+        }
+        c.onAdvertisedHosts = { [weak self] serverId, hosts in
+            self?.mergeAdvertisedHosts(serverId: serverId, hosts: hosts)
+        }
+        c.onFarewell = { [weak self, weak c] reason, at in
+            guard let self, let c, c === self.client else { return }
+            self.noteFarewell(reason, at: at)
+        }
+        c.onFarewellWithdrawn = { [weak self, weak c] in
+            guard let self, let c, c === self.client else { return }
+            self.withdrawFarewell()
+        }
+        c.onListFrame = { [weak self, weak c] text in
+            guard let self, let c, c === self.client, c.deviceId != nil, !self.demoMode,
+                  !self.isVisit, let id = self.activeMacId else { return }
+            self.link.snapshots.record(text, for: id)
+        }
+        c.onApnsToken = { [weak self, weak c] ok in
+            guard let self else { return }
+            guard ok else {
+                print("apns: server rejected token registration")
+                return
+            }
+            // Credit the ack to the Mac that is active *now*, and only while this is
+            // still the live client. Both matter: a pairing connection reaches
+            // `ready` before `handlePaired` names its Mac, and a late ack from a
+            // replaced connection must not be credited to the Mac that took over.
+            guard let c, c === self.client else { return }
+            self.notePushRegistered(for: self.activeMacId)
+        }
+    }
+
+    private func wireProjects(_ c: LpmClient) {
+        c.onProjects = { [weak self] p in
+            guard let self else { return }
+            self.projects = p
+            self.projectsLoaded = true
+            self.link.listAsOf = nil
+            // Waiting actions go out against the live list, not the saved one.
+            if case .ready = self.connection, let client = self.client, !self.link.pairing {
+                self.link.flushQueued(to: client)
+            }
+            for proj in p where self.pendingRun[proj.name] == proj.running {
+                self.pendingRun[proj.name] = nil
+            }
+            for proj in p {
+                guard let pending = self.pendingServiceToggle[proj.name], !pending.isEmpty else { continue }
+                let runningNow = proj.running ? Set(proj.services.map(\.name)) : []
+                for (svc, desired) in pending where runningNow.contains(svc) == desired {
+                    self.pendingServiceToggle[proj.name]?[svc] = nil
+                }
+            }
+            self.reconcileNotifications(p)
+        }
+        c.onSidebar = { [weak self] order, groups in
+            self?.sidebarOrder = order
+            self?.groups = groups
+        }
+        // A sidebar folder mutation reply carries the updated layout so the phone
+        // re-renders in place; a failure surfaces once.
+        c.onSidebarMutation = { [weak self] order, groups, error in
+            guard let self else { return }
+            if let error { self.actionError = error }
+            else { self.sidebarOrder = order; self.groups = groups }
+        }
+        // Rename succeeded silently (the projects-changed push refreshes the label);
+        // only a failure needs surfacing.
+        c.onRenameProject = { [weak self] _, error in
+            if let error { self?.actionError = error }
+        }
+        c.onWorkStatusPalette = { [weak self] statuses, order in
+            self?.workStatuses = statuses
+            self?.workStatusOrder = order
+        }
+        // A refused status leaves the optimistic row wearing something the Mac
+        // never wrote, so re-ask for the list rather than trusting the next push.
+        c.onSetWorkStatus = { [weak self] _, error in
+            guard let self, let error else { return }
+            self.actionError = error
+            self.client?.requestProjects()
+        }
+        c.onFileChunk = { [weak self] chunk in self?.fileFetches.deliver(chunk) }
+    }
+
+    private func wireStats(_ c: LpmClient) {
+        // Read-aloud on the Mac engine: the store asks, the client sends, the
+        // reply lands back on the store.
+        speech.requestSpeech = { [weak c] reqId, text in c?.requestSpeech(reqId: reqId, text: text) }
+        c.onSpeech = { [weak self] reqId, audio, error in
+            self?.speech.receiveSpeech(reqId: reqId, audio: audio, error: error)
+        }
+
+        c.onStats = { [weak self] stats, error in
+            guard let self else { return }
+            if let stats {
+                // The usage rows ask for today alone; the echoed period tells their
+                // answer apart from the Stats screen's.
+                if stats.days == 1 { self.usage.applyToday(stats) }
+                // Drop a stale reply from a superseded period — the payload echoes the
+                // period it was scanned for, and only the current one may land.
+                guard stats.days == self.statsDays else { return }
+                self.statsTimeout.cancel("stats")
+                self.stats = stats
+                self.statsError = nil
+                self.statsLoading = false
+            } else if self.statsLoading {
+                // A failure echoes no period; only a screen waiting on one claims it.
+                self.statsTimeout.cancel("stats")
+                self.statsLoading = false
+                self.statsError = error ?? "Couldn't load stats."
+            }
+        }
+    }
+
+    private func wireUsage(_ c: LpmClient) {
+        c.onLimits = { [weak self] snapshot, error in self?.usage.apply(snapshot, error: error) }
+        c.onLimitsChanged = { [weak self] snapshot in self?.usage.applyPush(snapshot) }
+    }
+
+    private func wireTerminals(_ c: LpmClient) {
+        c.onTerminals = { [weak self] proj, t in
+            guard let self else { return }
+            var list = t
+            if var closing = self.closingTerminals[proj] {
+                // Ids no longer in the list are confirmed closed; the rest are
+                // still in flight and stay hidden.
+                closing.formIntersection(t.map(\.id))
+                self.closingTerminals[proj] = closing.isEmpty ? nil : closing
+                list.removeAll { closing.contains($0.id) }
+            }
+            self.terminals[proj] = list
+            if let base = self.creatingBaseline[proj], list.contains(where: { !base.contains($0.id) }) {
+                let fresh = list.first(where: { !base.contains($0.id) })
+                self.creatingBaseline[proj] = nil
+                self.creatingTerminals.remove(proj)
+                if let cb = self.spawnCallbacks[proj], let fresh {
+                    cb(fresh)
+                    self.spawnCallbacks[proj] = nil
+                }
+            }
+        }
+        c.onSlash = { [weak self] id, cmds in self?.slashCommands[id] = cmds }
+        c.onUpload = { [weak self] id, reqId, path in
+            self?.composerStores[id]?.resolveUpload(reqId: reqId, path: path)
+        }
+        c.onUploadStep = { [weak self] step in self?.composerStores[step.termId]?.applyUploadStep(step) }
+        c.onMentions = { [weak self] proj, entries in self?.mentions[proj] = entries }
+        c.onHistory = { [weak self] proj, rows in self?.history[proj] = rows.filter { !$0.isDraft } }
+    }
+
+    private func wireAutomations(_ c: LpmClient) {
+        c.onJobs = { [weak self] jobs, error in
+            guard let self else { return }
+            self.automationsLoaded = true
+            if let error { self.automationError = error }
+            else { self.automations = jobs }
+        }
+        c.onJobHistory = { [weak self] project, jobId, entries, error in
+            guard let self else { return }
+            let key = self.automationKey(project, jobId)
+            self.automationHistoryLoading.remove(key)
+            if error == nil { self.automationHistory[key] = entries }
+            else { self.automationError = error }
+        }
+        c.onJobLiveOutput = { [weak self] project, jobId, live, error in
+            guard let self else { return }
+            let key = self.automationKey(project, jobId)
+            if let live { self.automationLiveOutput[key] = live }
+            else { self.automationLiveOutput[key] = nil }
+            if let error { self.automationError = error }
+        }
+        c.onAutomationMutation = { [weak self] project, jobId, error in
+            guard let self else { return }
+            let key = self.automationKey(project, jobId)
+            self.automationPending.remove(key)
+            if let error { self.automationError = error }
+            c.requestJobs()
+            if self.automationHistory[key] != nil {
+                c.requestJobHistory(project: project, jobId: jobId)
+            }
+        }
+        c.onAutomationFollowup = { [weak self] project, jobId, error in
+            guard let self else { return }
+            let key = self.automationKey(project, jobId)
+            self.automationPending.remove(key)
+            if let error { self.automationFollowupError[key] = error }
+            c.requestJobs()
+            c.requestJobHistory(project: project, jobId: jobId)
+            c.requestJobLiveOutput(project: project, jobId: jobId)
+        }
+        c.onJobConfig = { [weak self] project, jobId, job, error in
+            guard let self else { return }
+            self.jobConfigLoadingKey = nil
+            if let error { self.jobConfigError = error }
+            else { self.jobConfigBody = job }
+        }
+        c.onJobSaved = { [weak self] _, error in
+            guard let self else { return }
+            self.jobMutationTimeout.cancel("job")
+            self.jobMutationInFlight = false
+            if let error { self.jobMutationError = error }
+            else {
+                self.jobMutationDoneToken += 1
+                c.requestJobs()
+            }
+        }
+        c.onJobDeleted = { [weak self] _, error in
+            guard let self else { return }
+            self.jobMutationTimeout.cancel("job")
+            self.jobMutationInFlight = false
+            if let error { self.jobMutationError = error }
+            else {
+                self.jobMutationDoneToken += 1
+                c.requestJobs()
+            }
+        }
+        c.onJobsChanged = { [weak self] in
+            guard let self else { return }
+            c.requestJobs()
+            for key in self.automationHistory.keys {
+                // A standalone job's project is the empty sentinel, so the split
+                // has to keep the empty leading component.
+                let parts = key.split(separator: "\n", maxSplits: 1,
+                                      omittingEmptySubsequences: false).map(String.init)
+                if parts.count == 2 { c.requestJobHistory(project: parts[0], jobId: parts[1]) }
+            }
+        }
+    }
+
+    private func wireProjectEvents(_ c: LpmClient) {
+        c.onProjectsChanged = {
+            c.requestProjects()
+            c.requestSidebar()
+            c.requestJobs()
+        }
+        c.onStatusChanged = { proj in c.requestStatus(project: proj) }
+        c.onActionError = { [weak self] message in self?.actionError = message }
+        c.onSendQueueFull = { [weak self] in self?.actionError = "Not connected — action not sent." }
+        c.onActionFailed = { [weak self] proj, message in
+            guard let self else { return }
+            self.creatingBaseline[proj] = nil
+            self.creatingTerminals.remove(proj)
+            self.spawnCallbacks[proj] = nil
+            self.actionError = message
+        }
+        c.onDuplicateDefaults = { [weak self] excl, reinstall, pull in
+            guard let self else { return }
+            self.duplicateDefaults.excludeUncommitted = excl
+            self.duplicateDefaults.reinstallDeps = reinstall
+            self.duplicateDefaults.pullLatest = pull
+        }
+        c.onDuplicateProgress = { [weak self] done, total, name in
+            guard let self else { return }
+            if var p = self.duplicateProgress {
+                p.done = done
+                p.total = total
+                self.duplicateProgress = p
+            } else {
+                self.duplicateProgress = DuplicateProgress(source: name, done: done, total: total)
+            }
+        }
+        c.onDuplicateDone = { [weak self] error, warning in
+            guard let self else { return }
+            self.duplicateProgress = nil
+            if let error {
+                self.actionError = error
+            } else if let warning {
+                self.notice = warning
+            }
+        }
+        c.onStatus = { [weak self] proj, entries in
+            guard let self else { return }
+            if let idx = self.projects.firstIndex(where: { $0.name == proj }) {
+                // Copy with fresh status — preserves services/actions.
+                self.projects[idx] = self.projects[idx].withStatus(entries)
+                self.reconcileNotifications([self.projects[idx]])
+            }
+        }
+    }
+
+    private func wireTerminalStreams(_ c: LpmClient) {
+        c.onSeed = { [weak self] id, cols, rows, data, reset in
+            self?.terminalScreens.current(id)?.seed(cols, rows, data, reset)
+        }
+        c.onOutput = { [weak self] id, data in self?.terminalScreens.current(id)?.output(data) }
+        c.onControl = { [weak self] id, owner in self?.setControlOwner(id, owner) }
+        c.onExit = { [weak self] id, code, gone in
+            self?.endedTerminals[id] = TerminalEnding(code: code, gone: gone)
+        }
+    }
+
+    private func wireGit(_ c: LpmClient) {
+        c.onGit = { [weak self] project, snapshot, error in
+            self?.git.applySnapshot(project, snapshot, error: error)
+        }
+        c.onGitDiff = { [weak self] project, path, result, error in
+            self?.git.applyDiff(project, path: path, result: result, error: error)
+        }
+        c.onGitDiffs = { [weak self] project, entries, error in
+            // A whole-batch failure is project-resolution only (unreachable once a
+            // project's snapshot has loaded); the per-key timeouts clear the spinners.
+            guard let self, error == nil else { return }
+            for e in entries {
+                self.git.applyDiff(project, path: e.path, result: e.result, error: e.error)
+            }
+        }
+        c.onGitCommit = { [weak self] project, error in self?.git.finishCommit(project, error: error) }
+        c.onGitPush = { [weak self] project, error in self?.git.finishPush(project, error: error) }
+        c.onGitGenMessage = { [weak self] project, message, error in
+            self?.git.finishGenMessage(project, message: message, error: error)
+        }
+        c.onGitGenPr = { [weak self] project, title, body, error in
+            self?.git.finishGenPr(project, title: title, body: body, error: error)
+        }
+        c.onGitCreatePr = { [weak self] project, url, error in
+            self?.git.finishCreatePr(project, url: url, error: error)
+        }
+        c.onGitPull = { [weak self] project, error in self?.git.finishPull(project, error: error) }
+        c.onGitFetch = { [weak self] project, error in self?.git.finishFetch(project, error: error) }
+        c.onGitDiscardAll = { [weak self] project, error in self?.git.finishDiscard(project, error: error) }
+        c.onGitChanged = { [weak self] project in self?.git.changed(project) }
+        c.onGitBranches = { [weak self] project, current, branches, error in
+            self?.git.applyBranches(project, current: current, branches: branches, error: error)
+        }
+        c.onGitCheckout = { [weak self] project, error in self?.git.finishCheckout(project, error: error) }
+        c.onGitCreateBranch = { [weak self] project, error in self?.git.finishCreateBranch(project, error: error) }
+        c.onGitAuto = { [weak self] project, run, error in self?.gitAuto.apply(project, run: run, error: error) }
+        c.onGitAutoSwitchBase = { [weak self] project, base, error, pullError in
+            self?.gitAuto.finishSwitch(project, base: base, error: error, pullError: pullError)
+        }
+    }
+
+    private func wireMemory(_ c: LpmClient) {
+        c.onMemory = { [weak self] project, list, error in
+            self?.memory.applyList(project, list, error: error)
+        }
+        c.onMemorySession = { [weak self] project, name, session, error in
+            self?.memory.applySession(project, name: name, session: session, error: error)
+        }
+        c.onMemorySave = { [weak self] project, name, error in
+            self?.memory.finishSave(project, name: name, error: error)
+        }
+        c.onMemoryDelete = { [weak self] project, name, error in
+            self?.memory.finishDelete(project, name: name, error: error)
+        }
+        // The push names the owner folder, which for a duplicate is its original.
+        c.onMemoryChanged = { [weak self] owner in self?.memory.changed(owner) }
+    }
+
+    private func wireNotes(_ c: LpmClient) {
+        c.onNotesChats = { [weak self] project, chats, error in
+            self?.notes.applyChats(project, chats, error: error)
+        }
+        c.onNotesCreateChat = { [weak self] project, chat, error in
+            self?.notes.finishCreateChat(project, chat: chat, error: error)
+        }
+        c.onNotesRenameChat = { [weak self] project, chatId, error in
+            self?.notes.finishRenameChat(project, chatId: chatId, error: error)
+        }
+        c.onNotesDeleteChat = { [weak self] project, chatId, error in
+            self?.notes.finishDeleteChat(project, chatId: chatId, error: error)
+        }
+        c.onNotesMessages = { [weak self] project, chatId, beforeId, messages, error in
+            self?.notes.applyMessages(project, chatId: chatId, beforeId: beforeId,
+                                      messages: messages, error: error)
+        }
+        c.onNotesAddMessage = { [weak self] project, chatId, message, error in
+            self?.notes.finishAddNote(project, chatId: chatId, message: message, error: error)
+        }
+        c.onNotesEditMessage = { [weak self] project, id, error in
+            self?.notes.finishEditNote(project, id: id, error: error)
+        }
+        c.onNotesDeleteMessage = { [weak self] project, id, error in
+            self?.notes.finishDeleteNote(project, id: id, error: error)
+        }
+        c.onNotesSearch = { [weak self] project, query, hits, error in
+            self?.notes.search.apply(project, query: query, hits: hits, error: error)
+        }
+        c.onNotesAttachment = { [weak self] _, hash, data, error in
+            self?.notes.attachments.apply(hash: hash, data: data, error: error)
+        }
+    }
+
+    private func wireComposer(_ c: LpmClient) {
+        c.onComposerActions = { [weak self] actions in self?.composerActions = actions }
+        c.onTransformVariant = { [weak self] reqId, idx, text, error in
+            guard let self, let termId = self.transformRoutes[reqId] else { return }
+            self.composerStores[termId]?.receiveTransformVariant(reqId: reqId, idx: idx, text: text, error: error)
+        }
+        c.onTransformDone = { [weak self] reqId, ok in
+            guard let self else { return }
+            let termId = self.transformRoutes[reqId]
+            self.transformRoutes[reqId] = nil
+            if let termId { self.composerStores[termId]?.finishTransform(reqId: reqId, ok: ok) }
+        }
+        c.onComposerDraft = { [weak self] id, text, rev, origin, isSeed in
+            self?.composerStores[id]?.applyRemoteDraft(text: text, rev: rev, origin: origin, isSeed: isSeed)
+        }
+        c.onServices = { [weak self] project, running, services, error in
+            guard let self, error == nil else { return }
+            self.services[project] = services
+            self.servicesRunning[project] = running
+        }
+        c.onServiceLogs = { [weak self] project, pane, text, error in
+            guard let self else { return }
+            let key = self.serviceLogsKey(project, pane)
+            if let text { self.serviceLogsResult[key] = text; self.serviceLogsError[key] = nil }
+            else { self.serviceLogsError[key] = error ?? "Couldn't read the logs." }
+        }
+    }
+
+    private func wireBackground(_ c: LpmClient) {
+        c.onActionBgOutput = { [weak self] runId, snapshot in
+            guard let self else { return }
+            guard let snapshot else {
+                // found:false — the run was reaped on the Mac (or never existed).
+                // Keeping stale state would leave the row spinning on "Running" and
+                // re-polled forever, so drop the run. A just-started run whose first
+                // poll raced the Mac-side registration gets a grace window instead.
+                self.pruneBackgroundRun(runId)
+                return
+            }
+            self.backgroundRuns[runId] = snapshot
+            if self.backgroundRunInfo[runId] == nil {
+                self.backgroundRunInfo[runId] = BackgroundRunInfo(
+                    runId: runId, project: snapshot.project, label: snapshot.label,
+                    startedAt: snapshot.startedAt)
+            }
+        }
+        c.onActionBgStartFailed = { [weak self] runId, error in
+            self?.backgroundRunErrors[runId] = error
+        }
+        c.onBackgroundRuns = { [weak self] project, runs in
+            guard let self else { return }
+            // The Mac's list is authoritative (running + finished within the TTL):
+            // anything of ours it no longer carries has been reaped, so prune it —
+            // this also bounds the section across a long session.
+            let listed = Set(runs.map(\.runId))
+            for (id, info) in self.backgroundRunInfo
+            where info.project == project && !listed.contains(id) {
+                self.pruneBackgroundRun(id)
+            }
+            for r in runs where self.backgroundRunInfo[r.runId] == nil {
+                self.backgroundRunInfo[r.runId] = BackgroundRunInfo(
+                    runId: r.runId, project: project, label: r.label, startedAt: r.startedAt)
+            }
+        }
+    }
+
+    private func wireHistory(_ c: LpmClient) {
+        c.onHistoryQuery = { [weak self] items, hasMore in
+            guard let self, !self.historyPending.isEmpty else { return }
+            let req = self.historyPending.removeFirst()
+            // Only the newest in-flight request may mutate the list; a stale reply
+            // from a superseded filter/search is dropped (its loading flags are
+            // cleared by the newest reply, which arrives after it in order).
+            guard req.gen == self.historyReqGen else { return }
+            if req.paging { self.historyItems.append(contentsOf: items) }
+            else { self.historyItems = items }
+            self.historyHasMore = hasMore
+            self.historyLoading = false
+            self.historyLoadingMore = false
+        }
+        c.onHistorySaveDraft = { _ in }
+        c.onHistoryToggleFavorite = { [weak self] id, favorite, error in
+            guard let self, error == nil else { return }
+            if let i = self.historyItems.firstIndex(where: { $0.id == id }), self.historyItems[i].favorite != favorite {
+                self.historyItems[i].favorite = favorite
+            }
+        }
+        c.onHistoryMutated = { [weak self] _, _ in self?.client?.requestHistoryFolders() }
+        c.onHistoryFolders = { [weak self] folders in self?.historyFolders = folders }
+        c.onHistoryCreateFolder = { [weak self] folder, _ in
+            guard let self, let folder else { return }
+            if !self.historyFolders.contains(where: { $0.id == folder.id }) {
+                self.historyFolders.append(folder)
+                self.historyFolders.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            }
+        }
+    }
+
+    private func wireMachines(_ c: LpmClient) {
+        // A visited machine's own machines are never added here.
+        guard !isVisit else { return }
+        c.onMachines = { [weak self, weak c] machines in
+            guard let self, let c, c === self.client, !self.demoMode,
+                  let source = self.activeRecord?.serverId else { return }
+            self.machineImporter.update(machines, source: source, macs: self.macs)
+        }
+        c.onMachinePair = { [weak self, weak c] slug, offer, error in
+            guard let self, let c, c === self.client else { return }
+            self.machineImporter.receiveOffer(slug: slug, offer: offer, error: error)
+        }
+    }
+
+    private func wireConfig(_ c: LpmClient) {
+        // Form-seed reads: cancel the guard, drop the spinner, seed or surface error.
+        c.onListDirs = { [weak self] listing, error in
+            guard let self else { return }
+            self.configTimeout.cancel("dirs")
+            self.dirListingLoading = false
+            if let listing { self.dirListing = listing; self.dirListingError = nil }
+            else { self.dirListingError = error ?? "Couldn't list folders." }
+        }
+        c.onListSshHosts = { [weak self] hosts, error in
+            guard let self else { return }
+            self.configTimeout.cancel("sshHosts")
+            self.sshHostsLoaded = true
+            if let error { self.sshHostsError = error }
+            else { self.sshHosts = hosts; self.sshHostsError = nil }
+        }
+        c.onReadConfig = { [weak self] _, _, content, available, error in
+            guard let self else { return }
+            self.configTimeout.cancel("readConfig")
+            self.configTextLoading = false
+            if let error { self.configTextError = error }
+            else { self.configText = content; self.configAvailable = available; self.configTextError = nil }
+        }
+        c.onServiceBody = { [weak self] _, _, body, source, error in
+            guard let self else { return }
+            self.configTimeout.cancel("serviceBody")
+            self.serviceBodyLoading = false
+            if let error { self.serviceBodyError = error }
+            else { self.serviceBody = body; self.serviceBodySource = source }
+        }
+        c.onActionBody = { [weak self] _, _, body, section, source, error in
+            guard let self else { return }
+            self.configTimeout.cancel("actionBody")
+            self.actionBodyLoading = false
+            if let error { self.actionBodyError = error }
+            else { self.actionBody = body; self.actionBodySection = section; self.actionBodySource = source }
+        }
+        // Config writes all settle through the shared mutation cluster. saveConfig
+        // additionally adopts the possibly-renamed project name before finishing.
+        c.onCreateProject = { [weak self] _, error in self?.finishConfigMutation(error, c) }
+        c.onCreateSshProject = { [weak self] _, error in self?.finishConfigMutation(error, c) }
+        c.onCloneProject = { [weak self] _, error in self?.finishConfigMutation(error, c) }
+        c.onSaveConfig = { [weak self] _, _, name, error in
+            guard let self else { return }
+            if error == nil, !name.isEmpty { self.configSavedName = name }
+            self.finishConfigMutation(error, c)
+        }
+        c.onSaveService = { [weak self] _, _, error in self?.finishConfigMutation(error, c) }
+        c.onDeleteService = { [weak self] _, _, error in self?.finishConfigMutation(error, c) }
+        c.onSaveProfile = { [weak self] _, _, error in self?.finishConfigMutation(error, c) }
+        c.onDeleteProfile = { [weak self] _, _, error in self?.finishConfigMutation(error, c) }
+        c.onSaveAction = { [weak self] _, _, error in self?.finishConfigMutation(error, c) }
+        c.onDeleteAction = { [weak self] _, _, error in self?.finishConfigMutation(error, c) }
+    }
+}
+
+/// The state of an approve-on-Mac pairing attempt. `requesting` is the brief
+/// window before the Mac replies; `waiting` carries the 4-digit match code both
+/// screens show; `denied`/`timedOut` are terminal failures the sheet reports.
+enum ApprovalPairingState: Equatable {
+    case requesting
+    case waiting(matchCode: String)
+    // "busy" | "declined" | LpmClient.badAddressReason; `message` is the server's
+    // own sentence for a decline (a headless host explains to use its code).
+    case denied(reason: String, message: String?)
+    case timedOut
+}
+
+/// A generated pull-request draft (title + body), filled into the PR sheet's
+/// editable fields.
+struct GitPrDraft: Equatable {
+    var title: String
+    var body: String
+}
+
+/// A rendered project row: the project plus whether it's a nested duplicate,
+/// which the list indents under its parent — mirroring the desktop's `isChild`.
+struct SidebarRow: Identifiable {
+    let project: Project
+    let isChild: Bool
+    var id: String { project.name }
+}
+
+/// One row of the projects screen: a top-level project (possibly a nested
+/// duplicate) or a folder + its members (each member carries its own indent flag).
+enum SidebarItem: Identifiable {
+    case project(SidebarRow)
+    case folder(ProjectFolder, [SidebarRow])
+    case machine(MachineSection)
+
+    var id: String {
+        switch self {
+        case .project(let r): return "p:" + r.project.name
+        case .folder(let g, _): return "g:" + g.id
+        case .machine(let m): return "m:" + m.id
+        }
+    }
+}
+
+private extension String {
+    /// The string trimmed of surrounding whitespace, or nil if that leaves nothing —
+    /// so an empty/blank `serverName` never overwrites a real record name.
+    var trimmedNonEmpty: String? {
+        let t = trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.isEmpty ? nil : t
+    }
+}

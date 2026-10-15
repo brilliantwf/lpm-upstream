@@ -1,0 +1,10 @@
+appId: cx.lpm.mobile
+name: 12-exit-demo
+tags: [demo, pairing]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "Exit"
+- extendedWaitUntil:
+    visible: "Connect to your Mac"
+    timeout: 5000
+- takeScreenshot: 1-back-to-pairing

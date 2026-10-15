@@ -1,0 +1,15 @@
+appId: cx.lpm.mobile
+name: 04-project-detail
+tags: [demo, projects, services]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- assertVisible: "Terminal 1"
+- assertVisible: "New tab"
+- assertVisible: "Services · 2 of 3 running"
+- assertVisible: "Stop all"
+- assertVisible: "Tap a service for its logs."
+- takeScreenshot: 1-storefront

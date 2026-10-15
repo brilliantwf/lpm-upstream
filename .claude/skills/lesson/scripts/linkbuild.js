@@ -73,7 +73,8 @@ function sourcesStamp() {
       else hash.update(`${path.relative(REPO, p)}:${st.size}:${st.mtimeMs}`);
     }
   };
-  walk(path.join(REPO, "mobile"));
+  walk(path.join(REPO, "mobile/ios"));
+  walk(path.join(REPO, "mobile/shared"));
   walk(path.join(REPO, "tailnet"));
   return hash.digest("hex");
 }
@@ -98,18 +99,18 @@ function ensureLinkBuild({ log = console.log } = {}) {
   if (fs.existsSync(APP) && fs.existsSync(stampFile) && fs.readFileSync(stampFile, "utf8") === stamp) return APP;
   fs.rmSync(SRC, { recursive: true, force: true });
   fs.mkdirSync(SRC, { recursive: true });
-  execFileSync("rsync", ["-a", "--exclude", "build", "--exclude", ".build", "--exclude", "xcuserdata",
+  execFileSync("rsync", ["-a", "--exclude", "/android", "--exclude", "build", "--exclude", ".build", "--exclude", "xcuserdata",
     path.join(REPO, "mobile") + "/", path.join(SRC, "mobile") + "/"]);
   fs.symlinkSync(path.join(REPO, "tailnet"), path.join(SRC, "tailnet"));
-  applyPatches(path.join(SRC, "mobile/Sources/LpmMobile"));
-  execFileSync("xcodegen", ["generate", "--quiet"], { cwd: path.join(SRC, "mobile"), stdio: "inherit" });
+  applyPatches(path.join(SRC, "mobile/ios/Sources/LpmMobile"));
+  execFileSync("xcodegen", ["generate", "--quiet"], { cwd: path.join(SRC, "mobile/ios"), stdio: "inherit" });
   log("building lpm Link for the simulator (a few minutes the first time)");
   const logFile = path.join(HOME, "build.log");
   try {
     const out = execFileSync("xcodebuild", ["-project", "LpmMobile.xcodeproj", "-scheme", "LpmMobile",
       "-configuration", "Release", "-sdk", "iphonesimulator", "-destination", "generic/platform=iOS Simulator",
       "-derivedDataPath", path.join(HOME, "dd"), ...SIGNING, "build"],
-      { cwd: path.join(SRC, "mobile"), maxBuffer: 1 << 28 });
+      { cwd: path.join(SRC, "mobile/ios"), maxBuffer: 1 << 28 });
     fs.writeFileSync(logFile, out);
   } catch (e) {
     fs.writeFileSync(logFile, String(e.stdout || "") + String(e.stderr || ""));
