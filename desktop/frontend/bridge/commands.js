@@ -1045,6 +1045,15 @@ export function VoiceToTextAvailable() {
 export function VoiceToTextToggle() {
   return invoke("voice_to_text_toggle");
 }
+export function VoiceToTextStart() {
+  return invoke("voice_to_text_start");
+}
+export function VoiceToTextStop() {
+  return invoke("voice_to_text_stop");
+}
+export function VoiceToTextCancel() {
+  return invoke("voice_to_text_cancel");
+}
 
 // Connect Macs — peer control. Host role manages who may drive this Mac; client
 // role manages the Macs this one drives. See src/peer/route.ts for routing.

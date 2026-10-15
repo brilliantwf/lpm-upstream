@@ -14,6 +14,8 @@ import { SquarePenIcon } from "./icons";
 import { SendSplitButton, type SendSplitButtonProps } from "./SendSplitButton";
 import { TerminalHistoryButton, type TerminalHistoryButtonProps } from "./TerminalHistoryButton";
 import { DICTATION_AVAILABLE } from "../hooks/useVoiceDictation";
+import { useDictationHost } from "../hooks/useDictationHost";
+import { DictationStrip } from "./dictation/DictationStrip";
 
 export type ComposerHistorySource = Pick<
   TerminalHistoryButtonProps,
@@ -45,6 +47,9 @@ interface ComposerToolbarProps {
 // here, as a button, or in the More menu at the row's end, and the user moves
 // it between the two from either place.
 export function ComposerToolbar({ boxRef, history, onNewInput, actions, memory, model, fork, send }: ComposerToolbarProps) {
+  // Dictating into this composer: the recorder takes over the row — the
+  // strip where the tools were, the mic as the one button beside them.
+  const dictating = useDictationHost(boxRef) !== null;
   const layout = useComposerToolbar({
     mic: DICTATION_AVAILABLE,
     actions: actions !== null,
@@ -57,7 +62,13 @@ export function ComposerToolbar({ boxRef, history, onNewInput, actions, memory, 
   const renderTool = (id: ComposerToolId, variant: ComposerToolVariant, host?: ComposerMenuHost) => {
     switch (id) {
       case "mic":
-        return <ComposerMicButton variant={variant} onPick={host?.close} />;
+        return (
+          <ComposerMicButton
+            variant={variant}
+            onPick={host?.close}
+            prominent={variant === "button" && (send.disabled || dictating)}
+          />
+        );
       case "actions":
         return (
           actions && (
@@ -127,9 +138,11 @@ export function ComposerToolbar({ boxRef, history, onNewInput, actions, memory, 
     }
   };
 
-  // Model keeps its seat at the right edge beside Send; every other button
-  // sits on the left, in canonical order, with the More menu after them.
-  const left = layout.toolbar.filter((id) => id !== "model");
+  // Model and the mic keep their seats at the right edge beside Send; every
+  // other button sits on the left, in canonical order, with the More menu
+  // after them. With nothing to send, the mic takes Send's place.
+  const left = layout.toolbar.filter((id) => id !== "model" && id !== "mic");
+  const micBesideSend = layout.toolbar.includes("mic");
   const slot = (id: ComposerToolId) => (
     <ComposerToolbarSlot
       key={id}
@@ -143,22 +156,29 @@ export function ComposerToolbar({ boxRef, history, onNewInput, actions, memory, 
   );
 
   return (
-    <div className="flex items-center justify-between px-2 pb-1">
-      <div className="flex items-center gap-1">
-        {left.map(slot)}
-        {layout.menu.length > 0 && (
-          <ComposerMoreButton
-            tools={layout.menu}
-            isDefault={layout.isDefault}
-            renderRow={(id, host) => renderTool(id, "row", host)}
-            onMove={(id) => layout.move(id, true)}
-            onReset={layout.reset}
-          />
-        )}
-      </div>
-      <div className="flex items-center gap-1.5">
+    <div data-dictation-host className="flex items-center justify-between gap-2 px-2 pb-1">
+      {dictating ? (
+        <div className="dictation-tone-composer flex min-w-0 flex-1">
+          <DictationStrip />
+        </div>
+      ) : (
+        <div className="flex items-center gap-1">
+          {left.map(slot)}
+          {layout.menu.length > 0 && (
+            <ComposerMoreButton
+              tools={layout.menu}
+              isDefault={layout.isDefault}
+              renderRow={(id, host) => renderTool(id, "row", host)}
+              onMove={(id) => layout.move(id, true)}
+              onReset={layout.reset}
+            />
+          )}
+        </div>
+      )}
+      <div className="flex shrink-0 items-center gap-1.5">
         {layout.toolbar.includes("model") && slot("model")}
-        <SendSplitButton {...send} />
+        {micBesideSend ? slot("mic") : dictating && <ComposerMicButton prominent />}
+        {!(micBesideSend && send.disabled) && !dictating && <SendSplitButton {...send} />}
       </div>
     </div>
   );

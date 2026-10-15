@@ -1,19 +1,20 @@
 import type { CSSProperties } from "react";
 
 // The composer send control's visual definition, shared by the terminal
-// composer's split button and the standalone send button so the two stay
-// identical: one segmented pill — solid accent when live, a quiet neutral
-// shell when there's nothing to send.
+// composer's split button, the standalone send button, and the mic that takes
+// Send's place in an empty composer, so they stay identical: one segmented
+// pill — solid accent when live, a quiet neutral shell when there's nothing
+// to send.
 
 export const SEND_SHELL_CLASS = "flex items-center rounded-lg transition-colors duration-150";
 
 export const sendShellTint = (inert: boolean) =>
   inert ? "bg-[var(--composer-inert-bg)]" : "bg-[var(--accent-blue)]";
 
-export const sendGlow = (inert: boolean): CSSProperties | undefined =>
+export const sendGlow = (inert: boolean, accent = "var(--accent-blue)"): CSSProperties | undefined =>
   inert
     ? undefined
-    : { boxShadow: "0 2px 12px -2px color-mix(in srgb, var(--accent-blue) 60%, transparent)" };
+    : { boxShadow: `0 2px 12px -2px color-mix(in srgb, ${accent} 60%, transparent)` };
 
 // `radius` differs by host: the split button's send half only rounds its left
 // side, the standalone button rounds the whole pill.

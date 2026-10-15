@@ -239,6 +239,8 @@ mod vaultcred;
 #[cfg(all(unix, not(target_os = "macos")))]
 mod vaultkeyfile;
 mod voicetotext;
+#[cfg(target_os = "macos")]
+mod voicetotext_api;
 mod watchfilter;
 mod webengine;
 #[cfg(windows)]

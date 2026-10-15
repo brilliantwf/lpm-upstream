@@ -4,7 +4,8 @@
 
 // Canonical order, used by both places, so moving a tool out and back leaves
 // the row exactly as it was. Model is listed last because it keeps its seat at
-// the right edge beside Send whenever it is in the row.
+// the right edge beside Send whenever it is in the row; the mic sits there too,
+// taking Send's place while there's nothing to send.
 export const COMPOSER_TOOL_IDS = [
   "mic",
   "actions",

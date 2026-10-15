@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Toaster } from "sonner";
+import { DictationOverlay } from "./components/dictation/DictationOverlay";
 import { Sidebar } from "./components/Sidebar";
 import { ProjectDetail } from "./components/ProjectDetail";
 import { FeedbackModal } from "./components/FeedbackModal";
@@ -108,6 +109,7 @@ export function DetachedApp({ projectName }: DetachedAppProps) {
         richColors
         toastOptions={{ duration: 5000 }}
       />
+      <DictationOverlay />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           projects={projects}
