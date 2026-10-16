@@ -8,6 +8,7 @@ the phone is a display and input client.
 mobile/
 ├── PROTOCOL.md     # the wire contract both apps implement (matches remote.rs)
 ├── shared/web/     # xterm.js terminal + markdown pages, bundled by both apps' WebViews
+├── shared/demo/    # Demo Mode sample files (images) both apps ship
 ├── ios/            # iOS app (SwiftUI) — the reference; see ios/README.md
 ├── android/        # Android app (Kotlin, Jetpack Compose) — see android/PORTING.md
 └── parity/         # side-by-side tests: one set of Maestro flows on both apps

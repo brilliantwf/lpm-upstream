@@ -1,0 +1,71 @@
+appId: cx.lpm.mobile
+name: 97-claude-account-consent
+tags: [demo, projects, claude]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Claude Account"
+    timeout: 5000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Claude Account"
+      - extendedWaitUntil:
+          visible: "Always use one account"
+          timeout: 5000
+- tapOn: "Choose Accounts.*"
+- extendedWaitUntil:
+    visible: "Take turns, in this order"
+    timeout: 5000
+# Personal isn't confirmed as the person's own yet, so the desktop's notice asks first.
+- tapOn: "Personal"
+- extendedWaitUntil:
+    visible: "Add this account to the list?"
+    timeout: 5000
+- assertVisible: "Cancel"
+- assertVisible: "It's Only Mine"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-consent
+- tapOn: "It's Only Mine"
+# Personal now takes turns alone, so new sessions in storefront use it.
+- scrollUntilVisible:
+    element: "Personal, in use"
+    direction: DOWN
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Claude Account"
+    timeout: 5000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Claude Account"
+      - extendedWaitUntil:
+          visible: "Always use one account"
+          timeout: 5000
+# The checkmark moved from the main accounts to the list.
+- assertVisible:
+    text: "selected"
+    below: "Old laptop.*"
+- assertNotVisible:
+    text: "selected"
+    above: "Always use one account"
+- tapOn: "Choose Accounts"
+- extendedWaitUntil:
+    visible: "Take turns, in this order"
+    timeout: 5000
+# Personal leads the list, checked; a list's only account can't be taken out.
+- assertVisible:
+    text: "selected"
+    below: "Take turns, in this order"
+    above: "Main login.*"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-list
+- tapOn: "Personal"
+- assertVisible: "Take turns, in this order"

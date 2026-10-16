@@ -1,0 +1,65 @@
+package cx.lpm.mobile.feature.connection
+
+import androidx.compose.runtime.Immutable
+import cx.lpm.mobile.core.data.link.ConnectionIssue
+import cx.lpm.mobile.core.data.link.IssueCopy
+import cx.lpm.mobile.core.data.link.LinkState
+import cx.lpm.mobile.core.data.link.LinkView
+import cx.lpm.mobile.core.data.link.issueCopy
+import cx.lpm.mobile.core.data.session.MacSession
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+
+/** How an issue is shown: the bar over a list, or a card in place of content. */
+enum class IssueStyle { Bar, Card }
+
+/** The link as the connection UI shows it: the derived view plus the store's own flags. */
+@Immutable
+data class LinkUiState(
+    val view: LinkView,
+    val link: LinkState,
+    val isReady: Boolean,
+    val demo: Boolean,
+    val recoveryStatus: String?,
+    val device: String
+) {
+    /** The bar names the machine by kind; a card by its name. */
+    fun content(issue: ConnectionIssue, style: IssueStyle): IssueContentState = IssueContentState(
+        issue = issue,
+        copy = issue.issueCopy(
+            mac = if (style == IssueStyle.Bar) view.macNoun else view.macLabel,
+            device = device
+        ),
+        recoveryStatus = recoveryStatus?.takeIf { issue.isConnecting },
+        failure = link.tailscaleFailure,
+        waitingCount = if (link.pairing) 0 else link.waitingCount,
+        trying = link.trying,
+        tailscaleWorking = link.tailscaleWorking
+    )
+}
+
+/** One issue's words and buttons, with what the link adds to them right now. */
+@Immutable
+data class IssueContentState(
+    val issue: ConnectionIssue,
+    val copy: IssueCopy,
+    /** "Found <name>, reconnecting…" while a connect is under way. */
+    val recoveryStatus: String? = null,
+    val failure: String? = null,
+    val waitingCount: Int = 0,
+    val trying: Boolean = false,
+    val tailscaleWorking: Boolean = false
+)
+
+/** Follows `session`'s link for the connection UI. */
+fun MacSession.linkUi(device: String): Flow<LinkUiState> =
+    combine(link.views, link.state, state) { view, link, s ->
+        LinkUiState(
+            view = view,
+            link = link,
+            isReady = s.isReady,
+            demo = s.demoMode,
+            recoveryStatus = s.recoveryStatus,
+            device = device
+        )
+    }

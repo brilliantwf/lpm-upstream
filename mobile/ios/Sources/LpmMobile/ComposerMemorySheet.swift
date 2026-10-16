@@ -99,13 +99,16 @@ struct ComposerMemorySheet: View {
         }
     }
 
+    /// The eye sits beside the row's button, not in its label: a control inside a
+    /// button's label never gets the touch. Borderless, so the button takes only its
+    /// own taps rather than the whole row's, and the eye keeps the tint it had inside it.
     private func sessionRow(_ session: MemorySession) -> some View {
-        Button {
-            Haptics.tap()
-            onPick(invocation(for: session.name))
-            dismiss()
-        } label: {
-            HStack(spacing: 10) {
+        HStack(spacing: 10) {
+            Button {
+                Haptics.tap()
+                onPick(invocation(for: session.name))
+                dismiss()
+            } label: {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(session.title)
                         .font(.system(size: 15))
@@ -115,18 +118,21 @@ struct ComposerMemorySheet: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
-                Spacer(minLength: 8)
-                NavigationLink {
-                    MemorySessionView(project: project, name: session.name, title: session.title)
-                        .environment(model)
-                } label: {
-                    Image(systemName: "eye")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .fixedSize()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.borderless)
+            NavigationLink {
+                MemorySessionView(project: project, name: session.name, title: session.title)
+                    .environment(model)
+            } label: {
+                Image(systemName: "eye")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.tint.opacity(0.5))
+            }
+            .buttonStyle(.plain)
+            .fixedSize()
+            .accessibilityLabel("Preview")
         }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) { deleting = session } label: {

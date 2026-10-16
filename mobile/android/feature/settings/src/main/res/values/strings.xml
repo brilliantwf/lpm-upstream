@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Settings</string>
+    <string name="settings_done">Done</string>
+    <string name="settings_back">Back</string>
+
+    <string name="settings_away">Away from home</string>
+    <string name="settings_tailscale">Built-in Tailscale</string>
+    <string name="settings_away_footer">Reach your Mac over cellular or any network, no Tailscale app needed.</string>
+    <string name="settings_tailscale_off">Off</string>
+    <string name="settings_tailscale_connected">Connected</string>
+    <string name="settings_tailscale_sign_in">Sign in</string>
+    <string name="settings_tailscale_waiting">Waiting</string>
+    <string name="settings_tailscale_problem">Problem</string>
+    <string name="settings_tailscale_connecting">Connecting…</string>
+
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme">Theme</string>
+
+    <string name="settings_terminal">Terminal</string>
+    <string name="settings_terminal_footer">Font size and color scheme for the built-in terminal.</string>
+
+    <string name="settings_read_aloud">Read aloud</string>
+    <string name="settings_notifications">Notifications</string>
+
+    <string name="notify_push">Push notifications</string>
+    <string name="notify_denied">Notifications are turned off for lpm in your device settings.</string>
+    <string name="notify_open_settings">Open Settings</string>
+    <string name="notify_nudge">Get a nudge on your phone when something happens while the app is closed.</string>
+    <string name="notify_allow">Allow notifications</string>
+    <string name="notify_agents">Agents</string>
+    <string name="notify_waiting">Waiting for you</string>
+    <string name="notify_finished">Finished</string>
+    <string name="notify_error">Error</string>
+    <string name="notify_agents_footer">Waiting for you: an agent needs your input or approval. Finished: a run wrapped up. Error: something went wrong.</string>
+    <string name="notify_not_connected">Not connected to your Mac — changes apply the next time this phone connects.</string>
+    <string name="notify_automations">Automations</string>
+    <string name="notify_started">Started</string>
+    <string name="notify_error_or_timeout">Error or timeout</string>
+    <string name="notify_automations_footer">Choose which automation outcomes send a notification when this app is closed.</string>
+</resources>

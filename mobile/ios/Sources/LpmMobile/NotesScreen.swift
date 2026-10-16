@@ -54,6 +54,7 @@ struct NotesScreen: View {
                     Image(systemName: "square.and.pencil")
                 }
                 .disabled(notes.chatMutating.contains(project))
+                .accessibilityLabel("New Chat")
             }
         }
         .refreshable {
@@ -184,6 +185,7 @@ struct NotesScreen: View {
                     Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Close")
             }
             .foregroundStyle(.orange)
             .padding(.horizontal, 14)

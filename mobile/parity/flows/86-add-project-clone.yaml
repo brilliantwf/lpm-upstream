@@ -1,0 +1,43 @@
+appId: cx.lpm.mobile
+name: 86-add-project-clone
+tags: [demo, config, projects]
+---
+- runFlow: subflows/enter-demo.yaml
+- runFlow: subflows/open-more-menu.yaml
+- tapOn: "Add Project…"
+- extendedWaitUntil:
+    visible: "Folder on your Mac"
+    timeout: 5000
+# Clone: the name follows the repository address until it's typed over.
+- tapOn: "Clone"
+- extendedWaitUntil:
+    visible: "Repository address"
+    timeout: 5000
+- assertVisible: "Branch (optional)"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-clone
+- tapOn: "Repository address"
+- inputText: "https://github.com/acme/web-shop.git"
+- extendedWaitUntil:
+    visible: "web-shop"
+    timeout: 5000
+- tapOn: "Clone into"
+- extendedWaitUntil:
+    visible: "Projects"
+    timeout: 5000
+- tapOn: "Projects"
+- extendedWaitUntil:
+    visible: "storefront"
+    timeout: 5000
+- tapOn: "Use This Folder"
+- extendedWaitUntil:
+    visible: "/Users/demo/Projects"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-filled
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    notVisible: "Repository address"
+    timeout: 5000

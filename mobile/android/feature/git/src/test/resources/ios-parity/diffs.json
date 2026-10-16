@@ -1,0 +1,237 @@
+[
+ {
+  "name": "demo-checkout-form",
+  "ext": "tsx",
+  "diff": "diff --git a/components/CheckoutForm.tsx b/components/CheckoutForm.tsx\nindex 4a5c2de..8f13a9b 100644\n--- a/components/CheckoutForm.tsx\n+++ b/components/CheckoutForm.tsx\n@@ -3,6 +3,8 @@\n import { Button } from \"@/components/ui/button\"\n import { Input } from \"@/components/ui/input\"\n import { formatPrice } from \"@/lib/format\"\n+import { createPaymentIntent, type PaymentMethod } from \"@/lib/payments\"\n+import { PaymentMethodPicker } from \"./PaymentMethodPicker\"\n\n type CheckoutFormProps = {\n   cart: Cart\n@@ -11,11 +13,21 @@ type CheckoutFormProps = {\n\n export function CheckoutForm({ cart, onComplete }: CheckoutFormProps) {\n   const [email, setEmail] = useState(\"\")\n+  const [method, setMethod] = useState<PaymentMethod>(\"card\")\n   const [submitting, setSubmitting] = useState(false)\n+  const [error, setError] = useState<string | null>(null)\n\n   async function handleSubmit(event: React.FormEvent) {\n     event.preventDefault()\n     setSubmitting(true)\n-    await submitOrder({ email, items: cart.items })\n-    onComplete()\n+    setError(null)\n+    try {\n+      const intent = await createPaymentIntent(cart, method)\n+      await submitOrder({ email, intent, items: cart.items })\n+      onComplete()\n+    } catch {\n+      setError(\"Payment failed. Please try again.\")\n+    } finally {\n+      setSubmitting(false)\n+    }\n   }\n@@ -32,6 +44,8 @@ export function CheckoutForm({ cart, onComplete }: CheckoutFormProps) {\n         onChange={(e) => setEmail(e.target.value)}\n         required\n       />\n+      <PaymentMethodPicker value={method} onChange={setMethod} />\n+      {error && <p className=\"text-sm text-red-600\">{error}</p>}\n       <Button type=\"submit\" disabled={submitting}>\n         {submitting ? \"Placing order…\" : `Pay ${formatPrice(cart.total)}`}\n       </Button>"
+ },
+ {
+  "name": "demo-checkout-page",
+  "ext": "tsx",
+  "diff": "diff --git a/app/checkout/page.tsx b/app/checkout/page.tsx\nindex c91e044..2b7a51c 100644\n--- a/app/checkout/page.tsx\n+++ b/app/checkout/page.tsx\n@@ -1,13 +1,19 @@\n import { CheckoutForm } from \"@/components/CheckoutForm\"\n+import { OrderSummary } from \"@/components/OrderSummary\"\n import { getCart } from \"@/lib/cart\"\n\n+export const metadata = { title: \"Checkout\" }\n+\n export default async function CheckoutPage() {\n   const cart = await getCart()\n\n   return (\n-    <main className=\"mx-auto max-w-lg px-4 py-8\">\n-      <h1 className=\"text-2xl font-semibold\">Checkout</h1>\n-      <CheckoutForm cart={cart} />\n+    <main className=\"mx-auto grid max-w-4xl gap-8 px-4 py-8 md:grid-cols-[1fr_360px]\">\n+      <section>\n+        <h1 className=\"text-2xl font-semibold\">Checkout</h1>\n+        <CheckoutForm cart={cart} />\n+      </section>\n+      <OrderSummary cart={cart} />\n     </main>\n   )\n }"
+ },
+ {
+  "name": "demo-payments",
+  "ext": "ts",
+  "diff": "diff --git a/lib/payments.ts b/lib/payments.ts\nnew file mode 100644\nindex 0000000..7d1f2ab\n--- /dev/null\n+++ b/lib/payments.ts\n@@ -0,0 +1,22 @@\n+import type { Cart } from \"./cart\"\n+\n+export type PaymentMethod = \"card\" | \"apple-pay\"\n+\n+export type PaymentIntent = {\n+  id: string\n+  amount: number\n+  method: PaymentMethod\n+}\n+\n+export async function createPaymentIntent(\n+  cart: Cart,\n+  method: PaymentMethod,\n+): Promise<PaymentIntent> {\n+  const res = await fetch(\"/api/payments/intent\", {\n+    method: \"POST\",\n+    headers: { \"Content-Type\": \"application/json\" },\n+    body: JSON.stringify({ amount: cart.total, method }),\n+  })\n+  if (!res.ok) throw new Error(\"Could not start the payment\")\n+  return res.json()\n+}"
+ },
+ {
+  "name": "demo-readme",
+  "ext": "md",
+  "diff": "diff --git a/README.md b/README.md\nindex e4a10bd..f6c92d3 100644\n--- a/README.md\n+++ b/README.md\n@@ -6,7 +6,12 @@ ## Getting started\n\n ```sh\n npm install\n npm run dev\n ```\n\n+## Payments\n+\n+Checkout talks to the new payments module in `lib/payments.ts`. Set\n+`PAYMENT_API_KEY` in `.env.local` before testing the flow locally.\n+\n ## Deployment"
+ },
+ {
+  "name": "demo-added",
+  "ext": "ts",
+  "diff": "diff --git a/src/new.ts b/src/new.ts\nnew file mode 100644\nindex 0000000..b2d61a4\n--- /dev/null\n+++ b/src/new.ts\n@@ -0,0 +1,4 @@\n+export function demo() {\n+  return true\n+}\n+"
+ },
+ {
+  "name": "demo-modified",
+  "ext": "ts",
+  "diff": "diff --git a/src/app.ts b/src/app.ts\nindex 3f1c2aa..9b04d1e 100644\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1,5 +1,6 @@\n import { config } from \"./config\"\n\n-const enabled = false\n+const enabled = true\n+const retries = 3\n\n export { config }"
+ },
+ {
+  "name": "empty",
+  "ext": "ts",
+  "diff": ""
+ },
+ {
+  "name": "swift",
+  "ext": "swift",
+  "diff": "diff --git a/App.swift b/App.swift\nindex 1111111..2222222 100644\n--- a/App.swift\n+++ b/App.swift\n@@ -10,8 +10,11 @@ struct ContentView: View {\n     /* A block comment\n        that spans lines */\n-    let count = 0x1F + 1_000\n+    let count = 0x2F + 2_000 // more\n     var name = \"say \\\"hi\\\"\"\n+    guard let value = try? await load() else { return nil }\n\n+    /* opened\n+\n+       still open */ let after = 3.14\n     func body() -> some View { Text(\"x\") }\n\\ No newline at end of file\n"
+ },
+ {
+  "name": "rust",
+  "ext": "rs",
+  "diff": "@@ -1,4 +1,4 @@\n use std::io;\n-fn main() -> Result<(), Box<dyn Error>> {\n+pub fn main() -> Result<(), Box<dyn Error>> {\n     let mut v: Vec<u8> = Vec::new(); // bytes\n     println!(\"{}\", 42u32);\n"
+ },
+ {
+  "name": "python",
+  "ext": "py",
+  "diff": "@@ -3,6 +3,7 @@ class Thing:\n     def go(self, x):\n-        return None if x is None else x * 2\n+        return x and x * 2  # doubled\n+        yield 'single' \"double\"\n     async def run():\n         await asyncio.sleep(0.5)\n"
+ },
+ {
+  "name": "go",
+  "ext": "go",
+  "diff": "@@ -1,5 +1,5 @@\n package main\n-import \"fmt\"\n+import `fmt`\n func main() {\n-\tvar x int = 10\n+\tx := map[string]int{\"a\": 1}\n }\n"
+ },
+ {
+  "name": "ruby",
+  "ext": "rb",
+  "diff": "@@ -1,3 +1,3 @@\n-def hello(name) # greet\n+def hello(name = \"world\") # greet\n   puts \"hi #{name}\" unless name.nil?\n end\n"
+ },
+ {
+  "name": "shell",
+  "ext": "sh",
+  "diff": "@@ -1,4 +1,4 @@\n #!/bin/sh\n-if [ -f \"$1\" ]; then echo 'found'; fi\n+if [ -d \"$1\" ]; then echo 'dir'; fi\n export PATH=$HOME/bin:$PATH # path\n"
+ },
+ {
+  "name": "json",
+  "ext": "json",
+  "diff": "@@ -1,5 +1,5 @@\n {\n-  \"name\": \"storefront\",\n+  \"name\": \"storefront-web\",\n   \"private\": true,\n   \"version\": null, \"count\": 12.5e3\n }\n"
+ },
+ {
+  "name": "yaml",
+  "ext": "yml",
+  "diff": "@@ -1,12 +1,13 @@\n # lpm project\n name: storefront\n-services:\n+services: # all of them\n   web:\n     cmd: npm run dev\n     port: 3000\n     env: {NODE_ENV: development}\n+    url: http://localhost:3000\n   - item\n   - key: value\n   - - nested: true\n   \"quoted\": no\n ---\n a:b\n"
+ },
+ {
+  "name": "css",
+  "ext": "css",
+  "diff": "@@ -1,4 +1,4 @@\n /* theme */\n-.btn { color: #fff; margin: 0 4px; }\n+.btn { color: #000; margin: 0 8px; content: \"x\"; }\n a[href='x'] { }\n"
+ },
+ {
+  "name": "scss",
+  "ext": "scss",
+  "diff": "@@ -1,3 +1,3 @@\n-$gap: 4px; // small\n+$gap: 8px; // bigger\n .a { /* note */ padding: $gap; }\n"
+ },
+ {
+  "name": "html",
+  "ext": "html",
+  "diff": "@@ -1,5 +1,6 @@\n <!doctype html>\n-<div class=\"a\" id='b'>text 12</div>\n+<div class=\"a b\" id='b'>text 13</div>\n+<!-- a comment\n+ spanning --> <p>after</p>\n <p>end</p>\n"
+ },
+ {
+  "name": "plain-markdown",
+  "ext": "md",
+  "diff": "@@ -1,3 +1,3 @@\n # Title\n-Some \"text\" with 12 numbers // not a comment\n+Some \"text\" with 13 numbers // still not\n"
+ },
+ {
+  "name": "unknown-ext",
+  "ext": "",
+  "diff": "@@ -1 +1 @@\n-let a = 1\n+let a = 2\n"
+ },
+ {
+  "name": "uppercase-ext",
+  "ext": "TS",
+  "diff": "@@ -1 +1 @@\n-const a = 1\n+const a = 2\n"
+ },
+ {
+  "name": "indent-trim",
+  "ext": "ts",
+  "diff": "@@ -20,6 +20,7 @@ function outer() {\n         if (ready) {\n-            start()\n+            start(options)\n+            log(\"started\")\n\n             return true\n         }\n"
+ },
+ {
+  "name": "indent-tabs",
+  "ext": "go",
+  "diff": "@@ -5,4 +5,4 @@ func f() {\n \t\ta := 1\n-\t\tb := 2\n+\t\tb := 3\n\n \t\treturn\n"
+ },
+ {
+  "name": "indent-mixed",
+  "ext": "py",
+  "diff": "@@ -1,4 +1,4 @@\n     x = 1\n-\ty = 2\n+\ty = 3\n     z = 4\n"
+ },
+ {
+  "name": "emphasis-pairs",
+  "ext": "ts",
+  "diff": "@@ -1,10 +1,10 @@\n-const userName = getName(id)\n-const total = price * quantity\n+const userLabel = getName(id)\n+const total = price * qty\n keep()\n-abc\n+xyz\n-removeOnly(1)\n-removeTwo(2)\n+addOnly(1)\n same()\n-foo(bar_baz)\n+foo(bar_qux)\n-\n+x\n"
+ },
+ {
+  "name": "emphasis-whole",
+  "ext": "ts",
+  "diff": "@@ -1,2 +1,2 @@\n-completely different line\n+another thing entirely here\n-prefix_same_suffix\n+prefix_same_suffix2\n"
+ },
+ {
+  "name": "unicode",
+  "ext": "ts",
+  "diff": "@@ -1,4 +1,4 @@\n-const greeting = \"héllo 👋 wörld\"\n+const greeting = \"héllo 👋🏽 wörld\"\n-const kanji = \"東京都\"\n+const kanji = \"京都府\"\n const flag = \"🇺🇸\" // country\n-const cafe = \"café\"\n+const café = \"café\"\n"
+ },
+ {
+  "name": "renamed",
+  "ext": "ts",
+  "diff": "diff --git a/old.ts b/new.ts\nsimilarity index 90%\nrename from old.ts\nrename to new.ts\nold mode 100644\nnew mode 100755\nindex 1..2\n--- a/old.ts\n+++ b/new.ts\n@@ -1,2 +1,2 @@\n-export const a = 1\n+export const a = 2\n export const b = 3\n"
+ },
+ {
+  "name": "deleted-file",
+  "ext": "ts",
+  "diff": "diff --git a/gone.ts b/gone.ts\ndeleted file mode 100644\n--- a/gone.ts\n+++ /dev/null\n@@ -1,2 +0,0 @@\n-export const a = 1\n-export const b = 2\n"
+ },
+ {
+  "name": "big-numbers",
+  "ext": "rs",
+  "diff": "@@ -998,4 +1002,5 @@ impl Thing {\n     fn a() {}\n-    fn b() {}\n+    fn b() -> u8 { 1 }\n+    fn c() {}\n     fn d() {}\n@@ -12000,2 +12005,2 @@\n-    x\n+    y\n"
+ },
+ {
+  "name": "no-trailing-newline",
+  "ext": "ts",
+  "diff": "@@ -1,2 +1,2 @@\n-a\n+b\n c"
+ },
+ {
+  "name": "malformed-hunk",
+  "ext": "ts",
+  "diff": "@@ broken\n+added\n context\n"
+ },
+ {
+  "name": "context-without-space",
+  "ext": "ts",
+  "diff": "@@ -1,3 +1,3 @@\nraw context\n-x\n+y\n"
+ },
+ {
+  "name": "crlf",
+  "ext": "ts",
+  "diff": "@@ -1,2 +1,2 @@\r\n-a = 1\r\n+a = 2\r\n"
+ },
+ {
+  "name": "crlf-mixed",
+  "ext": "ts",
+  "diff": "diff --git a/x b/x\r\n@@ -1,3 +1,3 @@ ctx\r\n keep\n-old\r\n+new\r\n\\ No newline at end of file"
+ },
+ {
+  "name": "chunked",
+  "ext": "ts",
+  "diff": "@@ -1,50 +1,50 @@ chunk\n     context 0\n     context 1\n     context 2\n     context 3\n     context 4\n     context 5\n     context 6\n     context 7\n     context 8\n     context 9\n     context 10\n     context 11\n     context 12\n     context 13\n     context 14\n     context 15\n     context 16\n     context 17\n     context 18\n     context 19\n-    old line 0 \n-    old line 1 x\n-    old line 2 xx\n-    old line 3 xxx\n-    old line 4 xxxx\n-    old line 5 xxxxx\n-    old line 6 xxxxxx\n-    old line 7 \n-    old line 8 x\n-    old line 9 xx\n-    old line 10 xxx\n-    old line 11 xxxx\n-    old line 12 xxxxx\n-    old line 13 xxxxxx\n-    old line 14 \n-    old line 15 x\n-    old line 16 xx\n-    old line 17 xxx\n-    old line 18 xxxx\n-    old line 19 xxxxx\n-    old line 20 xxxxxx\n-    old line 21 \n-    old line 22 x\n-    old line 23 xx\n-    old line 24 xxx\n-    old line 25 xxxx\n-    old line 26 xxxxx\n-    old line 27 xxxxxx\n-    old line 28 \n-    old line 29 x\n+    new line 0  // tail\n+    new line 1 y\n+    new line 2 yy\n+    new line 3 yyy\n+    new line 4 yyyy\n+    new line 5 yyyyy // tail\n+    new line 6 yyyyyy\n+    new line 7 yyyyyyy\n+    new line 8 yyyyyyyy\n+    new line 9 yyyyyyyyy\n+    new line 10 yyyyyyyyyy // tail\n+    new line 11 \n+    new line 12 y\n+    new line 13 yy\n+    new line 14 yyy\n+    new line 15 yyyy // tail\n+    new line 16 yyyyy\n+    new line 17 yyyyyy\n+    new line 18 yyyyyyy\n+    new line 19 yyyyyyyy\n+    new line 20 yyyyyyyyy // tail\n+    new line 21 yyyyyyyyyy\n+    new line 22 \n+    new line 23 y\n+    new line 24 yy\n+    new line 25 yyy // tail\n+    new line 26 yyyy\n+    new line 27 yyyyy\n+    new line 28 yyyyyy\n+    new line 29 yyyyyyy\n"
+ },
+ {
+  "name": "hl-swift",
+  "ext": "swift",
+  "lines": [
+   "let x = 0b1010 + 0o17 + 1.5e3 // done",
+   "/* starts",
+   "",
+   "middle */ var y = \"a\\\\\"",
+   "",
+   "s = \"unterminated",
+   "ident1 2ident _x $y"
+  ]
+ },
+ {
+  "name": "hl-yaml",
+  "ext": "yaml",
+  "lines": [
+   "key: value",
+   "  - name: x # comment",
+   "- plain",
+   "'quoted': 1",
+   "a:b",
+   "---",
+   "key:",
+   "  :",
+   "   : x",
+   "url: \"http://x:1\"",
+   "on: yes"
+  ]
+ },
+ {
+  "name": "hl-html",
+  "ext": "html",
+  "lines": [
+   "<!-- one",
+   "two",
+   "three --> <b>4</b>"
+  ]
+ },
+ {
+  "name": "hl-plain",
+  "ext": "txt",
+  "lines": [
+   "anything // here",
+   ""
+  ]
+ },
+ {
+  "name": "hl-numbers",
+  "ext": "js",
+  "lines": [
+   "a1 1a 0xFF 1_000.5 x.5 .5 ２３ １",
+   "foo(12)+bar[3]"
+  ]
+ }
+]

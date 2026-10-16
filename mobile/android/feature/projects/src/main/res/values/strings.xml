@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Projects list -->
+    <string name="projects_title">Projects</string>
+    <string name="projects_updated">Updated %1$s</string>
+    <string name="projects_stale_footer">Projects open read-only until your Mac is back. Start and Stop wait for it, for up to 2 minutes.</string>
+    <string name="projects_none">No projects</string>
+    <string name="projects_more">More</string>
+    <string name="projects_more_needs_you">More — an agent needs you</string>
+    <string name="projects_more_automations">More — automations have new messages</string>
+    <string name="menu_activity">Activity</string>
+    <string name="menu_automations">Automations</string>
+    <string name="menu_automations_count">Automations (%1$d)</string>
+    <string name="menu_stats">Stats</string>
+    <string name="menu_usage">Usage</string>
+    <string name="menu_settings">Settings</string>
+    <string name="menu_add_project">Add Project…</string>
+    <string name="menu_new_folder">New Folder…</string>
+    <string name="demo_banner">Demo — sample projects</string>
+    <string name="demo_exit">Exit</string>
+
+    <!-- Mac title and switcher -->
+    <string name="mac_default_name">Mac</string>
+    <string name="mac_status_detail">%1$s · %2$s</string>
+    <plurals name="mac_waiting">
+        <item quantity="one">%1$d waiting</item>
+        <item quantity="other">%1$d waiting</item>
+    </plurals>
+    <string name="mac_details">Details</string>
+    <string name="mac_status_hint">Shows how this phone reaches the Mac</string>
+    <string name="mac_exit_demo">Exit Demo</string>
+    <string name="mac_add">Add a machine…</string>
+    <string name="mac_manage">Manage machines…</string>
+    <string name="mac_online">Online</string>
+    <string name="mac_checking">Checking…</string>
+    <string name="mac_not_answering">Not answering right now</string>
+    <string name="mac_last_connected">Last connected %1$s</string>
+
+    <!-- Machines the live Mac connects to -->
+    <string name="machine_section_through_mac">Opens through this Mac</string>
+    <string name="machine_section_adding">Adding to this phone…</string>
+    <string name="machine_section_not_on_phone">Not on this phone</string>
+    <string name="machine_section_needs_update">Update lpm on it to open it here</string>
+    <string name="machine_section_open">Open</string>
+    <string name="machine_section_switch">Switch to %1$s</string>
+    <string name="visit_unavailable">Project unavailable</string>
+
+    <!-- Project rows -->
+    <string name="row_config_error">Config error</string>
+    <plurals name="row_terminals">
+        <item quantity="one">%1$d terminal</item>
+        <item quantity="other">%1$d terminals</item>
+    </plurals>
+    <string name="queued_waiting">%1$s · waiting for the Mac</string>
+    <string name="queued_expired">%1$s wasn\'t sent</string>
+    <string name="queued_cancel">Cancel</string>
+    <string name="queued_retry">Try again</string>
+    <string name="queued_dismiss">Dismiss</string>
+    <string name="dot_separator">·</string>
+
+    <!-- Row actions -->
+    <string name="row_start_with_profile">Start with profile</string>
+    <string name="row_move_to_folder">Move to folder</string>
+    <string name="row_new_folder">New folder…</string>
+    <string name="row_no_folder">No folder</string>
+    <string name="row_duplicate">Duplicate</string>
+    <string name="row_remove">Remove</string>
+    <string name="row_remove_duplicate">Remove duplicate</string>
+    <string name="folder_rename">Rename folder</string>
+    <string name="folder_delete">Delete folder</string>
+
+    <!-- Dialogs -->
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="save">Save</string>
+    <string name="remove_title">Remove duplicate?</string>
+    <string name="project_remove_message">This deletes “%1$s” and its folder from disk. This can\'t be undone.</string>
+    <string name="folder_new_title">New folder</string>
+    <string name="folder_name">Folder name</string>
+    <string name="folder_create">Create</string>
+    <string name="folder_create_move">Create &amp; move</string>
+    <string name="folder_move_message">Move “%1$s” into a new folder.</string>
+    <string name="folder_rename_title">Rename folder</string>
+    <string name="folder_delete_title">Delete folder?</string>
+    <string name="folder_delete_message">“%1$s” is removed and its projects move back out to the top level. The projects themselves aren\'t deleted.</string>
+    <string name="session_error_title">Couldn\'t complete that</string>
+    <string name="session_notice_title">Heads up</string>
+
+    <!-- Duplicate progress -->
+    <string name="duplicating">Duplicating %1$s</string>
+    <string name="duplicating_progress">%1$d of %2$d</string>
+    <string name="duplicating_working">Working…</string>
+
+    <!-- Work status -->
+    <string name="status_menu">Status</string>
+    <string name="status_clear">Clear %1$s</string>
+    <string name="status_note_blocked_placeholder">Waiting on…</string>
+    <string name="status_note_placeholder">What\'s going on…</string>
+    <string name="status_note_blocked_message">What is blocking %1$s? It shows under the name in the projects list.</string>
+    <string name="status_note_message">A line about %1$s, shown under its name in the projects list.</string>
+
+    <!-- Duplicate options -->
+    <string name="duplicate_title">Duplicate %1$s</string>
+    <string name="duplicate_copies">Copies</string>
+    <string name="duplicate_auto_named">Auto-named</string>
+    <string name="duplicate_single_footer">A label to recognize the copy by. Leave blank to name it automatically.</string>
+    <string name="duplicate_labels">Labels</string>
+    <string name="duplicate_copy_auto_named">Copy %1$d — auto-named</string>
+    <string name="duplicate_labels_footer">Leave a field blank to name that copy automatically.</string>
+    <string name="duplicate_folder_name">Folder name (optional)</string>
+    <string name="duplicate_folder_footer">Group the copies under a sidebar folder. Leave blank to keep them loose.</string>
+    <string name="duplicate_run_header">Run on each copy</string>
+    <string name="duplicate_run_nothing">Nothing</string>
+    <string name="duplicate_run_action">Action</string>
+    <string name="duplicate_run_command">Command</string>
+    <string name="duplicate_prompt">Prompt for an AI agent (optional)</string>
+    <string name="duplicate_run_footer">Runs in each new copy\'s terminal once it\'s ready. The prompt is sent only if the command starts an AI agent. Requires the lpm app open on your Mac.</string>
+    <string name="duplicate_options">Options</string>
+    <string name="duplicate_committed_only">Committed work only</string>
+    <string name="duplicate_pull_latest">Pull latest changes</string>
+    <string name="duplicate_reinstall">Reinstall dependencies</string>
+    <string name="duplicate_run_one">Run on the copy</string>
+    <plurals name="duplicate_run_many">
+        <item quantity="one">Run on %1$d copy</item>
+        <item quantity="other">Run on %1$d copies</item>
+    </plurals>
+    <plurals name="duplicate_create">
+        <item quantity="one">Create %1$d copy</item>
+        <item quantity="other">Create %1$d copies</item>
+    </plurals>
+
+    <!-- Project menu -->
+    <string name="menu_actions">Actions</string>
+    <string name="menu_stop">Stop</string>
+    <string name="menu_start">Start</string>
+    <string name="menu_review_changes">Review Changes</string>
+    <plurals name="menu_changed_files">
+        <item quantity="one">%1$d changed file</item>
+        <item quantity="other">%1$d changed files</item>
+    </plurals>
+    <string name="menu_git">Git</string>
+    <string name="menu_memory">Memory</string>
+    <string name="menu_notes">Notes</string>
+    <plurals name="menu_new_runs">
+        <item quantity="one">%1$d with new runs</item>
+        <item quantity="other">%1$d with new runs</item>
+    </plurals>
+    <string name="menu_profiles">Profiles</string>
+    <string name="menu_rename">Rename…</string>
+    <string name="menu_configure">Configure…</string>
+    <string name="menu_terminal_settings">Terminal Settings</string>
+    <string name="git_pull">Pull</string>
+    <string name="git_push">Push</string>
+    <string name="git_fetch">Fetch</string>
+    <string name="git_switch_branch">Switch Branch…</string>
+    <string name="git_create_pr">Create Pull Request…</string>
+    <string name="git_auto_running">Running… tap to view</string>
+    <string name="git_copy_branch">Copy Branch Name</string>
+    <string name="git_discard">Discard All Changes…</string>
+    <string name="auto_pull">Auto Pull</string>
+    <string name="auto_pull_selected">selected</string>
+    <string name="auto_pull_undo">Undo Auto Pull</string>
+    <string name="auto_pull_on">On</string>
+    <string name="auto_pull_off">Off</string>
+    <string name="auto_pull_default">Default (%1$s)</string>
+    <string name="auto_pull_same_as">Same as %1$s (%2$s)</string>
+    <string name="rename_project_title">Rename project</string>
+    <string name="rename_project_message">Set a display name for this project. Leave it blank to use the project id.</string>
+    <string name="rename_project_field">Project name</string>
+    <string name="discard_title">Discard all changes?</string>
+    <string name="discard_message">This permanently discards every uncommitted change in this project. This can\'t be undone.</string>
+    <string name="discard_confirm">Discard changes</string>
+
+    <!-- Project detail -->
+    <string name="back">Back</string>
+    <string name="detail_running">Running</string>
+    <string name="detail_stopped">Stopped</string>
+    <string name="detail_invalid_config">Invalid configuration</string>
+    <string name="detail_tabs">Tabs</string>
+    <string name="detail_new_tab">New tab</string>
+    <plurals name="detail_services">
+        <item quantity="one">Services · %1$d of %2$d running</item>
+        <item quantity="other">Services · %1$d of %2$d running</item>
+    </plurals>
+    <string name="detail_stop_all">Stop all</string>
+    <string name="detail_services_footer">Tap a service for its logs.</string>
+    <string name="detail_no_terminals">No Terminals</string>
+    <string name="detail_no_terminals_message">Open a terminal to work in this project.</string>
+    <string name="detail_new_terminal">New Terminal</string>
+    <string name="detail_edit_config">Edit Configuration File</string>
+    <string name="detail_retry">Retry</string>
+    <string name="tab_pin">Pin</string>
+    <string name="tab_unpin">Unpin</string>
+    <string name="tab_rename">Rename</string>
+    <string name="tab_close">Close</string>
+    <string name="tab_remote">Remote</string>
+    <string name="tab_rename_title">Rename terminal</string>
+    <string name="tab_rename_field">Name</string>
+
+    <!-- Service logs -->
+    <string name="logs_close">Close</string>
+    <string name="logs_stop">Stop</string>
+    <string name="logs_start">Start</string>
+    <string name="logs_stopping">Stopping…</string>
+    <string name="logs_starting">Starting…</string>
+    <string name="logs_running">Running</string>
+    <string name="logs_stopped">Stopped</string>
+    <string name="logs_waiting">Waiting for output…</string>
+    <string name="logs_not_running">This service isn\'t running.</string>
+
+    <!-- Service editor -->
+    <string name="service_add_title">Add Service</string>
+    <string name="service_edit_title">Edit Service</string>
+    <string name="service_loading">Loading service…</string>
+    <string name="service_save_failed">Couldn\'t save service</string>
+    <string name="service_load_failed">Couldn\'t load service</string>
+    <string name="service_delete_title">Delete this service?</string>
+    <string name="service_delete_message">Remove it from this project and from any profiles that use it. This can\'t be undone.</string>
+    <string name="service_delete_confirm">Delete</string>
+    <string name="service_delete">Delete service</string>
+    <string name="service_name">Name</string>
+    <string name="service_name_footer">Lowercase letters, digits, and dashes.</string>
+    <string name="service_command">Command</string>
+    <string name="service_advanced">Advanced</string>
+    <string name="service_cwd">Working directory</string>
+    <string name="service_port">Port</string>
+    <string name="service_port_busy">When the port is busy</string>
+    <string name="service_port_ask">Ask</string>
+    <string name="service_port_free">Free it</string>
+    <string name="service_port_fail">Don\'t start</string>
+    <string name="service_port_ask_hint">Asks before freeing the port.</string>
+    <string name="service_port_free_hint">Frees the port automatically before starting.</string>
+    <string name="service_port_fail_hint">Won\'t start while the port is in use.</string>
+    <string name="service_depends_on">Depends on</string>
+    <string name="service_depends_on_footer">These services start first and turn on automatically with this one.</string>
+    <string name="service_env">Environment variables</string>
+    <string name="service_env_add">Add variable</string>
+    <string name="service_env_delete">Delete</string>
+</resources>

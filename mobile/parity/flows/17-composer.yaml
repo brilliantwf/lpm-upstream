@@ -1,0 +1,73 @@
+# The terminal composer: send a message, the "+" menu, the history sheet, the
+# rewrite sheet, then the agent terminal's seeded draft and its slash and @
+# suggestions. The key bar's "Hide keyboard" closes the keyboard on both phones
+# (Maestro's hideKeyboard can't on iOS).
+appId: cx.lpm.mobile
+name: 17-composer
+tags: [demo, terminal, composer]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Terminal 1"
+    timeout: 5000
+- tapOn: "Terminal 1"
+- extendedWaitUntil:
+    visible: "Message"
+    timeout: 10000
+- tapOn: "Message"
+- inputText: "echo hello"
+- takeScreenshot: 1-typed
+- tapOn: "Send"
+- extendedWaitUntil:
+    visible: "Message"
+    timeout: 5000
+- tapOn: "Hide keyboard"
+- tapOn: "Add"
+- extendedWaitUntil:
+    visible: "Photo Library"
+    timeout: 3000
+- takeScreenshot: 2-plus-menu
+- tapOn: "History"
+- extendedWaitUntil:
+    visible: "Favorites"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 3-history
+- tapOn: "Fix the checkout button spacing on mobile"
+- extendedWaitUntil:
+    notVisible: "Favorites"
+    timeout: 5000
+- tapOn: "Add"
+- tapOn: "Rewrite with AI"
+- extendedWaitUntil:
+    visible: "Improve writing"
+    timeout: 5000
+- takeScreenshot: 4-rewrite
+- tapOn: "Cancel"
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Claude"
+    timeout: 5000
+- tapOn: "Claude"
+- extendedWaitUntil:
+    visible: "Add Apple Pay as a payment option in the new checkout flow"
+    timeout: 10000
+- tapOn: "Send"
+- extendedWaitUntil:
+    visible: "Message"
+    timeout: 5000
+- tapOn: "Message"
+- inputText: "/re"
+- extendedWaitUntil:
+    visible: "/review"
+    timeout: 5000
+- takeScreenshot: 5-slash
+- tapOn: "/review"
+- inputText: "@"
+- extendedWaitUntil:
+    visible: "app/checkout/page.tsx"
+    timeout: 5000
+- takeScreenshot: 6-mention

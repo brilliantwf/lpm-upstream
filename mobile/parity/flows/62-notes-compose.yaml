@@ -1,0 +1,46 @@
+# Writing a note: it lands at the bottom of the thread, then a long press offers
+# Edit, Copy and Delete.
+appId: cx.lpm.mobile
+name: 62-notes-compose
+tags: [demo, notes]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Notes"
+    timeout: 5000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Notes"
+      - extendedWaitUntil:
+          visible: "Ideas"
+          timeout: 5000
+- tapOn: "Ideas"
+- extendedWaitUntil:
+    visible: ".*keep the confirmation page calm for now."
+    timeout: 5000
+- tapOn: "Write a note…"
+- inputText: "Ask support about gift notes"
+- takeScreenshot: 1-typed
+- tapOn: "Send"
+- extendedWaitUntil:
+    visible: "Write a note…"
+    timeout: 5000
+- assertVisible: "Ask support about gift notes"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-sent
+- longPressOn: "Ask support about gift notes"
+- extendedWaitUntil:
+    visible: "Copy"
+    timeout: 3000
+- assertVisible: "Edit"
+- assertVisible: "Delete"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 3-note-menu

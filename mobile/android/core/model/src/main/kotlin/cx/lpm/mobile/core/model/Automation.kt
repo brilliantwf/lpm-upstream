@@ -1,0 +1,192 @@
+package cx.lpm.mobile.core.model
+
+import kotlinx.serialization.json.JsonObject
+
+/** One automation (the Mac's JobInfo). Timestamps are unix seconds. */
+data class AutomationJob(
+    val id: String,
+    val project: String,
+    val valid: Boolean,
+    val source: String,
+    val error: String,
+    val label: String,
+    val emoji: String,
+    val enabled: Boolean,
+    val duplicate: Boolean,
+    val runKind: String,
+    /** What the job runs, in one piece: the prompt, the command, or the action's name. */
+    val summary: String,
+    val scheduleMode: String,
+    // The five-field line of a `cron` schedule, as written; empty otherwise.
+    val cron: String,
+    val everySecs: Int,
+    val atMinutes: Int,
+    val days: List<String>,
+    // Randomized timing, absent on a schedule that fires at a fixed point:
+    // `everyMaxSecs` and `untilMinutes` open the schedule into a range the run
+    // time is drawn from, `times` puts several runs in that window, and
+    // `pickDays` uses only some of `days` each week.
+    val everyMaxSecs: Int,
+    val untilMinutes: Int?,
+    val times: Int,
+    val pickDays: Int,
+    // Further fixed times, and days that aren't weekdays: dates of the month
+    // (with each month's last day), a position in the month ("first" "mon"),
+    // or one-off calendar dates. An interval held to some hours carries
+    // `fromMinutes`..`untilMinutes` and its `days`. Older servers omit them all.
+    val alsoAtMinutes: List<Int>,
+    val monthDays: List<Int>,
+    val lastDay: Boolean,
+    val shortMonths: String,
+    val nth: String,
+    val nthOf: String,
+    val onDates: List<String>,
+    val fromMinutes: Int?,
+    val lastRunAt: Long?,
+    val lastResult: String,
+    val nextFireAt: Long?,
+    val running: Boolean,
+    val runningSince: Long?,
+    val agent: String,
+    val model: String,
+    val effort: String,
+    // Which projects the job runs in. A project- or repo-layer job carries its one
+    // owning project; a global-layer job collapses to a single row whose `targets`
+    // are every project it covers ([] when it is standalone).
+    val targets: List<String>,
+    val targetCount: Int,
+    val runningCount: Int,
+    val standalone: Boolean,
+    /** Runs that landed since this automation was last read, folded across its projects. */
+    val unread: Int
+) {
+    val key: String get() = runProject + "\n" + id
+    val displayName: String get() = label.ifEmpty { id }
+
+    /**
+     * The projects this job runs in — none when it is standalone. Older servers
+     * omit `targets`, in which case the job's own project stands for it.
+     */
+    val runsIn: List<String>
+        get() = when {
+            standalone -> emptyList()
+            targets.isNotEmpty() -> targets
+            else -> if (project.isEmpty()) emptyList() else listOf(project)
+        }
+
+    /**
+     * Every folder the job runs in, keyed the way the Mac keys run state: a
+     * standalone job's is the sentinel "" (the home folder).
+     */
+    val runTargets: List<String> get() = if (standalone) listOf("") else runsIn
+
+    /**
+     * The one project to address this job by — a global-layer row carries only its
+     * `targets`, never a `project` of its own.
+     */
+    val runProject: String get() = runTargets.firstOrNull().orEmpty()
+
+    companion object {
+        fun parse(o: JsonObject): AutomationJob {
+            val schedule = o.obj("schedule") ?: JsonObject(emptyMap())
+            return AutomationJob(
+                id = o.string("id").orEmpty(),
+                project = o.string("project").orEmpty(),
+                valid = o.bool("valid") ?: false,
+                source = o.string("source").orEmpty(),
+                error = o.string("error").orEmpty(),
+                label = o.string("label").orEmpty(),
+                emoji = o.string("emoji").orEmpty(),
+                enabled = o.bool("enabled") ?: false,
+                duplicate = o.bool("duplicate") ?: false,
+                runKind = o.string("runKind").orEmpty(),
+                summary = o.string("description").orEmpty(),
+                scheduleMode = schedule.string("mode").orEmpty(),
+                cron = schedule.string("cron").orEmpty(),
+                everySecs = schedule.int("everySecs") ?: 0,
+                atMinutes = schedule.int("atMinutes") ?: 0,
+                days = schedule.strings("days").orEmpty(),
+                everyMaxSecs = schedule.int("everyMaxSecs") ?: 0,
+                untilMinutes = schedule.int("untilMinutes"),
+                times = schedule.int("times") ?: 1,
+                pickDays = schedule.int("pickDays") ?: 0,
+                alsoAtMinutes = schedule.ints("alsoAtMinutes").orEmpty(),
+                monthDays = schedule.ints("monthDays").orEmpty(),
+                lastDay = schedule.bool("lastDay") ?: false,
+                shortMonths = schedule.string("shortMonths").orEmpty(),
+                nth = schedule.string("nth").orEmpty(),
+                nthOf = schedule.string("nthOf").orEmpty(),
+                onDates = schedule.strings("onDates").orEmpty(),
+                fromMinutes = schedule.int("fromMinutes"),
+                lastRunAt = o.long("lastRunAt"),
+                lastResult = o.string("lastResult").orEmpty(),
+                nextFireAt = o.long("nextFireAt"),
+                running = o.bool("running") ?: false,
+                runningSince = o.long("runningSince"),
+                agent = o.string("agent").orEmpty(),
+                model = o.string("model").orEmpty(),
+                effort = o.string("effort").orEmpty(),
+                targets = o.strings("targets").orEmpty(),
+                targetCount = o.int("targetCount") ?: 0,
+                runningCount = o.int("runningCount") ?: 0,
+                standalone = o.bool("standalone") ?: false,
+                unread = o.int("unread") ?: 0
+            )
+        }
+    }
+}
+
+/** One run of an automation (the Mac's JobHistoryEntry). Timestamps are unix seconds. */
+data class AutomationHistoryEntry(
+    val at: Long,
+    val result: String,
+    val count: Int,
+    val copy: String,
+    val output: String,
+    val durationSecs: Int?,
+    val costUsd: Double?,
+    val question: String,
+    val session: String,
+    val resumed: String,
+    val follows: Long?,
+    val compacted: Boolean,
+    /**
+     * Whether the job's after-the-run check passed. null means the job declares no
+     * check, or there was no live run to check — unverified, not failed.
+     */
+    val verified: Boolean?,
+    /** The run landed after this automation was last read. */
+    val unread: Boolean
+) {
+    val id: Long get() = at
+
+    companion object {
+        fun parse(o: JsonObject): AutomationHistoryEntry = AutomationHistoryEntry(
+            at = o.long("at") ?: 0,
+            result = o.string("result").orEmpty(),
+            count = o.int("count") ?: 1,
+            copy = o.string("copy").orEmpty(),
+            output = o.string("output").orEmpty(),
+            durationSecs = o.int("durationSecs"),
+            costUsd = o.number("costUsd"),
+            question = o.string("question").orEmpty(),
+            session = o.string("session").orEmpty(),
+            resumed = o.string("resumed").orEmpty(),
+            follows = o.long("follows"),
+            compacted = o.bool("compacted") ?: false,
+            verified = o.bool("verified"),
+            unread = o.bool("unread") ?: false
+        )
+    }
+}
+
+data class AutomationLiveOutput(val startedAt: Long, val text: String) {
+    companion object {
+        fun parse(o: JsonObject?): AutomationLiveOutput? = o?.let {
+            AutomationLiveOutput(
+                startedAt = it.long("startedAt") ?: 0,
+                text = it.string("text").orEmpty()
+            )
+        }
+    }
+}

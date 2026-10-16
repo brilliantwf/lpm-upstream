@@ -1,0 +1,33 @@
+appId: cx.lpm.mobile
+name: 15-enter-code-hint
+tags: [pairing]
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Pair for this Wi-Fi only"
+    timeout: 15000
+- tapOn: "Pair for this Wi-Fi only"
+- tapOn: "Enter a code"
+- extendedWaitUntil:
+    visible: "Enter a Code"
+    timeout: 5000
+- inputText: "AB12CD34"
+- tapOn: "192.168.1.20"
+- inputText: "100.64.1.2"
+- extendedWaitUntil:
+    visible: "Tailscale address — works from anywhere."
+    timeout: 5000
+- takeScreenshot: 1-tailscale-hint
+# With the keyboard up, Android's navigation bar shows the keyboard's own "Back"
+# (android:id/input_method_nav_back), which Maestro picks over the screen's back
+# button and which only hides the keyboard. Hide it first so "Back" is the screen's.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible: "Connect to your Mac"
+    timeout: 5000

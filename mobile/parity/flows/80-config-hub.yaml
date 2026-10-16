@@ -1,0 +1,41 @@
+appId: cx.lpm.mobile
+name: 80-config-hub
+tags: [demo, config]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+# "Configure…" in the project's "…" menu: services, profiles, actions, the raw file.
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Configure…"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Configure…"
+      - extendedWaitUntil:
+          visible: "Configuration"
+          timeout: 5000
+- assertVisible: "Port 3000"
+- assertVisible: "Port 4000"
+- assertVisible: "Add Service"
+- assertVisible: "Add Profile"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-configuration
+- scrollUntilVisible:
+    element: "Edit Configuration File"
+- assertVisible: "Add Action"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-actions
+- tapOn: "Done"
+- extendedWaitUntil:
+    notVisible: "Configuration"
+    timeout: 5000
+- assertVisible: "Tabs"

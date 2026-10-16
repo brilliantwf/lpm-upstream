@@ -1,0 +1,37 @@
+appId: cx.lpm.mobile
+name: 36-stats-periods
+tags: [demo, stats]
+---
+- runFlow: subflows/enter-demo.yaml
+- runFlow: subflows/open-more-menu.yaml
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Stats.*"
+      - extendedWaitUntil:
+          visible: "Token activity"
+          timeout: 5000
+- tapOn: "Today"
+- extendedWaitUntil:
+    visible: "so far today"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-today
+- tapOn: "7 days"
+- extendedWaitUntil:
+    visible: "peak.*"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-7-days
+- tapOn: "All time"
+- waitForAnimationToEnd:
+    timeout: 3000
+- scrollUntilVisible:
+    element: "Recent sessions"
+    direction: DOWN
+- scrollUntilVisible:
+    element: ".*local history files scanned"
+    direction: DOWN
+- takeScreenshot: 3-all-time-bottom

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- lpm updates: the bar under the projects list -->
+    <string name="mac_update_checking_for_updates">Checking for updates…</string>
+    <string name="mac_update_up_to_date_title">lpm is up to date</string>
+    <string name="mac_update_check_failed">Couldn\'t check for updates</string>
+    <string name="mac_update_failed">Couldn\'t update lpm</string>
+    <string name="mac_update_lpm">lpm</string>
+    <string name="mac_update_lpm_release">lpm %1$s</string>
+    <string name="mac_update_updating_to">Updating to %1$s</string>
+    <string name="mac_update_installing_target">Installing %1$s…</string>
+    <string name="mac_update_restarting">Restarting lpm…</string>
+    <string name="mac_update_updated_to_lpm">Updated to lpm %1$s</string>
+    <string name="mac_update_available">%1$s is available</string>
+    <string name="mac_update_runs">This Mac runs %1$s</string>
+    <string name="mac_update_cancelling">Cancelling…</string>
+    <string name="mac_update_checking">Checking…</string>
+    <string name="mac_update_downloading">Downloading…</string>
+    <string name="mac_update_restarts_when_done">lpm restarts when it\'s done</string>
+    <string name="mac_update_reconnects">lpm Link reconnects when it\'s back</string>
+    <string name="mac_update_reconnected">Restarted and reconnected</string>
+    <string name="mac_update_update">Update</string>
+    <string name="mac_update_try_again">Try Again</string>
+    <string name="mac_update_cancel">Cancel</string>
+    <string name="mac_update_close">Close</string>
+
+    <!-- lpm updates: the warning before an update cuts agents off -->
+    <string name="mac_update_busy_one">An agent is still running</string>
+    <string name="mac_update_busy_many">Agents are still running</string>
+    <plurals name="mac_update_agents">
+        <item quantity="one">an agent</item>
+        <item quantity="other">%1$d agents</item>
+    </plurals>
+    <string name="mac_update_busy_message">Updating restarts lpm on %1$s, which stops %2$s mid-task in %3$s.</string>
+    <string name="mac_update_anyway">Update Anyway</string>
+
+    <!-- lpm updates: the connection sheet's section and the "…" menu -->
+    <string name="mac_update_section">lpm</string>
+    <string name="mac_update_version">Version</string>
+    <string name="mac_update_status">Status</string>
+    <string name="mac_update_status_up_to_date">Up to date</string>
+    <string name="mac_update_to">Update to %1$s</string>
+    <string name="mac_update_updated_to">Updated to %1$s</string>
+    <string name="mac_update_downloading_percent">Downloading · %1$d%%</string>
+    <string name="mac_update_installing">Installing…</string>
+    <string name="mac_update_footer">Updating restarts lpm there, which stops agents mid-task. Running services keep going.</string>
+    <string name="mac_update_check_now">Check for lpm Updates…</string>
+
+    <!-- Machines the live Mac connects to -->
+    <string name="mac_machines_connected_to">Connected to %1$s</string>
+    <string name="mac_machines_this_mac">this Mac</string>
+    <string name="mac_machines_adding">Adding…</string>
+    <string name="mac_machines_failed">%1$s Tap to try again.</string>
+    <string name="mac_machines_tap_to_add">Tap to add</string>
+    <string name="mac_machines_offline">Offline</string>
+    <string name="mac_machines_needs_update">Update lpm on it to add it here</string>
+    <string name="mac_machines_pair_directly">Pair Directly with %1$s</string>
+    <string name="mac_machines_pair_directly_detail">Get its notifications and open it while this Mac sleeps</string>
+</resources>

@@ -90,6 +90,7 @@ struct NotesComposer: View {
                 .frame(width: 34, height: 34)
                 .contentShape(Rectangle())
         }
+        .accessibilityLabel("Attach")
     }
 
     private var field: some View {
@@ -117,6 +118,7 @@ struct NotesComposer: View {
         }
         .buttonStyle(.plain)
         .disabled(!hasContent || isSending || isEncoding)
+        .accessibilityLabel("Send")
     }
 
     private var chips: some View {
@@ -255,6 +257,7 @@ private struct NotePendingChip: View {
             }
             .buttonStyle(.plain)
             .offset(x: 5, y: -5)
+            .accessibilityLabel("Remove")
         }
     }
 

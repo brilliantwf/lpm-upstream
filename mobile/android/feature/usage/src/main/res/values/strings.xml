@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="back">Back</string>
+    <string name="try_again">Try Again</string>
+
+    <!-- Stats -->
+    <string name="stats_title">Stats</string>
+    <string name="stats_period_today">Today</string>
+    <string name="stats_period_7">7 days</string>
+    <string name="stats_period_30">30 days</string>
+    <string name="stats_period_all">All time</string>
+    <string name="stats_total_tokens">Total tokens</string>
+    <string name="stats_input">Input</string>
+    <string name="stats_output">Output</string>
+    <string name="stats_sessions">Sessions</string>
+    <string name="stats_cost">≈ %1$s</string>
+    <string name="stats_so_far_today">so far today</string>
+    <string name="stats_peak">peak %1$s · %2$s</string>
+    <string name="stats_from_cache">%1$s from cache</string>
+    <string name="stats_no_cache">no cache</string>
+    <string name="stats_reasoning">%1$s reasoning</string>
+    <string name="stats_no_reasoning">no reasoning tokens</string>
+    <string name="stats_projects_models">%1$s · %2$s</string>
+    <plurals name="stats_projects">
+        <item quantity="one">%1$d project</item>
+        <item quantity="other">%1$d projects</item>
+    </plurals>
+    <plurals name="stats_models">
+        <item quantity="one">%1$d model</item>
+        <item quantity="other">%1$d models</item>
+    </plurals>
+    <plurals name="stats_session_count">
+        <item quantity="one">%1$d session</item>
+        <item quantity="other">%1$d sessions</item>
+    </plurals>
+    <string name="stats_sessions_share">%1$s · %2$s</string>
+    <string name="stats_token_activity">Token activity</string>
+    <string name="stats_providers">Providers</string>
+    <string name="stats_no_providers">No provider usage yet</string>
+    <string name="stats_top_projects">Top projects</string>
+    <string name="stats_nothing_in">Nothing in %1$s</string>
+    <plurals name="stats_more">
+        <item quantity="one">+%1$d more</item>
+        <item quantity="other">+%1$d more</item>
+    </plurals>
+    <string name="stats_recent_sessions">Recent sessions</string>
+    <string name="stats_session_meta">%1$s · %2$s</string>
+    <string name="stats_privacy">Usage metadata stays on your Mac. Prompts and responses aren\'t included.</string>
+    <string name="stats_files_scanned">%1$s local history files scanned</string>
+    <string name="stats_empty_title">No local agent usage found</string>
+    <string name="stats_empty_text">lpm reads token usage from Claude Code and Codex session histories. Usage appears here after an agent runs inside a local project.</string>
+    <string name="stats_error_title">Couldn\'t load stats</string>
+
+    <!-- Usage -->
+    <string name="usage_title">Usage</string>
+    <string name="usage_claude">Claude</string>
+    <string name="usage_codex">Codex</string>
+    <string name="usage_claude_waiting">Waiting for a Claude session. Your usage appears here as soon as you run Claude in a project.</string>
+    <string name="usage_claude_off">Claude usage is off on this Mac. Turn it on in lpm on your Mac and the meters appear here.</string>
+    <string name="usage_codex_waiting">Codex usage appears here automatically the first time you run Codex in a project.</string>
+    <string name="usage_footer">Live plan usage for your AI coding tools</string>
+    <string name="usage_refresh_failed">Couldn\'t refresh — these are the last numbers your Mac sent.</string>
+    <string name="usage_error_title">Couldn\'t load usage</string>
+    <string name="usage_pull_to_refresh">Pull to refresh.</string>
+    <string name="usage_weekly">Weekly</string>
+    <string name="usage_five_hour">5-hour</string>
+    <string name="usage_percent">%</string>
+    <string name="usage_no_value">—</string>
+    <string name="usage_meter_label">%1$s window usage</string>
+
+    <!-- Usage rows -->
+    <string name="rows_header">Usage</string>
+    <string name="rows_details">Details</string>
+    <string name="rows_in_use">in use</string>
+    <string name="rows_pool">pool</string>
+    <string name="rows_hint_hide">Hides the details</string>
+    <string name="rows_hint_show">Shows both windows</string>
+    <string name="rows_value">%1$s of the %2$s window used, resets in %3$s</string>
+    <string name="rows_value_lane">%1$s; %2$s</string>
+    <string name="rows_switch_to">Switch to %1$s</string>
+    <string name="rows_always_use">Always use %1$s</string>
+    <string name="rows_using">Using %1$s</string>
+    <string name="rows_new_sessions_in">New sessions in %1$s</string>
+    <string name="rows_new_sessions_now">New sessions in %1$s use it now</string>
+    <string name="rows_new_sessions_always">New sessions in %1$s always use it</string>
+    <string name="rows_no_window">No usage window reported yet.</string>
+</resources>

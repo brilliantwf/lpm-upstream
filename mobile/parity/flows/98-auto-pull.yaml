@@ -1,0 +1,71 @@
+appId: cx.lpm.mobile
+name: 98-auto-pull
+tags: [demo, projects, git]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Review Changes.*"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+# Under load iOS can drop a tap on a menu that's still settling; tap again if so.
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Git"
+      - extendedWaitUntil:
+          visible: "Auto Pull"
+          timeout: 5000
+# The row reads "Auto Pull" alone; its choices name what following resolves to.
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Auto Pull"
+      - extendedWaitUntil:
+          visible: "Default \\(On\\)"
+          timeout: 5000
+- assertVisible: "On"
+- assertVisible: "Off"
+- assertVisible:
+    text: "selected"
+    above: "On"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-auto-pull
+- tapOn: "Off"
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Review Changes.*"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+# Under load iOS can drop a tap on a menu that's still settling; tap again if so.
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Git"
+      - extendedWaitUntil:
+          visible: "Auto Pull"
+          timeout: 5000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Auto Pull"
+      - extendedWaitUntil:
+          visible: "Default \\(On\\)"
+          timeout: 5000
+# The checkmark moved to Off, under On.
+- assertVisible:
+    text: "selected"
+    below: "On"
+- assertNotVisible:
+    text: "selected"
+    above: "On"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-off

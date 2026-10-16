@@ -80,7 +80,10 @@ struct ParsedDiff {
     /// Parses hunk by hunk so each hunk's common leading indentation is trimmed and
     /// old/new line numbers are assigned by walking from the header's start lines.
     static func parse(_ diff: String) -> [DiffLine] {
-        var raw = diff.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        // "\r\n" is a single Character in Swift, so split a CRLF diff only after
+        // normalizing its line endings.
+        var raw = diff.replacingOccurrences(of: "\r\n", with: "\n")
+            .split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         // The newline ending the diff's last line leaves one empty piece behind;
         // kept, it would render as a phantom numbered context line.
         if raw.last == "" { raw.removeLast() }
@@ -174,7 +177,8 @@ struct ParsedDiff {
     /// The diff reduced to hunk headers and their +/- lines (file-header metadata
     /// dropped), for pasting into an agent prompt as a ```diff block.
     static func promptDiff(_ diff: String) -> String {
-        diff.split(separator: "\n", omittingEmptySubsequences: false)
+        diff.replacingOccurrences(of: "\r\n", with: "\n")
+            .split(separator: "\n", omittingEmptySubsequences: false)
             .map(String.init)
             .filter { !isFileHeader($0) && !$0.hasPrefix("\\") }
             .joined(separator: "\n")

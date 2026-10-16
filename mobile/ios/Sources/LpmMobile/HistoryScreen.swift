@@ -171,6 +171,7 @@ struct HistoryScreen: View {
                     Image(systemName: "folder.badge.plus").font(.system(size: 13, weight: .semibold))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("New folder")
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 6)
             }

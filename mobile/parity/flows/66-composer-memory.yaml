@@ -1,0 +1,58 @@
+# The composer's memory picker in an agent terminal: remember this conversation or
+# continue a saved session; the eye previews one inside the sheet.
+appId: cx.lpm.mobile
+name: 66-composer-memory
+tags: [demo, terminal, composer, memory]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Claude"
+    timeout: 5000
+- tapOn: "Claude"
+- extendedWaitUntil:
+    visible: "Add Apple Pay as a payment option in the new checkout flow"
+    timeout: 10000
+- tapOn: "Send"
+- extendedWaitUntil:
+    visible: "Message"
+    timeout: 5000
+- tapOn: "Add"
+- extendedWaitUntil:
+    visible: "Memory"
+    timeout: 3000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Memory"
+      - extendedWaitUntil:
+          visible: "Remember this conversation"
+          timeout: 5000
+- extendedWaitUntil:
+    visible: "Checkout redesign"
+    timeout: 5000
+- assertVisible: "Continue a session"
+- assertVisible: "Payments module"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-composer-memory
+- tapOn:
+    text: "Preview"
+    index: 0
+- extendedWaitUntil:
+    visible: "Updated 2 hours ago by claude"
+    timeout: 5000
+- assertVisible: "checkout-redesign"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-composer-memory-preview
+- runFlow: subflows/back.yaml
+- extendedWaitUntil:
+    visible: "Remember this conversation"
+    timeout: 5000
+- tapOn: "Checkout redesign"
+- extendedWaitUntil:
+    notVisible: "Remember this conversation"
+    timeout: 5000
+- assertVisible: ".*/lpm-memory checkout-redesign.*"
+- takeScreenshot: 3-composer-memory-picked

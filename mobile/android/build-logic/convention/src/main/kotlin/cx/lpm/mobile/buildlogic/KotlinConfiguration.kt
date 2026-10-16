@@ -33,6 +33,8 @@ internal fun Project.configureKotlinAndroid(android: CommonExtension) {
     // (robolectric/robolectric#11434).
     tasks.withType<Test>().configureEach {
         jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED")
+        // Hilt generates test sources in every module, including ones with no tests yet.
+        failOnNoDiscoveredTests.set(false)
     }
     configureKotlin()
 }

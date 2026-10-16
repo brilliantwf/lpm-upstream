@@ -56,6 +56,10 @@ gradlePlugin {
             id = libs.plugins.lpm.spotless.get().pluginId
             implementationClass = "cx.lpm.mobile.buildlogic.SpotlessConventionPlugin"
         }
+        register("stringConflicts") {
+            id = libs.plugins.lpm.string.conflicts.get().pluginId
+            implementationClass = "cx.lpm.mobile.buildlogic.StringConflictsConventionPlugin"
+        }
         register("jvmLibrary") {
             id = libs.plugins.lpm.jvm.library.get().pluginId
             implementationClass = "cx.lpm.mobile.buildlogic.JvmLibraryConventionPlugin"

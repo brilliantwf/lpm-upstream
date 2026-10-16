@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug builds only: the design-system gallery. Not a launcher entry, so the app
+  keeps one launch activity for the parity flows; open it with
+  adb shell am start -n cx.lpm.mobile/.gallery.GalleryActivity
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name=".gallery.GalleryActivity"
+            android:exported="true"
+            android:label="@string/gallery_name" />
+    </application>
+
+</manifest>

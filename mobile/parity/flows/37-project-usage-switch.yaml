@@ -1,0 +1,30 @@
+appId: cx.lpm.mobile
+name: 37-project-usage-switch
+tags: [demo, usage, projects]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tap a service for its logs."
+    timeout: 5000
+# On a project's screen an expanded Claude account row switches the project to it.
+- scrollUntilVisible:
+    element: "Work, pool"
+    direction: DOWN
+- tapOn: "Work, pool"
+- extendedWaitUntil:
+    visible: "Switch to Work"
+    timeout: 5000
+- assertVisible: "New sessions in storefront"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-switch-offered
+- tapOn: "Switch to Work"
+- extendedWaitUntil:
+    visible: "Using Work"
+    timeout: 5000
+- assertVisible: "New sessions in storefront always use it"
+- assertVisible: "Work, in use"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-switched

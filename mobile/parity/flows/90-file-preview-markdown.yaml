@@ -1,0 +1,33 @@
+# A Markdown file from the composer's @-mention list: its eye ("Preview") opens
+# the preview sheet with README.md rendered; "Done" closes it.
+appId: cx.lpm.mobile
+name: 90-file-preview-markdown
+tags: [demo, terminal, files]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Terminal 1"
+    timeout: 5000
+- tapOn: "Terminal 1"
+- extendedWaitUntil:
+    visible: "Message"
+    timeout: 10000
+- tapOn: "Message"
+- inputText: "@READ"
+- extendedWaitUntil:
+    visible: "README.md"
+    timeout: 5000
+- tapOn: "Preview"
+- extendedWaitUntil:
+    visible: "Getting started"
+    timeout: 10000
+- assertVisible: "Source"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-markdown
+- tapOn: "Done"
+- extendedWaitUntil:
+    notVisible: "Getting started"
+    timeout: 5000
+- assertVisible: "README.md"

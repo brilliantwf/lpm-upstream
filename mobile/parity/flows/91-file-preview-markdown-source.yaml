@@ -1,0 +1,47 @@
+# The Markdown preview's "Preview" / "Source" switch: Source shows the file as
+# text, and the choice is remembered for the next Markdown file.
+appId: cx.lpm.mobile
+name: 91-file-preview-markdown-source
+tags: [demo, terminal, files]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Terminal 1"
+    timeout: 5000
+- tapOn: "Terminal 1"
+- extendedWaitUntil:
+    visible: "Message"
+    timeout: 10000
+- tapOn: "Message"
+- inputText: "@READ"
+- extendedWaitUntil:
+    visible: "README.md"
+    timeout: 5000
+- tapOn: "Preview"
+- extendedWaitUntil:
+    visible: "Getting started"
+    timeout: 10000
+- tapOn: "Source"
+- extendedWaitUntil:
+    visible: ".*# storefront.*"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-markdown-source
+- tapOn: "Done"
+- extendedWaitUntil:
+    notVisible: "Source"
+    timeout: 5000
+- tapOn: "Preview"
+- extendedWaitUntil:
+    visible: ".*# storefront.*"
+    timeout: 10000
+- assertVisible: "Source"
+- tapOn: "Preview"
+- extendedWaitUntil:
+    visible: "Getting started"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-markdown-again

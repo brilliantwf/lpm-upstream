@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="speech_title">Read aloud</string>
+    <string name="speech_read_aloud">Read aloud</string>
+    <string name="speech_stop_reading">Stop reading</string>
+
+    <string name="speech_preparing">Preparing audio…</string>
+    <string name="speech_back_15">Back 15 seconds</string>
+    <string name="speech_previous_sentence">Previous sentence</string>
+    <string name="speech_forward_15">Forward 15 seconds</string>
+    <string name="speech_next_sentence">Next sentence</string>
+    <string name="speech_play">Play</string>
+    <string name="speech_pause">Pause</string>
+    <string name="speech_speed">Speed</string>
+    <string name="speech_position">Playback position</string>
+    <string name="speech_skip_seconds">15</string>
+
+    <string name="speech_error_title">Couldn\'t read aloud</string>
+    <string name="speech_error_synthesis">Couldn\'t synthesize speech.</string>
+    <string name="speech_error_playback">Couldn\'t play the audio the Mac sent back.</string>
+    <string name="speech_ok">OK</string>
+
+    <string name="speech_engine">Engine</string>
+    <string name="speech_engine_device">This %1$s</string>
+    <string name="speech_engine_mac">Mac</string>
+    <string name="speech_engine_mac_footer">Your Mac synthesizes the speech with OpenAI and sends the audio over. Better voice, and you can scrub through it — but it needs your Mac, and the text is sent to OpenAI.</string>
+    <string name="speech_engine_device_footer">Speech is generated on this %1$s. Works offline and nothing leaves the device.</string>
+    <string name="speech_hear_sample">Hear a sample</string>
+    <string name="speech_speed_footer">Voice and speed for reading automation replies out loud.</string>
+    <string name="speech_voice">Voice</string>
+    <string name="speech_best_available">Best available</string>
+    <string name="speech_quality_premium">Premium</string>
+    <string name="speech_quality_enhanced">Enhanced</string>
+    <string name="speech_basic_voices">Your installed voices are all basic ones. Download a Premium voice in Settings → Accessibility → Text-to-speech output for much more natural speech.</string>
+</resources>

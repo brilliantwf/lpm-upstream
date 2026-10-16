@@ -1,0 +1,43 @@
+appId: cx.lpm.mobile
+name: 74-action-confirm
+tags: [demo, actions]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "mobile-app"
+- extendedWaitUntil:
+    visible: "Tap a service for its logs."
+    timeout: 5000
+- tapOn: "Actions"
+- extendedWaitUntil:
+    visible: "Clear caches"
+    timeout: 5000
+# An action marked confirm asks first; Cancel runs nothing.
+- tapOn: "Clear caches"
+- extendedWaitUntil:
+    visible: "Run Clear caches.*"
+    timeout: 5000
+- assertVisible: "Cancel"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-confirm
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    notVisible: "Run Clear caches.*"
+    timeout: 5000
+- assertNotVisible: "Background runs"
+- tapOn: "Actions"
+- extendedWaitUntil:
+    visible: "Clear caches"
+    timeout: 5000
+- tapOn: "Clear caches"
+- extendedWaitUntil:
+    visible: "Run Clear caches.*"
+    timeout: 5000
+- tapOn: "Run"
+- extendedWaitUntil:
+    visible: "(?s).*Caches cleared.*"
+    timeout: 15000
+- assertVisible: "Done"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-run-done

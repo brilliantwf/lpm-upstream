@@ -78,6 +78,7 @@ private struct TabChip: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Close")
         }
         .padding(.leading, 10)
         .padding(.trailing, 8)

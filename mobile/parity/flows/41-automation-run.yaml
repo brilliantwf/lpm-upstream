@@ -1,0 +1,27 @@
+appId: cx.lpm.mobile
+name: 41-automation-run
+tags: [demo, automations]
+---
+- runFlow: subflows/enter-demo.yaml
+- runFlow: subflows/open-more-menu.yaml
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Automations.*"
+      - extendedWaitUntil:
+          visible: "Nightly tests"
+          timeout: 5000
+- tapOn: "Nightly tests"
+- extendedWaitUntil:
+    visible: "Run history"
+    timeout: 5000
+# The failed run two nights ago, with its rerun as a separate row.
+- scrollUntilVisible:
+    element: "Problem during the run"
+- tapOn: "Problem during the run"
+- extendedWaitUntil:
+    visible: "Copy message"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-automation-run

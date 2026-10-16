@@ -152,6 +152,7 @@ struct GitReviewView: View {
         } label: {
             Image(systemName: "list.bullet")
         }
+        .accessibilityLabel("Jump to file")
     }
 
     private func jumpSymbol(_ status: String) -> String {
@@ -395,6 +396,8 @@ private struct GitFileSection: View {
                     .foregroundStyle(selected ? Color.accentColor : Color.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Select")
+            .accessibilityAddTraits(selected ? .isSelected : [])
 
             Button {
                 withAnimation(.easeInOut(duration: 0.15)) { collapsed.toggle() }
@@ -427,6 +430,8 @@ private struct GitFileSection: View {
                     .foregroundStyle(viewed ? Color.green : Color.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Viewed")
+            .accessibilityAddTraits(viewed ? .isSelected : [])
 
             Menu {
                 askButton

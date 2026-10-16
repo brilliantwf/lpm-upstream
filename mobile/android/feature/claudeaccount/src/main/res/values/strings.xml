@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="claudeaccount_title">Claude Account</string>
+    <string name="claudeaccount_selected">selected</string>
+    <string name="claudeaccount_same_as_parent">Same as parent</string>
+    <string name="claudeaccount_main_accounts">Main accounts</string>
+    <string name="claudeaccount_always_one">Always use one account</string>
+    <string name="claudeaccount_not_signed_in">Not signed in</string>
+    <string name="claudeaccount_choose">Choose Accounts</string>
+    <string name="claudeaccount_choose_hint">Take turns on up to %1$d, in order</string>
+    <string name="claudeaccount_turns">Take turns, in this order</string>
+    <string name="claudeaccount_switching_off">Switching is off: new sessions use the first</string>
+    <string name="claudeaccount_new_sessions">New sessions</string>
+    <plurals name="claudeaccount_full">
+        <item quantity="one">Up to %1$d take turns</item>
+        <item quantity="other">Up to %1$d take turns</item>
+    </plurals>
+    <string-array name="claudeaccount_ordinals">
+        <item>1st</item>
+        <item>2nd</item>
+        <item>3rd</item>
+        <item>4th</item>
+        <item>5th</item>
+    </string-array>
+    <string name="claudeaccount_consent_title_one">Add this account to the list?</string>
+    <string name="claudeaccount_consent_title_many">Add these accounts to the list?</string>
+    <string name="claudeaccount_consent_confirm_one">It\'s Only Mine</string>
+    <string name="claudeaccount_consent_confirm_many">They\'re Only Mine</string>
+    <string name="claudeaccount_consent_cancel">Cancel</string>
+    <string name="claudeaccount_consent_account">%1$s (%2$s)</string>
+    <string name="claudeaccount_consent_message">%1$s\n\nNew Claude sessions start on the first account in your list and move to the next one only when an account is close to its 5-hour or weekly limit. Sessions already running stay on their account.\n\nEvery account must be yours alone. Anthropic hasn’t said whether switching accounts when one runs low is allowed, and it can limit or close accounts it believes break its terms. Usage credits or a higher plan are Anthropic’s supported ways to keep working past a limit.</string>
+</resources>

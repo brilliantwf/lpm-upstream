@@ -1,0 +1,37 @@
+appId: cx.lpm.mobile
+name: 55-git-auto-commit
+tags: [demo, git]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Git"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+# On iOS a tap while the menu is still settling can miss: tap again if nothing changed.
+- tapOn:
+    text: "Git"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Auto Commit.*"
+    timeout: 5000
+# iOS reads a menu item with its subtitle: "Auto Commit, AI writes the message, …".
+- tapOn: "Auto Commit(, AI writes the message, then commits)?"
+# The demo run takes about two seconds, so it's usually over by the first look.
+- extendedWaitUntil:
+    visible: "Committed"
+    timeout: 20000
+- assertVisible: "Commit changes"
+- assertVisible: "feat\\(checkout\\): redesign the checkout form and add a payments module"
+- takeScreenshot: 1-committed
+- tapOn: "Done"
+- tapOn: "More"
+- tapOn: "Git"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-menu-after

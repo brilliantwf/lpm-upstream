@@ -1,0 +1,50 @@
+# Settings → Read aloud: the engine, the speed with its sample, and the phone's
+# voices under "Best available". Voice names differ per device, so only the fixed
+# rows are asserted; choosing the Mac engine swaps the footer and hides the voices.
+appId: cx.lpm.mobile
+name: 100-read-aloud-settings
+tags: [demo, settings, speech]
+---
+- runFlow: subflows/enter-demo.yaml
+- runFlow: subflows/open-more-menu.yaml
+- tapOn: "Settings.*"
+- extendedWaitUntil:
+    visible: "Theme"
+    timeout: 5000
+- tapOn: "Read aloud"
+- extendedWaitUntil:
+    visible: "Engine"
+    timeout: 5000
+- assertVisible: "Speed"
+- assertVisible: "Hear a sample"
+- assertVisible: "Voice and speed for reading automation replies out loud."
+- assertVisible: "Speech is generated on this .*"
+- assertVisible: "Best available"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-read-aloud-settings
+- tapOn: "Speed.*"
+- extendedWaitUntil:
+    visible: "1.5x"
+    timeout: 5000
+- assertVisible: "0.75x"
+- assertVisible: "2x"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-speed-menu
+- tapOn: "1.5x"
+- extendedWaitUntil:
+    visible: ".*1.5x.*"
+    timeout: 5000
+- tapOn: "Engine.*"
+- extendedWaitUntil:
+    visible: "Mac"
+    timeout: 5000
+- tapOn: "Mac"
+- extendedWaitUntil:
+    visible: "Your Mac synthesizes the speech with OpenAI.*"
+    timeout: 5000
+- assertNotVisible: "Best available"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 3-mac-engine

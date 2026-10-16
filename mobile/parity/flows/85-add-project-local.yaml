@@ -1,0 +1,55 @@
+appId: cx.lpm.mobile
+name: 85-add-project-local
+tags: [demo, config, projects]
+---
+- runFlow: subflows/enter-demo.yaml
+- runFlow: subflows/open-more-menu.yaml
+- tapOn: "Add Project…"
+- extendedWaitUntil:
+    visible: "Folder on your Mac"
+    timeout: 5000
+- assertVisible: "Local"
+- assertVisible: "Clone"
+- assertVisible: "SSH"
+- assertVisible: "Choose…"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-add-project
+# The folder browser walks the Mac's folders from its home.
+- tapOn: "Folder on your Mac"
+- extendedWaitUntil:
+    visible: "Project folder"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "Developer"
+    timeout: 5000
+- assertVisible: "/Users/demo"
+- assertVisible: "Use This Folder"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-dir-browser
+- tapOn: "Developer"
+- extendedWaitUntil:
+    visible: "playground"
+    timeout: 5000
+- tapOn: "playground"
+- extendedWaitUntil:
+    visible: "No folders here."
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 3-empty-folder
+- tapOn: "Use This Folder"
+- extendedWaitUntil:
+    visible: "/Users/demo/Developer/playground"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 4-picked
+- tapOn: "Create"
+- extendedWaitUntil:
+    notVisible: "Folder on your Mac"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "playground"
+    timeout: 5000

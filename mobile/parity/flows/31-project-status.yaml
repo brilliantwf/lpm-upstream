@@ -1,0 +1,35 @@
+appId: cx.lpm.mobile
+name: 31-project-status
+tags: [demo, projects]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Status"
+    timeout: 5000
+- tapOn: "Status"
+# The built-in states and the Mac's own, emoji first ("⏳  In progress").
+- extendedWaitUntil:
+    visible: ".*In progress"
+    timeout: 5000
+- assertVisible: ".*Blocked"
+- assertVisible: ".*Review"
+- takeScreenshot: 1-status-menu
+# Blocked asks for a line before it applies.
+- tapOn: ".*Blocked"
+- extendedWaitUntil:
+    visible: "What is blocking storefront? It shows under the name in the projects list."
+    timeout: 5000
+- takeScreenshot: 2-blocked-note
+- tapOn: "Waiting on…"
+- inputText: "API keys"
+- tapOn: "Save"
+# The project's title now leads with the status's mark.
+- extendedWaitUntil:
+    visible: ".*storefront"
+    timeout: 5000
+- takeScreenshot: 3-blocked

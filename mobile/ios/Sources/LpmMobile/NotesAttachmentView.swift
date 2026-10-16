@@ -102,6 +102,7 @@ struct NotesAttachmentView: View {
                 Image(systemName: "arrow.down.circle").font(.system(size: 17))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Download")
         }
     }
 

@@ -1,35 +1,54 @@
 package cx.lpm.mobile
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import cx.lpm.mobile.core.data.session.MacSession
 import cx.lpm.mobile.core.designsystem.theme.LpmTheme
+import cx.lpm.mobile.core.tailnet.BuiltInTailscale
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject
+    lateinit var session: MacSession
+
+    @Inject
+    lateinit var tailscale: BuiltInTailscale
+
+    private val viewModel: AppViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
+        splash.setKeepOnScreenCondition { !viewModel.ready.value }
+        viewModel.start()
         enableEdgeToEdge()
         setContent {
-            LpmTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
-                    Box(
-                        modifier = Modifier.fillMaxSize().padding(padding),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("lpm Link", style = MaterialTheme.typography.headlineMedium)
-                    }
+            val ready by viewModel.ready.collectAsStateWithLifecycle()
+            val appearance by viewModel.appearance.collectAsStateWithLifecycle()
+            val dark = appearance.isDark(isSystemInDarkTheme())
+            DisposableEffect(dark) {
+                val style = if (dark) {
+                    SystemBarStyle.dark(Color.TRANSPARENT)
+                } else {
+                    SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
                 }
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                onDispose {}
+            }
+            LpmTheme(darkTheme = dark) {
+                if (ready) LpmApp(session, tailscale.state)
             }
         }
     }

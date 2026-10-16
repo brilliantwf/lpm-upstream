@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="back">Back</string>
+    <string name="cancel">Cancel</string>
+    <string name="done">Done</string>
+    <string name="ok">OK</string>
+    <string name="git_retry">Retry</string>
+    <string name="git_more">More</string>
+
+    <!-- Review -->
+    <string name="git_review_title">Changes</string>
+    <string name="git_review_added">+%1$d</string>
+    <string name="git_review_removed">−%1$d</string>
+    <string name="git_review_jump">Jump to file</string>
+    <string name="git_review_changed_files">Changed files (%1$d)</string>
+    <string name="git_review_reviewed" tools:ignore="PluralsCandidate">%1$d of %2$d reviewed</string>
+    <string name="git_review_no_changes">No changes</string>
+    <string name="git_review_commit_header">Commit</string>
+    <string name="git_review_commit_footer">Only the selected files are committed.</string>
+    <string name="git_review_commit_message">Commit message</string>
+    <string name="git_review_generating">Generating…</string>
+    <string name="git_review_generate_message">Generate message</string>
+    <plurals name="git_review_commit_files">
+        <item quantity="one">Commit %1$d file</item>
+        <item quantity="other">Commit %1$d files</item>
+    </plurals>
+    <string name="git_review_create_pr">Create Pull Request</string>
+    <string name="git_review_not_repo">Not a git repository</string>
+    <string name="git_review_not_repo_message">This project isn\'t tracked by git, so there\'s nothing to review.</string>
+    <string name="git_review_unreachable">Can\'t reach your Mac</string>
+    <string name="git_file_select">Select</string>
+    <string name="git_file_viewed">Viewed</string>
+    <string name="git_file_ask_agent">Ask agent…</string>
+    <string name="git_file_binary">Binary file</string>
+    <string name="git_file_no_changes">No changes to show</string>
+    <string name="git_file_loading">Loading diff…</string>
+    <string name="git_file_show_all" tools:ignore="PluralsCandidate">Show all %1$d lines</string>
+    <string name="git_hunk_indent">⇥ %1$d</string>
+
+    <!-- Pull request -->
+    <string name="git_pr_title">Pull Request</string>
+    <string name="git_pr_create">Create</string>
+    <string name="git_pr_field_title">Title</string>
+    <string name="git_pr_field_description">Description</string>
+    <string name="git_pr_generate">Generate with AI</string>
+    <string name="git_pr_footer">Creating a pull request pushes your branch first, so it can take a moment.</string>
+    <string name="git_pr_created">Pull request created</string>
+    <string name="git_pr_open">Open in Browser</string>
+    <string name="git_pr_error">Something went wrong</string>
+
+    <!-- Switch branch -->
+    <string name="git_branch_title">Switch Branch</string>
+    <string name="git_branch_new">New branch</string>
+    <string name="git_branch_new_placeholder">branch-name</string>
+    <string name="git_branch_new_message">Creates a new branch off the current HEAD and checks it out.</string>
+    <string name="git_branch_create">Create</string>
+    <string name="git_branch_switch_failed">Couldn\'t switch branch</string>
+    <string name="git_branch_local">Local</string>
+    <string name="git_branch_remote">Remote</string>
+    <string name="git_branch_none">No branches</string>
+    <string name="git_branch_loading">Loading branches…</string>
+    <string name="git_branch_load_failed">Couldn\'t load branches</string>
+
+    <!-- Auto Commit -->
+    <string name="git_auto_close">Close</string>
+    <string name="git_auto_stop">Stop</string>
+    <string name="git_auto_stopping">Stopping…</string>
+    <string name="git_auto_canceled">Canceled.</string>
+    <string name="git_auto_committed">Committed</string>
+    <string name="git_auto_committed_rebased_pushed">Committed, rebased onto new remote commits, and pushed</string>
+    <string name="git_auto_committed_pushed">Committed and pushed</string>
+    <string name="git_auto_pr_created">Pull request created</string>
+    <string name="git_auto_branch_to_base">%1$s → %2$s</string>
+    <string name="git_auto_open_github">Open on GitHub</string>
+    <string name="git_auto_switch_base">Switch to %1$s and pull</string>
+    <string name="git_auto_switching_base">Switching to %1$s…</string>
+    <string name="git_auto_failed">Something went wrong.</string>
+    <string name="git_auto_open_pr">Open Pull Request</string>
+
+    <!-- Ask agent -->
+    <string name="git_ask_title">Ask Agent</string>
+    <string name="git_ask_send">Send</string>
+    <string name="git_ask_instruction">Instruction</string>
+    <string name="git_ask_instruction_placeholder">What should the agent do?</string>
+    <string name="git_ask_terminal">Terminal</string>
+    <string name="git_ask_context">Context</string>
+    <string name="git_ask_no_terminals">No terminals</string>
+    <string name="git_ask_no_terminals_message">Open a terminal for this project first, then ask the agent about these changes.</string>
+    <string name="git_ask_more_lines" tools:ignore="PluralsCandidate">… (%1$d more lines)</string>
+    <string name="git_ask_no_diff">(no diff available)</string>
+</resources>

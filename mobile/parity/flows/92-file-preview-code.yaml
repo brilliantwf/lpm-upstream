@@ -1,0 +1,34 @@
+# A code file from the @-mention list: highlighted, monospaced text in the
+# preview sheet, scrolled to its end, then "Done".
+appId: cx.lpm.mobile
+name: 92-file-preview-code
+tags: [demo, terminal, files]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Terminal 1"
+    timeout: 5000
+- tapOn: "Terminal 1"
+- extendedWaitUntil:
+    visible: "Message"
+    timeout: 10000
+- tapOn: "Message"
+- inputText: "@CheckoutForm"
+- extendedWaitUntil:
+    visible: "components/CheckoutForm.tsx"
+    timeout: 5000
+- tapOn: "Preview"
+- extendedWaitUntil:
+    visible: "CheckoutForm.tsx"
+    timeout: 10000
+- extendedWaitUntil:
+    visible: ".*use client.*"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-code
+- tapOn: "Done"
+- extendedWaitUntil:
+    visible: "components/CheckoutForm.tsx"
+    timeout: 5000

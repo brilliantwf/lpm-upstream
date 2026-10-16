@@ -1,0 +1,22 @@
+appId: cx.lpm.mobile
+name: 13-tailscale-settings
+tags: [pairing, tailscale]
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Set up Built-in Tailscale"
+    timeout: 15000
+- tapOn: "Set up Built-in Tailscale"
+- extendedWaitUntil:
+    visible: "How it works"
+    timeout: 5000
+- assertVisible: "Built-in Tailscale"
+- assertVisible: "Reach your Mac from cellular or any Wi-Fi without installing the Tailscale app. Sign in with the same Tailscale account you use on your Mac."
+- assertVisible: "Turn it on here and sign in with the same Tailscale account."
+- waitForAnimationToEnd
+- takeScreenshot: 1-tailscale-off
+- tapOn: "Done"
+- extendedWaitUntil:
+    visible: "Connect to your Mac"
+    timeout: 5000

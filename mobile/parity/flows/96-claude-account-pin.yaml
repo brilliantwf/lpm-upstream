@@ -1,0 +1,47 @@
+appId: cx.lpm.mobile
+name: 96-claude-account-pin
+tags: [demo, projects, claude]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Claude Account"
+    timeout: 5000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Claude Account"
+      - extendedWaitUntil:
+          visible: "Always use one account"
+          timeout: 5000
+# Always use Work: the usage rows tag it as the account new sessions use.
+- tapOn: "Work.*"
+- scrollUntilVisible:
+    element: "Work, in use"
+    direction: DOWN
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Claude Account"
+    timeout: 5000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Claude Account"
+      - extendedWaitUntil:
+          visible: "Always use one account"
+          timeout: 5000
+# The checkmark moved to Work, between the main login and Personal.
+- assertVisible:
+    text: "selected"
+    below: "Main login.*"
+    above: "Personal.*"
+- assertNotVisible:
+    text: "selected"
+    above: "Always use one account"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-pinned-work

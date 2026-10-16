@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import UIKit
 
 /// Demo handlers for the Notes notebook: chats, paged notes, posting, editing,
 /// deleting, search, and attachment bytes. Everything is mutable fixture state,
@@ -363,49 +362,10 @@ private func noteSnippet(_ text: String, term: String) -> String {
         + (end < text.endIndex ? "…" : "")
 }
 
-/// The attached "screenshot": a checkout summary card drawn in process, so the
-/// demo ships an image without carrying one as a literal.
+/// The attached "screenshot": a checkout summary card, the same file the Android demo
+/// ships (mobile/shared/demo), so both apps describe an identical attachment.
 private func demoSummaryCardPNG() -> Data {
-    let size = CGSize(width: 420, height: 300)
-    let image = UIGraphicsImageRenderer(size: size).image { _ in
-        UIColor(white: 0.94, alpha: 1).setFill()
-        UIBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
-
-        UIColor.white.setFill()
-        UIBezierPath(roundedRect: CGRect(x: 20, y: 20, width: 380, height: 260),
-                     cornerRadius: 18).fill()
-
-        let ink = UIColor(white: 0.11, alpha: 1)
-        let muted = UIColor(white: 0.42, alpha: 1)
-        drawDemoText("Order summary", at: CGPoint(x: 44, y: 44), size: 17, weight: .semibold, color: ink)
-
-        var y: CGFloat = 84
-        for (label, price) in [("Merino crew — M", "$28.00"), ("Canvas tote", "$18.00"),
-                               ("Shipping", "$4.00")] {
-            drawDemoText(label, at: CGPoint(x: 44, y: y), size: 14, weight: .regular, color: muted)
-            drawDemoText(price, at: CGPoint(x: 316, y: y), size: 14, weight: .regular, color: muted)
-            y += 30
-        }
-
-        UIColor(white: 0.88, alpha: 1).setFill()
-        UIBezierPath(rect: CGRect(x: 44, y: y + 8, width: 332, height: 1)).fill()
-
-        drawDemoText("Total", at: CGPoint(x: 44, y: y + 24), size: 16, weight: .semibold, color: ink)
-        drawDemoText("$50.00", at: CGPoint(x: 308, y: y + 24), size: 16, weight: .semibold, color: ink)
-
-        UIColor(red: 0.16, green: 0.42, blue: 0.94, alpha: 1).setFill()
-        UIBezierPath(roundedRect: CGRect(x: 44, y: y + 62, width: 332, height: 44),
-                     cornerRadius: 12).fill()
-        drawDemoText("Pay $50.00", at: CGPoint(x: 168, y: y + 75), size: 15, weight: .semibold,
-                     color: .white)
-    }
-    return image.pngData() ?? Data()
-}
-
-private func drawDemoText(_ text: String, at point: CGPoint, size: CGFloat,
-                          weight: UIFont.Weight, color: UIColor) {
-    NSAttributedString(string: text, attributes: [
-        .font: UIFont.systemFont(ofSize: size, weight: weight),
-        .foregroundColor: color,
-    ]).draw(at: point)
+    guard let url = Bundle.main.url(forResource: "summary-card", withExtension: "png", subdirectory: "demo"),
+          let data = try? Data(contentsOf: url) else { return Data() }
+    return data
 }

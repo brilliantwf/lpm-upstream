@@ -1,0 +1,42 @@
+appId: cx.lpm.mobile
+name: 73-background-run
+tags: [demo, actions]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "api-gateway"
+- extendedWaitUntil:
+    visible: "Tap a service for its logs."
+    timeout: 5000
+- tapOn: "Actions"
+- extendedWaitUntil:
+    visible: "Test"
+    timeout: 5000
+- tapOn: "Test"
+# The run's sheet: a status bar over the output, Stop while it runs.
+- extendedWaitUntil:
+    visible: "Running"
+    timeout: 10000
+- assertVisible: "Stop"
+- assertVisible: "Close"
+- extendedWaitUntil:
+    visible: "(?s).*PASS.*"
+    timeout: 15000
+- assertVisible: "Done"
+- assertNotVisible: "Stop"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-run-done
+# Closed, it stays listed on the project; tapping it reopens the log.
+- tapOn: "Close"
+- extendedWaitUntil:
+    visible: "Background runs"
+    timeout: 5000
+- assertVisible: "Test"
+- assertVisible: "Done"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-background-runs
+- tapOn: "Test"
+- extendedWaitUntil:
+    visible: "(?s).*PASS.*"
+    timeout: 5000

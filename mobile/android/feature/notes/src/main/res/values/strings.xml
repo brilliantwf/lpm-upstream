@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notes_back">Back</string>
+    <string name="notes_cancel">Cancel</string>
+    <string name="notes_ok">OK</string>
+    <string name="notes_delete">Delete</string>
+    <string name="notes_save">Save</string>
+    <string name="notes_close">Close</string>
+    <string name="notes_done">Done</string>
+    <string name="notes_untitled">Untitled</string>
+
+    <string name="notes_title">Notes</string>
+    <string name="notes_search">Search notes</string>
+    <string name="notes_new_chat">New Chat</string>
+    <string name="notes_rename">Rename</string>
+    <string name="notes_search_failed">Search failed</string>
+    <string name="notes_no_results">No Results for “%1$s”</string>
+    <string name="notes_no_results_hint">Check the spelling or try a new search.</string>
+    <string name="notes_unavailable">Notes unavailable</string>
+    <string name="notes_empty">No notes yet</string>
+    <string name="notes_empty_description">Keep ideas, links and snippets for this project here. They stay on your Mac.</string>
+
+    <string name="notes_chat_new_title">New chat</string>
+    <string name="notes_chat_title_field">Title</string>
+    <string name="notes_chat_create">Create</string>
+    <string name="notes_chat_rename_title">Rename chat</string>
+    <string name="notes_chat_delete_title">Delete chat?</string>
+    <string name="notes_chat_delete_message">“%1$s” and every note in it will be removed. This can\'t be undone.</string>
+
+    <string name="notes_chat_empty">No notes here yet</string>
+    <string name="notes_chat_empty_description">Write the first note in this chat below.</string>
+    <string name="notes_note_edit">Edit</string>
+    <string name="notes_note_copy">Copy</string>
+    <string name="notes_note_edited">Edited</string>
+    <string name="notes_note_delete_title">Delete note?</string>
+    <string name="notes_note_delete_message">This note and its attachments will be removed. This can\'t be undone.</string>
+    <string name="notes_note_edit_title">Edit note</string>
+
+    <string name="notes_composer_placeholder">Write a note…</string>
+    <string name="notes_composer_attach">Attach</string>
+    <string name="notes_composer_send">Send</string>
+    <string name="notes_composer_photo_library">Photo Library</string>
+    <string name="notes_composer_take_photo">Take Photo</string>
+    <string name="notes_composer_choose_files">Choose Files</string>
+    <string name="notes_composer_too_large">Too large</string>
+    <string name="notes_composer_preparing">Preparing…</string>
+    <string name="notes_composer_remove">Remove</string>
+
+    <string name="notes_attachment_share">Share</string>
+    <string name="notes_attachment_download">Download</string>
+    <string name="notes_attachment_no_preview">Can\'t preview this file</string>
+    <string name="notes_attachment_no_preview_hint">Share it to open it in another app.</string>
+</resources>

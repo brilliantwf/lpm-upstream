@@ -1,0 +1,37 @@
+# One chat's transcript: newest notes at the bottom under a day capsule, then
+# scrolled back to the note carrying the summary-card picture.
+appId: cx.lpm.mobile
+name: 61-notes-chat
+tags: [demo, notes]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Notes"
+    timeout: 5000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Notes"
+      - extendedWaitUntil:
+          visible: "Checkout redesign"
+          timeout: 5000
+- tapOn: "Checkout redesign"
+- extendedWaitUntil:
+    visible: "Post in the design review channel once the pull request is open."
+    timeout: 5000
+- assertVisible: "Write a note…"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-notes-chat
+- scrollUntilVisible:
+    element: ".*this is the spacing we agreed on.*"
+    direction: UP
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-notes-attachment

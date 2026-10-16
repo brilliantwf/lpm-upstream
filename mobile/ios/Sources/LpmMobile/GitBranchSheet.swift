@@ -52,6 +52,7 @@ struct GitBranchSheet: View {
                         else { Image(systemName: "plus") }
                     }
                     .disabled(creating)
+                    .accessibilityLabel("New branch")
                 }
             }
             .alert("New branch", isPresented: $creatingBranch) {

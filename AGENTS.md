@@ -53,8 +53,10 @@ lpm starts, stops, duplicates, and switches between local dev projects, with a b
   automations, Git, notes, memory, project config), update the mobile app in the
   same change so it looks and behaves the same — same fields, defaults, placement
   and colors. Data the phone needs goes through `remote.rs`, `mobile/PROTOCOL.md`
-  and Demo Mode's seed (`mobile/ios/Sources/LpmMobile/Demo*.swift`), and a phone edit
-  writes the config exactly as a desktop edit would. Once the Android app
+  and Demo Mode's seed (`mobile/ios/Sources/LpmMobile/Demo*.swift`, mirrored in
+  `mobile/android/core/demo` — regenerate its goldens with
+  `core/demo/ios-parity/generate.sh`), and a phone edit writes the config exactly
+  as a desktop edit would. Once the Android app
   implements a feature, change it on both phones in the same change, and keep
   its parity flow in `mobile/parity/flows` passing on both
 - Never commit or push any changes

@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Terminal screen -->
+    <string name="terminal_back">Back</string>
+    <string name="terminal_fallback_title">Terminal</string>
+    <string name="terminal_opening">Opening terminal…</string>
+    <string name="terminal_unavailable">Terminal unavailable</string>
+    <string name="terminal_loading">Loading terminal…</string>
+    <string name="terminal_active_on">Active on %1$s</string>
+    <string name="terminal_controlled_elsewhere">This terminal is shown and controlled elsewhere.</string>
+    <string name="terminal_take_control">Take control</string>
+    <string name="terminal_taking_control">Taking control…</string>
+
+    <!-- Terminal settings -->
+    <string name="terminal_settings_title">Terminal</string>
+    <string name="terminal_settings_done">Done</string>
+    <string name="terminal_settings_font_size">Font size</string>
+    <string name="terminal_settings_color_scheme">Color scheme</string>
+    <string name="terminal_settings_footer">Font size and color scheme for the terminal. Applies to every terminal on this device.</string>
+    <string name="terminal_settings_preview_prompt">"$ "</string>
+    <string name="terminal_settings_preview_command">lpm run</string>
+
+    <!-- Special keys -->
+    <string name="key_esc">esc</string>
+    <string name="key_tab">tab</string>
+    <string name="key_ctrl_c">⌃C</string>
+    <string name="key_return">⏎</string>
+    <string name="key_up">Up</string>
+    <string name="key_down">Down</string>
+    <string name="key_left">Left</string>
+    <string name="key_right">Right</string>
+    <string name="key_paste">Paste</string>
+    <string name="key_hide_keyboard">Hide keyboard</string>
+
+    <!-- Composer -->
+    <string name="composer_placeholder">Message</string>
+    <string name="composer_add">Add</string>
+    <string name="composer_send">Send</string>
+    <string name="composer_rewriting">Rewriting your prompt…</string>
+    <string name="composer_cancel">Cancel</string>
+    <string name="composer_rewrite_with_ai">Rewrite with AI</string>
+    <string name="composer_photo_library">Photo Library</string>
+    <string name="composer_take_photo">Take Photo</string>
+    <string name="composer_choose_files">Choose Files</string>
+    <string name="composer_paste_image">Paste Image</string>
+    <string name="composer_memory">Memory</string>
+    <string name="composer_new_prompt">New prompt</string>
+    <string name="composer_history">History</string>
+    <string name="composer_rewrite_hint">Type a message first — then tap to rewrite it with AI.</string>
+    <string name="composer_save_draft">Save as draft</string>
+    <string name="composer_run_in_duplicates">Run in duplicates</string>
+    <plurals name="composer_copies">
+        <item quantity="one">%1$d copy</item>
+        <item quantity="other">%1$d copies</item>
+    </plurals>
+    <string name="composer_heads_up">Heads up</string>
+    <string name="composer_ok">OK</string>
+    <string name="composer_rewrite_failed">Rewrite failed</string>
+    <string name="composer_could_not_attach">Couldn’t attach</string>
+    <string name="composer_still_uploading">Still uploading an attachment — try again in a moment.</string>
+    <string name="composer_dropped_failures">Some attachments failed to upload and were left out.</string>
+    <string name="composer_saved_to_drafts">Saved to your drafts.</string>
+    <string name="composer_not_sent">Not sent — lpm isn\'t connected to your Mac right now. Your message is still here.</string>
+
+    <!-- Autocomplete -->
+    <string name="mention_changes">CHANGES</string>
+    <string name="mention_files">FILES</string>
+    <string name="mention_branches">BRANCHES</string>
+    <string name="mention_context">CONTEXT</string>
+    <string name="mention_changed">changed</string>
+    <string name="mention_preview">Preview</string>
+    <string name="mention_terminal_output">This terminal\'s output</string>
+    <string name="mention_terminal_output_subtitle">Insert recent output</string>
+    <string name="mention_service_logs">%1$s logs</string>
+    <string name="mention_service_logs_subtitle">Insert recent logs</string>
+    <string name="mention_terminal_output_label">Terminal output</string>
+
+    <!-- Attachments and prompt tabs -->
+    <string name="attachment_uploading">Uploading…</string>
+    <string name="attachment_percent">%1$d%%</string>
+    <string name="attachment_ready">Ready</string>
+    <string name="attachment_retry">Tap to retry</string>
+    <string name="attachment_remove">Remove</string>
+    <string name="attachment_done">Done</string>
+    <string name="tab_close">Close</string>
+
+    <!-- Rewrite -->
+    <string name="rewrite_title">Rewrite with AI</string>
+    <string name="rewrite_quick">Quick rewrites</string>
+    <string name="rewrite_custom">Custom</string>
+    <string name="rewrite_custom_placeholder">Ask AI to rewrite…</string>
+    <string name="rewrite_run">Rewrite</string>
+    <string name="rewrite_fewer">Remove</string>
+    <string name="rewrite_more">Add</string>
+    <string name="variants_title">Pick a rewrite</string>
+    <string name="variant_title">Variant %1$d</string>
+    <string name="variant_use">Use this</string>
+    <string name="variant_failed" tools:ignore="PluralsCandidate">Variant %1$d failed</string>
+    <string name="variant_failed_fallback">Failed</string>
+    <string name="variants_generating">Generating more…</string>
+
+    <!-- History -->
+    <string name="history_title">History</string>
+    <string name="history_done">Done</string>
+    <string name="history_search">Search</string>
+    <string name="history_all">All</string>
+    <string name="history_favorites">Favorites</string>
+    <string name="history_drafts">Drafts</string>
+    <string name="history_empty_title">No messages</string>
+    <string name="history_empty_message">Prompts you send and drafts you save appear here.</string>
+    <string name="history_no_results">No Results for “%1$s”</string>
+    <string name="history_no_results_message">Check the spelling or try a new search.</string>
+    <string name="history_new_folder">New folder</string>
+    <string name="history_new_folder_ellipsis">New folder…</string>
+    <string name="history_folder_name">Folder name</string>
+    <string name="history_create">Create</string>
+    <string name="history_cancel">Cancel</string>
+    <string name="history_move_to_folder">Move to folder</string>
+    <string name="history_remove_from_folder">Remove from folder</string>
+    <string name="history_send_now">Send now</string>
+    <string name="history_load">Load into composer</string>
+    <string name="history_favorite">Favorite</string>
+    <string name="history_unfavorite">Unfavorite</string>
+    <string name="history_delete">Delete</string>
+    <string name="history_delete_folder">Delete folder</string>
+    <string name="history_draft">Draft</string>
+    <string name="history_empty_text">(empty)</string>
+</resources>
