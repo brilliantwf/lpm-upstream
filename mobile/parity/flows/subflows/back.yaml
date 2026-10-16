@@ -1,0 +1,23 @@
+# Back one screen. iOS: the navigation bar's back button, whose id is "BackButton"
+# (its label is the previous screen's title). Android: system back — after closing
+# the keyboard if it's up, since back would only close it (and the keyboard's own
+# navigation button is also named "Back").
+appId: cx.lpm.mobile
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: "BackButton"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: "android:id/input_method_nav_back"
+          commands:
+            - hideKeyboard
+      - back

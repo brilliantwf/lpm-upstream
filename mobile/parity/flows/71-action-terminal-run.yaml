@@ -1,0 +1,26 @@
+appId: cx.lpm.mobile
+name: 71-action-terminal-run
+tags: [demo, actions, terminal]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "Actions"
+- extendedWaitUntil:
+    visible: "Lint"
+    timeout: 5000
+# A command action runs in a terminal on the Mac; the phone opens the tab it
+# spawned once the sheet is gone.
+- tapOn: "Lint"
+- extendedWaitUntil:
+    notVisible: "Fix tests"
+    timeout: 5000
+- extendedWaitUntil:
+    notVisible: "Tabs"
+    timeout: 10000
+- assertVisible: "Lint"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-spawned-terminal

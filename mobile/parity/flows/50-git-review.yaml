@@ -1,0 +1,48 @@
+appId: cx.lpm.mobile
+name: 50-git-review
+tags: [demo, git]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Review Changes.*"
+      - extendedWaitUntil:
+          visible: "components/CheckoutForm.tsx"
+          timeout: 10000
+# The diffs arrive in one batch right after the file list.
+- waitForAnimationToEnd:
+    timeout: 3000
+- assertVisible: "Changes"
+- takeScreenshot: 1-review
+# The jump menu: icon-only, labelled "Jump to file" on both platforms; its rows
+# are the files' names.
+- tapOn: "Jump to file"
+- extendedWaitUntil:
+    visible: "payments.ts"
+    timeout: 5000
+- assertVisible: "CheckoutForm.tsx"
+- assertVisible: "page.tsx"
+- takeScreenshot: 2-jump-menu
+- tapOn: "payments.ts"
+- waitForAnimationToEnd:
+    timeout: 3000
+- assertVisible: "lib/payments.ts"
+- takeScreenshot: 3-jumped
+- scrollUntilVisible:
+    element: "Only the selected files are committed."
+    direction: DOWN
+- assertVisible: "Generate message"
+- assertVisible: "Commit 4 files"
+- assertVisible: "Only the selected files are committed."
+- takeScreenshot: 4-commit
+- tapOn: "Generate message"
+- extendedWaitUntil:
+    visible: "feat\\(checkout\\): redesign the checkout form and add a payments module"
+    timeout: 10000
+- takeScreenshot: 5-generated

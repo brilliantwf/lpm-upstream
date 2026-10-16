@@ -13,7 +13,9 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
             apply(plugin = libs.pluginId("lpm-android-compose"))
             apply(plugin = libs.pluginId("lpm-hilt"))
             dependencies {
+                "implementation"(project(":core:data"))
                 "implementation"(project(":core:designsystem"))
+                "implementation"(project(":core:navigation"))
                 "implementation"(libs.library("androidx-lifecycle-runtime-compose"))
                 "implementation"(libs.library("androidx-lifecycle-viewmodel-navigation3"))
                 "implementation"(libs.library("androidx-hilt-lifecycle-viewmodel-compose"))

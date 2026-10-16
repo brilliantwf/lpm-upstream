@@ -1,0 +1,53 @@
+appId: cx.lpm.mobile
+name: 81-config-service
+tags: [demo, config, services]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+# The project's "…" menu; tap Configure… once it has settled.
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Configure…"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Configure…"
+      - extendedWaitUntil:
+          visible: "Configuration"
+          timeout: 5000
+# A service row opens its editor over the hub, seeded from its YAML body.
+- tapOn: "web"
+- extendedWaitUntil:
+    visible: "Edit Service"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "npm run dev"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-edit-service
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    notVisible: "Edit Service"
+    timeout: 5000
+# An action row opens the action editor.
+- scrollUntilVisible:
+    element: "Lint"
+- tapOn: "Lint"
+- extendedWaitUntil:
+    visible: "Edit Action"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "npm run lint"
+    timeout: 5000
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    notVisible: "Edit Action"
+    timeout: 5000
+- assertVisible: "Configuration"

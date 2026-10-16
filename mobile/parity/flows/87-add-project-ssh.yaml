@@ -1,0 +1,38 @@
+appId: cx.lpm.mobile
+name: 87-add-project-ssh
+tags: [demo, config, projects]
+---
+- runFlow: subflows/enter-demo.yaml
+- runFlow: subflows/open-more-menu.yaml
+- tapOn: "Add Project…"
+- extendedWaitUntil:
+    visible: "Folder on your Mac"
+    timeout: 5000
+# SSH: a saved host from the Mac's ~/.ssh/config fills in the connection.
+- tapOn: "SSH"
+- extendedWaitUntil:
+    visible: "Connect to host"
+    timeout: 5000
+- assertVisible: "Pick a saved host to fill in its details, or enter a new one."
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-ssh
+- tapOn: "Connect to host"
+- extendedWaitUntil:
+    visible: "staging — deploy"
+    timeout: 5000
+- tapOn: "staging — deploy"
+- extendedWaitUntil:
+    visible: "~/.ssh/id_ed25519"
+    timeout: 5000
+- assertVisible: "deploy-staging"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-host-picked
+- tapOn: "Add"
+- extendedWaitUntil:
+    notVisible: "Connect to host"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "deploy-staging"
+    timeout: 5000

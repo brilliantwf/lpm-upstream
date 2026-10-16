@@ -1,0 +1,42 @@
+appId: cx.lpm.mobile
+name: 83-config-yaml
+tags: [demo, config]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+# The project's "…" menu; tap Configure… once it has settled.
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Configure…"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Configure…"
+      - extendedWaitUntil:
+          visible: "Configuration"
+          timeout: 5000
+- scrollUntilVisible:
+    element: "Edit Configuration File"
+- tapOn: "Edit Configuration File"
+# The raw file of each layer, comments kept.
+- extendedWaitUntil:
+    visible: "This Project"
+    timeout: 5000
+- assertVisible: "Shared"
+- assertVisible: "All Projects"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-project-layer
+- tapOn: "All Projects"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-global-layer
+- tapOn: "This Project"
+- waitForAnimationToEnd:
+    timeout: 3000

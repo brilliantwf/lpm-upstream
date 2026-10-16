@@ -1,0 +1,408 @@
+{"at": 0, "frame": {"t": "projects"}}
+{"at": 0, "frame": {"t": "sidebar"}}
+{"at": 0, "frame": {"t": "duplicateDefaults"}}
+{"at": 0, "frame": {"t": "status", "project": "storefront"}}
+{"at": 0, "frame": {"t": "terminals", "project": "storefront"}}
+{"at": 0, "frame": {"t": "terminals", "project": "blog"}}
+{"at": 0, "frame": {"t": "nope"}}
+{"at": 0, "raw": "not json"}
+{"at": 0, "raw": "{\"x\":1}"}
+{"at": 100, "frame": {"t": "services", "project": "storefront"}}
+{"at": 100, "frame": {"t": "services", "project": "nope"}}
+{"at": 200, "frame": {"t": "serviceLogs", "project": "storefront", "paneIndex": 0}}
+{"at": 200, "frame": {"t": "serviceLogs", "project": "storefront", "paneIndex": 2}}
+{"at": 200, "frame": {"t": "serviceLogs", "project": "blog", "paneIndex": 0}}
+{"at": 300, "frame": {"t": "serviceLogsWatch", "project": "storefront", "paneIndex": 1}}
+{"at": 300, "frame": {"t": "fileChunk", "project": "storefront", "path": "package.json", "offset": 10, "length": 50, "reqId": "r1"}}
+{"at": 300, "frame": {"t": "fileChunk", "project": "storefront", "path": "lib/x.go", "reqId": 7}}
+{"at": 300, "frame": {"t": "fileChunk", "project": "blog", "path": "README.md"}}
+{"at": 300, "frame": {"t": "fileChunk", "project": "blog", "path": "docs/data.json"}}
+{"at": 300, "frame": {"t": "fileChunk", "project": "blog", "path": "src/a.ts", "offset": 5}}
+{"at": 300, "frame": {"t": "fileChunk", "project": "storefront", "path": "components/CheckoutForm.tsx"}}
+{"at": 300, "frame": {"t": "fileChunk", "project": "storefront", "path": "package.json"}}
+{"at": 300, "frame": {"t": "fileChunk", "project": "storefront", "path": "app/checkout/page.tsx"}}
+{"at": 300, "frame": {"t": "fileChunk", "project": "storefront", "path": "lib/payments.ts"}}
+{"at": 300, "frame": {"t": "fileChunk", "project": "storefront", "path": "README.md"}}
+{"at": 300, "frame": {"t": "fileChunk", "project": "storefront", "path": "a/b/", "offset": 1000}}
+{"at": 400, "frame": {"t": "listDirs", "path": "~/Projects/"}}
+{"at": 400, "frame": {"t": "listDirs", "path": "/"}}
+{"at": 400, "frame": {"t": "listDirs", "path": "  "}}
+{"at": 400, "frame": {"t": "listDirs", "path": "/Users"}}
+{"at": 400, "frame": {"t": "listSshHosts"}}
+{"at": 500, "frame": {"t": "git", "project": "storefront"}}
+{"at": 500, "frame": {"t": "git", "project": "nope"}}
+{"at": 500, "frame": {"t": "gitDiff", "project": "storefront", "path": "components/CheckoutForm.tsx"}}
+{"at": 500, "frame": {"t": "gitDiff", "project": "storefront", "path": "README.md"}}
+{"at": 500, "frame": {"t": "gitDiff", "project": "storefront", "path": "new.ts"}}
+{"at": 500, "frame": {"t": "gitDiff", "project": "storefront", "path": "app/checkout/page.tsx"}}
+{"at": 500, "frame": {"t": "gitDiff", "project": "storefront", "path": "lib/payments.ts"}}
+{"at": 500, "frame": {"t": "gitDiffs", "project": "storefront", "paths": ["lib/payments.ts", "x.md"]}}
+{"at": 500, "frame": {"t": "gitDiffs", "project": "blog", "paths": ["added.ts"]}}
+{"at": 600, "frame": {"t": "gitBranches", "project": "storefront"}}
+{"at": 600, "frame": {"t": "gitBranches", "project": "nope"}}
+{"at": 600, "frame": {"t": "gitWatch", "project": "storefront"}}
+{"at": 700, "frame": {"t": "gitGenMessage", "project": "storefront", "files": ["lib/payments.ts"]}}
+{"at": 700, "frame": {"t": "gitGenMessage", "project": "blog", "files": ["README.md", "docs/a.md"]}}
+{"at": 700, "frame": {"t": "gitGenMessage", "project": "blog", "files": ["app/page.tsx"]}}
+{"at": 700, "frame": {"t": "gitGenMessage", "project": "blog", "files": ["src/x.ts"]}}
+{"at": 700, "frame": {"t": "gitGenMessage", "project": "blog", "files": ["src/x.ts", "y.go"]}}
+{"at": 700, "frame": {"t": "gitGenPr", "project": "storefront"}}
+{"at": 700, "frame": {"t": "gitGenPr", "project": "blog"}}
+{"at": 800, "frame": {"t": "jobs"}}
+{"at": 800, "frame": {"t": "jobHistory", "project": "storefront", "jobId": "nightly-tests"}}
+{"at": 800, "frame": {"t": "jobConfig", "project": "blog", "jobId": "weekly-deps"}}
+{"at": 800, "frame": {"t": "jobConfig", "project": "x", "jobId": "y"}}
+{"at": 800, "frame": {"t": "jobLiveOutput", "project": "storefront", "jobId": "nightly-tests"}}
+{"at": 900, "frame": {"t": "memory", "project": "storefront"}}
+{"at": 900, "frame": {"t": "memory", "project": "blog"}}
+{"at": 900, "frame": {"t": "memory", "project": "api-gateway"}}
+{"at": 900, "frame": {"t": "memory", "project": "mobile-app"}}
+{"at": 900, "frame": {"t": "memorySession", "project": "storefront", "name": "checkout-redesign"}}
+{"at": 900, "frame": {"t": "memorySession", "project": "storefront", "name": "gone"}}
+{"at": 950, "frame": {"t": "memorySession", "project": "storefront", "name": "checkout-redesign"}}
+{"at": 950, "frame": {"t": "memorySession", "project": "storefront", "name": "payments-module"}}
+{"at": 950, "frame": {"t": "memorySession", "project": "storefront", "name": "cart-badge-bug"}}
+{"at": 950, "frame": {"t": "memorySession", "project": "api-gateway", "name": "rate-limiting"}}
+{"at": 950, "frame": {"t": "memorySession", "project": "api-gateway", "name": "graceful-shutdown"}}
+{"at": 950, "frame": {"t": "memorySession", "project": "mobile-app", "name": "startup-time"}}
+{"at": 1000, "frame": {"t": "notesChats", "project": "storefront"}}
+{"at": 1000, "frame": {"t": "notesChats", "project": "blog"}}
+{"at": 1000, "frame": {"t": "notesChats", "project": "api-gateway"}}
+{"at": 1500, "frame": {"t": "notesMessages", "project": "storefront", "chatId": "chat-1", "limit": 50}}
+{"at": 2000, "frame": {"t": "notesMessages", "project": "storefront", "chatId": "chat-1", "limit": 50, "beforeId": "note-6"}}
+{"at": 2000, "frame": {"t": "notesMessages", "project": "storefront", "chatId": "chat-56"}}
+{"at": 2000, "frame": {"t": "notesSearch", "project": "storefront", "query": "mock"}}
+{"at": 2000, "frame": {"t": "notesSearch", "project": "storefront", "query": "  "}}
+{"at": 2000, "frame": {"t": "notesSearch", "project": "storefront", "query": "the", "limit": 5}}
+{"at": 2000, "frame": {"t": "notesAttachment", "project": "storefront", "hash": "nope"}}
+{"at": 2000, "frame": {"t": "notesMessages", "project": "storefront", "chatId": "chat-56", "limit": 100}}
+{"at": 2000, "frame": {"t": "notesMessages", "project": "storefront", "chatId": "chat-65", "limit": 100}}
+{"at": 2000, "frame": {"t": "notesMessages", "project": "api-gateway", "chatId": "chat-70", "limit": 100}}
+{"at": 2000, "frame": {"t": "notesMessages", "project": "mobile-app", "chatId": "chat-75", "limit": 100}}
+{"at": 2000, "frame": {"t": "notesMessages", "project": "storefront", "chatId": "chat-1", "limit": 0, "beforeId": "note-55"}}
+{"at": 2000, "frame": {"t": "notesMessages", "project": "storefront", "chatId": "chat-1", "beforeId": "nope"}}
+{"at": 2100, "frame": {"t": "stats", "days": 7}}
+{"at": 2100, "frame": {"t": "stats", "days": 0}}
+{"at": 2100, "frame": {"t": "stats", "days": 30}}
+{"at": 2100, "frame": {"t": "stats", "days": 1}}
+{"at": 2200, "frame": {"t": "limits"}}
+{"at": 2300, "frame": {"t": "claudeAccounts"}}
+{"at": 2300, "frame": {"t": "historyQuery"}}
+{"at": 2300, "frame": {"t": "historyQuery", "project": "storefront", "search": "Checkout"}}
+{"at": 2300, "frame": {"t": "historyFolders"}}
+{"at": 2300, "frame": {"t": "history", "project": "storefront", "q": ""}}
+{"at": 2300, "frame": {"t": "history", "project": "storefront", "q": "CHECKOUT"}}
+{"at": 2300, "frame": {"t": "historyQuery", "before": {"at": 1790033400123, "seq": 4}}}
+{"at": 2400, "frame": {"t": "composerActions"}}
+{"at": 2400, "frame": {"t": "slash", "id": "demo-storefront-claude", "project": "storefront"}}
+{"at": 2400, "frame": {"t": "slash", "id": "demo-storefront-1", "project": "storefront"}}
+{"at": 2400, "frame": {"t": "mentions", "project": "storefront"}}
+{"at": 2400, "frame": {"t": "mentions", "project": "blog"}}
+{"at": 2400, "frame": {"t": "mentions", "project": "api-gateway"}}
+{"at": 2400, "frame": {"t": "mentions", "project": "mobile-app"}}
+{"at": 2400, "frame": {"t": "mentions", "project": "design-system"}}
+{"at": 2400, "frame": {"t": "mentions", "project": "zzz"}}
+{"at": 2500, "frame": {"t": "transform", "reqId": "t1", "text": "can you please just fix the checkout   form. it is very slow", "instruction": "Make this text shorter and more concise.", "variants": 5}}
+{"at": 2500, "frame": {"t": "transform", "reqId": 9, "text": "hey i want you to add tests", "instruction": "Fix the grammar and spelling of this text.", "variants": 2}}
+{"at": 2500, "frame": {"t": "transform", "reqId": "t3", "text": "don't break it", "instruction": "Make this text more detailed and specific.", "variants": 7}}
+{"at": 2500, "frame": {"t": "transform", "reqId": "t4", "text": "", "instruction": "Improve the writing", "variants": 0}}
+{"at": 2500, "frame": {"t": "readConfig", "project": "storefront", "layer": "project"}}
+{"at": 2500, "frame": {"t": "readConfig", "project": "blog", "layer": "project"}}
+{"at": 2500, "frame": {"t": "readConfig", "project": "storefront", "layer": "repo"}}
+{"at": 2500, "frame": {"t": "readConfig", "project": "blog", "layer": "repo"}}
+{"at": 2500, "frame": {"t": "readConfig", "project": "storefront", "layer": "global"}}
+{"at": 2500, "frame": {"t": "readConfig", "project": "blog", "layer": "global"}}
+{"at": 2500, "frame": {"t": "readConfig", "project": "api-gateway", "layer": "project"}}
+{"at": 2500, "frame": {"t": "readConfig", "project": "nope", "layer": "project"}}
+{"at": 2600, "frame": {"t": "actionBody", "project": "storefront", "key": "test"}}
+{"at": 2600, "frame": {"t": "actionBody", "project": "api-gateway", "key": "release"}}
+{"at": 2600, "frame": {"t": "actionBody", "project": "blog", "key": "new-post"}}
+{"at": 2600, "frame": {"t": "actionBody", "project": "blog", "key": "nope"}}
+{"at": 2600, "frame": {"t": "serviceBody", "project": "storefront", "key": "web"}}
+{"at": 2600, "frame": {"t": "serviceBody", "project": "storefront", "key": "nope"}}
+{"at": 3000, "frame": {"t": "sub", "id": "demo-storefront-1"}}
+{"at": 3050, "frame": {"t": "in", "id": "demo-storefront-1", "d": "ls\r"}}
+{"at": 3100, "frame": {"t": "in", "id": "demo-storefront-1", "d": "git status\r"}}
+{"at": 3150, "frame": {"t": "in", "id": "demo-storefront-1", "d": "npm test\r"}}
+{"at": 3200, "frame": {"t": "in", "id": "demo-storefront-1", "d": "echo hello world\r"}}
+{"at": 3250, "frame": {"t": "in", "id": "demo-storefront-1", "d": "foo bar\r"}}
+{"at": 3300, "frame": {"t": "in", "id": "demo-storefront-1", "d": "git log\r"}}
+{"at": 3350, "frame": {"t": "in", "id": "demo-storefront-1", "d": "git push\r"}}
+{"at": 3400, "frame": {"t": "in", "id": "demo-storefront-1", "d": "abc\u007f\u007fx\u001b[A\u001b]0;title\u0007\u0003"}}
+{"at": 3450, "frame": {"t": "in", "id": "demo-storefront-1", "d": "claude\rpwd\rwhoami\r\r"}}
+{"at": 3500, "frame": {"t": "in", "id": "demo-storefront-1", "d": "npm run dev\rnpm run lint\r"}}
+{"at": 3550, "frame": {"t": "in", "id": "demo-storefront-1", "d": "caf\u00e9 \ud83d\ude00\u007f\r"}}
+{"at": 3600, "frame": {"t": "in", "id": "demo-storefront-1", "d": "\u0000ignored"}}
+{"at": 3650, "frame": {"t": "resize", "id": "demo-storefront-1", "cols": 100, "rows": 30}}
+{"at": 3700, "frame": {"t": "unsub", "id": "demo-storefront-1"}}
+{"at": 3800, "frame": {"t": "claim", "id": "demo-storefront-1"}}
+{"at": 4000, "frame": {"t": "sub", "id": "demo-storefront-claude"}}
+{"at": 4500, "frame": {"t": "in", "id": "demo-storefront-claude", "d": "hi there\u007f\u007f\u007fe\r"}}
+{"at": 5000, "frame": {"t": "serviceLogsUnwatch", "project": "storefront", "paneIndex": 1}}
+{"at": 5000, "frame": {"t": "start", "name": "api-gateway", "profile": ""}}
+{"at": 5000, "frame": {"t": "toggleService", "name": "storefront", "service": "worker"}}
+{"at": 5000, "frame": {"t": "start", "name": "nope"}}
+{"at": 6000, "frame": {"t": "duplicate", "name": "storefront", "count": 1, "labels": ["work copy"], "runMode": "action", "action": "test"}}
+{"at": 6000, "frame": {"t": "jobs"}}
+{"at": 7000, "frame": {"t": "runActionBackground", "project": "api-gateway", "action": "test", "inputValues": {}, "runId": "run-1"}}
+{"at": 7000, "frame": {"t": "actionBgOutput", "project": "api-gateway", "runId": "run-1"}}
+{"at": 9000, "frame": {"t": "git", "project": "work-copy"}}
+{"at": 9000, "frame": {"t": "terminals", "project": "work-copy"}}
+{"at": 9100, "frame": {"t": "sub", "id": "demo-work-copy-2"}}
+{"at": 9100, "frame": {"t": "sub", "id": "demo-work-copy-1"}}
+{"at": 9200, "frame": {"t": "unsub", "id": "demo-work-copy-1"}}
+{"at": 9300, "frame": {"t": "readConfig", "project": "work-copy", "layer": "repo"}}
+{"at": 9500, "frame": {"t": "actionBgOutput", "project": "api-gateway", "runId": "run-1"}}
+{"at": 13500, "frame": {"t": "actionBgOutput", "project": "api-gateway", "runId": "run-1"}}
+{"at": 13500, "frame": {"t": "backgroundRuns", "project": "api-gateway"}}
+{"at": 14000, "frame": {"t": "runActionBackground", "project": "blog", "action": "new-post", "inputValues": {"title": "Hello World!"}, "runId": "run-2"}}
+{"at": 14000, "frame": {"t": "runActionBackground", "project": "blog", "action": "nope", "inputValues": {}, "runId": "run-x"}}
+{"at": 14500, "frame": {"t": "cancelActionBackground", "runId": "run-2"}}
+{"at": 15000, "frame": {"t": "actionBgOutput", "project": "blog", "runId": "run-2"}}
+{"at": 15000, "frame": {"t": "actionBgOutput", "project": "blog", "runId": "nope"}}
+{"at": 15000, "frame": {"t": "runActionBackground", "project": "mobile-app", "action": "clean", "inputValues": {}, "runId": "run-3"}}
+{"at": 15000, "frame": {"t": "runAction", "project": "storefront", "action": "lint", "inputValues": {}}}
+{"at": 15000, "frame": {"t": "runAction", "project": "storefront", "action": "fix-tests", "inputValues": {}}}
+{"at": 15000, "frame": {"t": "runAction", "project": "storefront", "action": "nope"}}
+{"at": 16500, "frame": {"t": "terminals", "project": "storefront"}}
+{"at": 17000, "frame": {"t": "runJob", "project": "storefront", "jobId": "nightly-tests"}}
+{"at": 17000, "frame": {"t": "runJob", "project": "storefront", "jobId": "nope"}}
+{"at": 17500, "frame": {"t": "jobLiveOutput", "project": "storefront", "jobId": "nightly-tests"}}
+{"at": 20000, "frame": {"t": "jobLiveOutput", "project": "storefront", "jobId": "nightly-tests"}}
+{"at": 20000, "frame": {"t": "gitAuto", "project": "work-copy", "kind": "commitPush", "nonce": "wc1"}}
+{"at": 21000, "frame": {"t": "backgroundRuns", "project": "mobile-app"}}
+{"at": 24500, "frame": {"t": "git", "project": "work-copy"}}
+{"at": 24500, "frame": {"t": "gitAutoState", "project": "work-copy"}}
+{"at": 24600, "frame": {"t": "gitAuto", "project": "work-copy", "kind": "pr", "nonce": "wc2"}}
+{"at": 26000, "frame": {"t": "jobs"}}
+{"at": 26000, "frame": {"t": "jobHistory", "project": "storefront", "jobId": "nightly-tests"}}
+{"at": 26100, "frame": {"t": "markJobSeen", "project": "storefront", "jobId": "nightly-tests"}}
+{"at": 26200, "frame": {"t": "sendJobFollowup", "project": "blog", "jobId": "weekly-deps", "at": 0, "message": "Is it safe?"}}
+{"at": 26300, "frame": {"t": "sendJobFollowup", "project": "blog", "jobId": "weekly-deps", "at": 0, "message": "again"}}
+{"at": 27000, "frame": {"t": "runJob", "project": "blog", "jobId": "weekly-deps"}}
+{"at": 30000, "frame": {"t": "gitAutoState", "project": "work-copy"}}
+{"at": 30000, "frame": {"t": "jobLiveOutput", "project": "blog", "jobId": "weekly-deps"}}
+{"at": 33000, "frame": {"t": "jobHistory", "project": "blog", "jobId": "weekly-deps"}}
+{"at": 33000, "frame": {"t": "saveJob", "id": "hourly", "source": "project", "project": "storefront", "job": {"label": "Hourly check", "emoji": "\u23f1", "schedule": {"every": "2h-4h"}, "run": {"prompt": "Check", "agent": "Codex", "effort": "HIGH"}}}}
+{"at": 33000, "frame": {"t": "saveJob", "id": "window", "source": "global", "job": {"label": "Window", "schedule": {"at": "09:00", "until": "17:00", "times": 3, "days": ["MON", "wed"]}, "run": {"cmd": "make"}}}}
+{"at": 33000, "frame": {"t": "saveJob", "id": "daily2", "source": "project", "project": "blog", "job": {"label": "Daily", "schedule": {"every": 2}, "run": {"action": "new-post"}}}}
+{"at": 33000, "frame": {"t": "saveJob", "id": "manual1", "source": "project", "project": "blog", "job": {"label": "Manual", "schedule": {"manual": true}, "run": {"cmd": "ls"}}}}
+{"at": 33000, "frame": {"t": "saveJob", "id": "", "source": "global", "job": {}}}
+{"at": 33100, "frame": {"t": "jobs"}}
+{"at": 33100, "frame": {"t": "jobConfig", "project": "storefront", "jobId": "hourly"}}
+{"at": 33100, "frame": {"t": "jobConfig", "project": "storefront", "jobId": "nightly-tests"}}
+{"at": 33200, "frame": {"t": "setJobEnabled", "project": "storefront", "jobId": "nightly-tests", "enabled": false}}
+{"at": 33200, "frame": {"t": "setJobEnabled", "project": "blog", "jobId": "weekly-deps", "enabled": true}}
+{"at": 33300, "frame": {"t": "deleteJob", "id": "manual1", "source": "project", "project": "blog"}}
+{"at": 33400, "frame": {"t": "runJob", "project": "blog", "jobId": "daily2"}}
+{"at": 34000, "frame": {"t": "stopJob", "project": "blog", "jobId": "daily2"}}
+{"at": 34000, "frame": {"t": "gitCheckout", "project": "storefront", "branch": "main", "remote": ""}}
+{"at": 34100, "frame": {"t": "markAllJobsSeen"}}
+{"at": 34200, "frame": {"t": "jobs"}}
+{"at": 34200, "frame": {"t": "jobHistory", "project": "blog", "jobId": "daily2"}}
+{"at": 35000, "frame": {"t": "gitAuto", "project": "storefront", "kind": "pr", "nonce": "n1"}}
+{"at": 35100, "frame": {"t": "gitAuto", "project": "storefront", "kind": "pr", "nonce": "n2"}}
+{"at": 35200, "frame": {"t": "gitAutoState", "project": "storefront"}}
+{"at": 36000, "frame": {"t": "runJob", "project": "storefront", "jobId": "hourly"}}
+{"at": 36000, "frame": {"t": "runJob", "project": "", "jobId": "window"}}
+{"at": 36100, "frame": {"t": "runJob", "project": "storefront", "jobId": "hourly"}}
+{"at": 42000, "frame": {"t": "in", "id": "demo-storefront-claude", "d": "\u001b[200~Add tests\rand docs\u001b[201~"}}
+{"at": 42100, "frame": {"t": "in", "id": "demo-storefront-claude", "d": "\r"}}
+{"at": 42500, "frame": {"t": "in", "id": "demo-storefront-claude", "d": "queued\r"}}
+{"at": 45000, "frame": {"t": "in", "id": "demo-storefront-claude", "d": "more\r"}}
+{"at": 45000, "frame": {"t": "gitAutoState", "project": "storefront"}}
+{"at": 45000, "frame": {"t": "git", "project": "storefront"}}
+{"at": 45000, "frame": {"t": "jobs"}}
+{"at": 45000, "frame": {"t": "jobHistory", "project": "storefront", "jobId": "hourly"}}
+{"at": 45000, "frame": {"t": "jobHistory", "project": "", "jobId": "window"}}
+{"at": 45000, "frame": {"t": "jobHistory", "project": "blog", "jobId": "weekly-deps"}}
+{"at": 45000, "frame": {"t": "jobConfig", "project": "", "jobId": "window"}}
+{"at": 45000, "frame": {"t": "jobConfig", "project": "blog", "jobId": "daily2"}}
+{"at": 45100, "frame": {"t": "sendJobFollowup", "project": "storefront", "jobId": "nightly-tests", "at": 0, "message": "why?"}}
+{"at": 46000, "frame": {"t": "gitAuto", "project": "blog", "kind": "commit", "nonce": "n3"}}
+{"at": 46000, "frame": {"t": "gitAuto", "project": "nope", "kind": "commit", "nonce": "n4"}}
+{"at": 46000, "frame": {"t": "gitAuto", "project": "mobile-app", "kind": "weird", "nonce": "n5"}}
+{"at": 46000, "frame": {"t": "gitAuto", "project": "api-gateway", "kind": "pr", "nonce": "n6"}}
+{"at": 47000, "frame": {"t": "status", "project": "storefront"}}
+{"at": 47000, "frame": {"t": "clearStatus", "project": "storefront", "paneId": "demo-storefront-claude", "value": "Waiting"}}
+{"at": 47000, "frame": {"t": "clearStatus", "project": "storefront", "paneId": "demo-storefront-claude", "value": "Waiting"}}
+{"at": 47100, "frame": {"t": "sub", "id": "demo-storefront-claude"}}
+{"at": 47200, "frame": {"t": "unsub", "id": "demo-storefront-claude"}}
+{"at": 48000, "frame": {"t": "gitCheckout", "project": "storefront", "branch": "main", "remote": ""}}
+{"at": 48000, "frame": {"t": "gitCheckout", "project": "storefront", "branch": "fix/cart-badge", "remote": ""}}
+{"at": 48500, "frame": {"t": "gitCheckout", "project": "storefront", "branch": "release", "remote": "origin"}}
+{"at": 48600, "frame": {"t": "gitBranches", "project": "storefront"}}
+{"at": 48600, "frame": {"t": "git", "project": "storefront"}}
+{"at": 49000, "frame": {"t": "gitCreateBranch", "project": "storefront", "name": " feat/new thing "}}
+{"at": 49000, "frame": {"t": "gitCreateBranch", "project": "storefront", "name": ""}}
+{"at": 49000, "frame": {"t": "gitCreateBranch", "project": "storefront", "name": "main"}}
+{"at": 50000, "frame": {"t": "gitBranches", "project": "storefront"}}
+{"at": 50000, "frame": {"t": "gitAutoPullUndo", "project": "api-gateway"}}
+{"at": 50000, "frame": {"t": "gitAutoPullUndo", "project": "blog"}}
+{"at": 51000, "frame": {"t": "git", "project": "api-gateway"}}
+{"at": 51000, "frame": {"t": "setAutoPull", "project": "mobile-app", "value": true}}
+{"at": 51000, "frame": {"t": "setAutoPull", "project": "design-system", "value": null}}
+{"at": 51000, "frame": {"t": "setWorkStatus", "project": "storefront", "status": {"state": "custom", "label": "QA", "emoji": "\ud83e\uddea", "note": " check "}}}
+{"at": 51000, "frame": {"t": "setWorkStatus", "project": "blog", "status": {"state": "blocked", "note": "waiting on design"}}}
+{"at": 51000, "frame": {"t": "setWorkStatus", "project": "blog", "status": {"state": "custom"}}}
+{"at": 51000, "frame": {"t": "setWorkStatus", "project": "mobile-app", "status": {"state": "done"}}}
+{"at": 51050, "frame": {"t": "setWorkStatus", "project": "mobile-app", "status": null}}
+{"at": 51100, "frame": {"t": "projects"}}
+{"at": 51200, "frame": {"t": "gitAuto", "project": "storefront", "kind": "commitPush", "nonce": "n7"}}
+{"at": 51300, "frame": {"t": "gitAutoCancel", "project": "storefront"}}
+{"at": 52000, "frame": {"t": "createProject", "name": "my-app"}}
+{"at": 52000, "frame": {"t": "createProject", "name": ""}}
+{"at": 52000, "frame": {"t": "createProject", "name": "storefront"}}
+{"at": 52000, "frame": {"t": "createSshProject", "name": "remote-box", "ssh": {"host": "box.local", "user": "me"}}}
+{"at": 52000, "frame": {"t": "createSshProject", "name": "remote-2", "ssh": {"host": ""}}}
+{"at": 52000, "frame": {"t": "cloneProject", "name": "cloned", "url": " https://github.com/x/y "}}
+{"at": 52000, "frame": {"t": "cloneProject", "name": "cloned2", "url": "  "}}
+{"at": 52000, "frame": {"t": "jobHistory", "project": "storefront", "jobId": "nightly-tests"}}
+{"at": 52500, "frame": {"t": "duplicate", "name": "storefront", "count": 2, "labels": ["", "Feature X"], "groupName": "Copies", "runMode": "command", "command": " npm run lint ", "excludeUncommitted": true, "pullLatest": false, "reinstallDeps": true}}
+{"at": 52500, "frame": {"t": "duplicate", "name": "nope"}}
+{"at": 52600, "frame": {"t": "duplicate", "name": "blog", "count": 1, "runMode": "action", "action": "new-post"}}
+{"at": 52600, "frame": {"t": "duplicateDefaults"}}
+{"at": 53000, "frame": {"t": "gitAutoState", "project": "storefront"}}
+{"at": 55000, "frame": {"t": "projects"}}
+{"at": 55000, "frame": {"t": "sidebar"}}
+{"at": 55000, "frame": {"t": "terminals", "project": "storefront-2"}}
+{"at": 55000, "frame": {"t": "terminals", "project": "feature-x"}}
+{"at": 55000, "frame": {"t": "git", "project": "feature-x"}}
+{"at": 55100, "frame": {"t": "sub", "id": "demo-storefront-2-1"}}
+{"at": 55200, "frame": {"t": "unsub", "id": "demo-storefront-2-1"}}
+{"at": 56000, "frame": {"t": "memory", "project": "storefront-2"}}
+{"at": 56000, "frame": {"t": "readConfig", "project": "storefront-2", "layer": "project"}}
+{"at": 56000, "frame": {"t": "mentions", "project": "feature-x"}}
+{"at": 56500, "frame": {"t": "sidebarCreateFolder", "name": "Side Projects"}}
+{"at": 56500, "frame": {"t": "sidebarCreateFolder", "name": "side projects"}}
+{"at": 56500, "frame": {"t": "sidebarMoveProject", "project": "my-app", "folder": "Side Projects"}}
+{"at": 56500, "frame": {"t": "sidebarMoveProject", "project": "remote-box", "folder": "New Folder!"}}
+{"at": 56500, "frame": {"t": "sidebarRenameFolder", "name": "side PROJECTS", "newName": "Side Stuff"}}
+{"at": 56500, "frame": {"t": "sidebarDeleteFolder", "name": "Client Work"}}
+{"at": 56500, "frame": {"t": "sidebarMoveProject", "project": "my-app", "folder": ""}}
+{"at": 57000, "frame": {"t": "saveService", "project": "storefront", "key": "web", "previousKey": "", "payload": {"cmd": "npm run dev -- -p 3001", "port": 3001, "cwd": "apps/web", "dependsOn": ["api"], "env": {"NODE_ENV": "development", "A": "b: c"}}}}
+{"at": 57000, "frame": {"t": "saveService", "project": "storefront", "key": "api2", "previousKey": "api", "payload": {"cmd": "npm run api", "port": 4001}}}
+{"at": 57000, "frame": {"t": "saveService", "project": "nope", "key": "x", "payload": {}}}
+{"at": 57500, "frame": {"t": "readConfig", "project": "storefront", "layer": "project"}}
+{"at": 57500, "frame": {"t": "serviceBody", "project": "storefront", "key": "web"}}
+{"at": 57500, "frame": {"t": "saveProfile", "project": "storefront", "name": "backend", "services": ["api2", "worker"]}}
+{"at": 57550, "frame": {"t": "saveProfile", "project": "storefront", "name": "server", "previousName": "backend", "services": ["api2"]}}
+{"at": 57600, "frame": {"t": "saveAction", "project": "storefront", "key": "deploy", "payload": {"label": "Deploy", "cmd": "npm run deploy", "confirm": true, "inputs": [{"key": "env", "label": "Environment", "type": "select", "options": ["staging", "prod"], "required": true}], "actions": {"staging": {"label": "Staging", "cmd": "deploy staging"}, "prod": {"cmd": "deploy prod"}}}}}
+{"at": 57600, "frame": {"t": "saveAction", "project": "storefront", "key": "a:b", "payload": {"cmd": "x"}}}
+{"at": 57700, "frame": {"t": "saveAction", "project": "api-gateway", "key": "release", "payload": {"label": "\ud83d\ude80 Release \u00b7 {{git.tag}} \u00b7 {{git.tagAge}}", "cmd": "./scripts/release.sh", "type": "background"}}}
+{"at": 57700, "frame": {"t": "saveAction", "project": "api-gateway", "key": "test2", "previousKey": "test", "payload": {"cmd": "go test -race ./...", "emoji": "\ud83e\uddea", "label": "true"}}}
+{"at": 58000, "frame": {"t": "readConfig", "project": "storefront", "layer": "project"}}
+{"at": 58000, "frame": {"t": "readConfig", "project": "api-gateway", "layer": "project"}}
+{"at": 58000, "frame": {"t": "readConfig", "project": "blog", "layer": "project"}}
+{"at": 58000, "frame": {"t": "readConfig", "project": "remote-box", "layer": "repo"}}
+{"at": 58100, "frame": {"t": "actionBody", "project": "storefront", "key": "deploy:staging"}}
+{"at": 58100, "frame": {"t": "actionBody", "project": "storefront", "key": "deploy"}}
+{"at": 58100, "frame": {"t": "actionBody", "project": "api-gateway", "key": "release"}}
+{"at": 58200, "frame": {"t": "deleteService", "project": "storefront", "key": "worker"}}
+{"at": 58200, "frame": {"t": "deleteProfile", "project": "storefront", "name": "server"}}
+{"at": 58200, "frame": {"t": "deleteAction", "project": "storefront", "key": "lint"}}
+{"at": 58200, "frame": {"t": "deleteService", "project": "storefront", "key": "api2"}}
+{"at": 58500, "frame": {"t": "projects"}}
+{"at": 58500, "frame": {"t": "readConfig", "project": "storefront", "layer": "project"}}
+{"at": 58500, "frame": {"t": "serviceBody", "project": "storefront", "key": "web"}}
+{"at": 59000, "frame": {"t": "saveConfig", "project": "storefront", "layer": "project", "content": "x: 1"}}
+{"at": 59000, "frame": {"t": "saveConfig", "project": "storefront", "layer": "global", "content": "y: 2"}}
+{"at": 59000, "frame": {"t": "saveConfig", "project": "nope", "layer": "global", "content": "y: 2"}}
+{"at": 59500, "frame": {"t": "readConfig", "project": "storefront", "layer": "project"}}
+{"at": 59500, "frame": {"t": "readConfig", "project": "storefront-2", "layer": "project"}}
+{"at": 59500, "frame": {"t": "readConfig", "project": "blog", "layer": "global"}}
+{"at": 59500, "frame": {"t": "memorySave", "project": "storefront", "name": "new-session", "content": "# New one\nhello", "baseline": ""}}
+{"at": 59500, "frame": {"t": "memorySave", "project": "storefront", "name": "Bad Name", "content": "x"}}
+{"at": 59500, "frame": {"t": "memorySave", "project": "storefront", "name": "checkout-redesign", "content": "x", "baseline": "stale"}}
+{"at": 59600, "frame": {"t": "memorySave", "project": "storefront-2", "name": "payments-module", "content": "  #  \n# Payments v2 \nbody"}}
+{"at": 59700, "frame": {"t": "memorySave", "project": "blog", "name": "blog-notes", "content": "no title here"}}
+{"at": 61000, "frame": {"t": "memory", "project": "storefront"}}
+{"at": 61000, "frame": {"t": "memoryDelete", "project": "storefront", "name": "cart-badge-bug"}}
+{"at": 61000, "frame": {"t": "memory", "project": "blog"}}
+{"at": 61500, "frame": {"t": "memory", "project": "storefront"}}
+{"at": 61500, "frame": {"t": "notesCreateChat", "project": "storefront", "title": "  Launch  "}}
+{"at": 61500, "frame": {"t": "notesCreateChat", "project": "storefront", "title": "   "}}
+{"at": 61500, "frame": {"t": "notesAddMessage", "project": "storefront", "chatId": "chat-1", "text": "New note"}}
+{"at": 61500, "frame": {"t": "notesAddMessage", "project": "storefront", "chatId": "chat-1", "text": "With file", "attachments": [{"data": "aGVsbG8=", "name": "a.txt", "mimeType": "text/plain"}]}}
+{"at": 61500, "frame": {"t": "notesAddMessage", "project": "storefront", "chatId": "chat-1", "text": "bad", "attachments": [{"data": "abc"}]}}
+{"at": 61500, "frame": {"t": "notesAddMessage", "project": "storefront", "chatId": "chat-x", "text": "bad chat"}}
+{"at": 62500, "frame": {"t": "notesEditMessage", "project": "storefront", "id": "note-2", "text": "Edited mock note"}}
+{"at": 62500, "frame": {"t": "notesEditMessage", "project": "storefront", "id": "note-x", "text": "x"}}
+{"at": 62500, "frame": {"t": "notesDeleteMessage", "project": "storefront", "id": "note-3"}}
+{"at": 62500, "frame": {"t": "notesRenameChat", "project": "storefront", "chatId": "chat-56", "title": "Ideas 2"}}
+{"at": 62500, "frame": {"t": "notesRenameChat", "project": "storefront", "chatId": "chat-x", "title": "x"}}
+{"at": 62500, "frame": {"t": "notesDeleteChat", "project": "storefront", "chatId": "chat-65"}}
+{"at": 63500, "frame": {"t": "notesChats", "project": "storefront"}}
+{"at": 63500, "frame": {"t": "notesSearch", "project": "storefront", "query": "EDITED"}}
+{"at": 63500, "frame": {"t": "notesMessages", "project": "storefront", "chatId": "chat-1", "limit": 3}}
+{"at": 63500, "frame": {"t": "notesDeleteChat", "project": "storefront", "chatId": "chat-1"}}
+{"at": 64000, "frame": {"t": "historySaveDraft", "project": "storefront", "message": "Draft one"}}
+{"at": 64000, "frame": {"t": "historySaveDraft", "project": "storefront", "message": {"text": "Draft two"}}}
+{"at": 64000, "frame": {"t": "historyToggleFavorite", "id": "hm-1"}}
+{"at": 64000, "frame": {"t": "historyToggleFavorite", "id": "nope"}}
+{"at": 64000, "frame": {"t": "historySetFolder", "id": "hm-2", "folder": "folder-1"}}
+{"at": 64000, "frame": {"t": "historySetFolder", "id": "nope", "folder": ""}}
+{"at": 64000, "frame": {"t": "historyCreateFolder", "name": " Bugs "}}
+{"at": 64000, "frame": {"t": "historyCreateFolder", "name": "checkout"}}
+{"at": 64000, "frame": {"t": "historyCreateFolder", "name": ""}}
+{"at": 64000, "frame": {"t": "historyCreateFolder", "name": "alpha"}}
+{"at": 64000, "frame": {"t": "historyFolders"}}
+{"at": 64000, "frame": {"t": "historyDeleteFolder", "name": "Bugs"}}
+{"at": 64000, "frame": {"t": "historyDeleteFolder", "id": "folder-1"}}
+{"at": 64000, "frame": {"t": "historyDelete", "id": "hm-3"}}
+{"at": 64000, "frame": {"t": "historyAdd", "project": "storefront", "text": "Sent text"}}
+{"at": 64000, "frame": {"t": "historyFolders"}}
+{"at": 64100, "frame": {"t": "historyQuery", "favoritesOnly": true}}
+{"at": 64100, "frame": {"t": "historyQuery", "folder": "folder-1"}}
+{"at": 64100, "frame": {"t": "historyQuery", "project": "blog"}}
+{"at": 64100, "frame": {"t": "historyQuery", "before": {"at": 0, "seq": 0}}}
+{"at": 64100, "frame": {"t": "history", "project": "storefront", "q": ""}}
+{"at": 64500, "frame": {"t": "notesAttachment", "project": "storefront", "hash": "44212c0702f15f50af2ae799a3b69e2454def7d591febb3b36a2d25863f6885dx"}}
+{"at": 64500, "frame": {"t": "notesChats", "project": "storefront"}}
+{"at": 65000, "frame": {"t": "composerDraft", "id": "demo-storefront-claude", "text": "Hello"}}
+{"at": 65000, "frame": {"t": "composerDraft", "id": "demo-storefront-1", "text": ""}}
+{"at": 65100, "frame": {"t": "newTerminal", "project": "storefront"}}
+{"at": 65100, "frame": {"t": "newTerminal", "project": "nobody"}}
+{"at": 65100, "frame": {"t": "renameTerminal", "id": "demo-storefront-3", "label": "Logs"}}
+{"at": 65100, "frame": {"t": "pinTerminal", "id": "demo-storefront-3"}}
+{"at": 65100, "frame": {"t": "reorderTerminals", "project": "storefront", "order": ["demo-storefront-claude", "demo-storefront-3"]}}
+{"at": 65200, "frame": {"t": "terminals", "project": "storefront"}}
+{"at": 65300, "frame": {"t": "closeTerminal", "project": "storefront", "id": "demo-storefront-claude"}}
+{"at": 65400, "frame": {"t": "terminals", "project": "storefront"}}
+{"at": 66000, "frame": {"t": "uploadChunk", "id": "demo-storefront-1", "offset": 1048576, "b64": "aGVsbG8=", "reqId": "u2"}}
+{"at": 66000, "frame": {"t": "uploadDone", "id": "demo-storefront-1", "uploadId": "nope", "reqId": "u4"}}
+{"at": 66000, "frame": {"t": "uploadAbort", "uploadId": "nope"}}
+{"at": 66000, "frame": {"t": "upload", "id": "demo-storefront-1", "mime": "image/jpeg", "reqId": "u3"}}
+{"at": 66000, "frame": {"t": "upload", "id": "demo-storefront-1", "name": "shot.png"}}
+{"at": 66000, "frame": {"t": "uploadBegin", "id": "demo-storefront-1", "name": "clip.mov", "size": 5, "reqId": "u1"}}
+{"at": 66000, "frame": {"t": "uploadBegin", "id": "demo-storefront-1"}}
+{"at": 66500, "frame": {"t": "apnsToken", "token": "x"}}
+{"at": 66500, "frame": {"t": "ttsSpeak", "reqId": "s1", "text": "hi"}}
+{"at": 66900, "frame": {"t": "saveProfile", "project": "storefront", "name": "web-only", "services": ["web"]}}
+{"at": 67100, "frame": {"t": "sub", "id": "demo-storefront-1"}}
+{"at": 67200, "frame": {"t": "unsub", "id": "demo-storefront-1"}}
+{"at": 67500, "frame": {"t": "stop", "name": "storefront"}}
+{"at": 68000, "frame": {"t": "remove", "name": "storefront"}}
+{"at": 68000, "frame": {"t": "remove", "name": "my-app"}}
+{"at": 68500, "frame": {"t": "start", "name": "storefront", "profile": "web-only"}}
+{"at": 68500, "frame": {"t": "start", "name": "blog", "profile": "nope"}}
+{"at": 68500, "frame": {"t": "setClaudeAccount", "project": "mobile-app", "choice": {"kind": "list", "ids": ["personal", "work"]}, "confirm": ["personal"]}}
+{"at": 68500, "frame": {"t": "setClaudeAccount", "project": "storefront-2", "choice": {"kind": "main"}}}
+{"at": 68500, "frame": {"t": "setClaudeAccount", "project": "blog", "choice": {"kind": "pin", "id": "work"}}}
+{"at": 68500, "frame": {"t": "setClaudeAccount", "project": "blog", "choice": {"kind": "bogus"}}}
+{"at": 68800, "frame": {"t": "claudeAccounts"}}
+{"at": 69000, "frame": {"t": "gitCommit", "project": "storefront", "files": ["README.md"]}}
+{"at": 69000, "frame": {"t": "gitPush", "project": "storefront"}}
+{"at": 69000, "frame": {"t": "gitPull", "project": "storefront"}}
+{"at": 69000, "frame": {"t": "gitFetch", "project": "storefront"}}
+{"at": 69000, "frame": {"t": "gitDiscardAll", "project": "feature-x"}}
+{"at": 69000, "frame": {"t": "gitCreatePr", "project": "storefront"}}
+{"at": 69000, "frame": {"t": "gitAutoSwitchBase", "project": "storefront", "base": "main"}}
+{"at": 69000, "frame": {"t": "gitCommit", "project": "nope", "files": []}}
+{"at": 71000, "frame": {"t": "gitUnwatch", "project": "storefront"}}
+{"at": 71000, "frame": {"t": "git", "project": "storefront"}}
+{"at": 71000, "frame": {"t": "renameProject", "project": "storefront", "name": "Store"}}
+{"at": 71000, "frame": {"t": "renameProject", "project": "blog", "name": ""}}
+{"at": 71500, "frame": {"t": "projects"}}
+{"at": 73000, "frame": {"t": "limits"}}
+{"at": 80000}

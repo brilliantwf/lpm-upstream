@@ -1,0 +1,25 @@
+appId: cx.lpm.mobile
+name: 14-tailscale-app
+tags: [pairing, tailscale]
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "I use the Tailscale app"
+    timeout: 15000
+- tapOn: "I use the Tailscale app"
+- extendedWaitUntil:
+    visible: "Works anywhere with the Tailscale app"
+    timeout: 5000
+- assertVisible: "Open lpm on your Mac. Pick it below, then approve on the Mac."
+- assertVisible: "Scan QR code"
+- assertVisible: "Enter a code"
+- takeScreenshot: 1-app
+- tapOn: "Use Built-in Tailscale instead"
+- extendedWaitUntil:
+    visible: "How it works"
+    timeout: 5000
+- tapOn: "Done"
+- extendedWaitUntil:
+    visible: "Use lpm anywhere"
+    timeout: 5000

@@ -1,0 +1,20 @@
+appId: cx.lpm.mobile
+name: 16-qr-scanner
+tags: [pairing]
+---
+# Camera allowed up front, so neither platform shows its permission prompt. The
+# iOS simulator has no camera and shows a blank preview; the emulator its scene.
+- launchApp:
+    clearState: true
+    permissions:
+      camera: allow
+- extendedWaitUntil:
+    visible: "Pair for this Wi-Fi only"
+    timeout: 15000
+- tapOn: "Pair for this Wi-Fi only"
+- tapOn: "Scan QR code"
+- extendedWaitUntil:
+    visible: "Scan the QR from lpm → Settings → Mobile devices → Pair a device"
+    timeout: 5000
+- waitForAnimationToEnd
+- takeScreenshot: 1-scanner

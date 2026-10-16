@@ -1,0 +1,47 @@
+appId: cx.lpm.mobile
+name: 99-undo-auto-pull
+tags: [demo, projects, git]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "api-gateway"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+# lpm's last auto pull can be undone while it's recent, with what it brought in (iOS
+# reads the row as one "Undo Auto Pull, 3 commits on main" element, Android as two).
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Review Changes.*"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Git"
+      - extendedWaitUntil:
+          visible: "Auto Pull"
+          timeout: 5000
+- extendedWaitUntil:
+    visible: "(Undo Auto Pull, )?3 commits on main"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-undo-offered
+- tapOn: "Undo Auto Pull.*"
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Review Changes.*"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Git"
+      - extendedWaitUntil:
+          visible: "Auto Pull"
+          timeout: 5000
+- assertNotVisible: "Undo Auto Pull.*"

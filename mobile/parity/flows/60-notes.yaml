@@ -1,0 +1,40 @@
+# The project's notebook: its chats, newest activity first, then a search across
+# every note in them, and a hit opening its chat.
+appId: cx.lpm.mobile
+name: 60-notes
+tags: [demo, notes]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Notes"
+    timeout: 5000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Notes"
+      - extendedWaitUntil:
+          visible: "Checkout redesign"
+          timeout: 5000
+- assertVisible: "Ideas"
+- assertVisible: "General"
+- assertVisible: "New Chat"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-notes-list
+- tapOn: "Search notes"
+- inputText: "mock"
+- extendedWaitUntil:
+    visible: ".*payment mock.*"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-notes-search
+- tapOn: ".*Warming the mock.*"
+- extendedWaitUntil:
+    visible: "Write a note…"
+    timeout: 5000

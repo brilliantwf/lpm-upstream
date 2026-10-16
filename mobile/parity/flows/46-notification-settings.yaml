@@ -1,0 +1,19 @@
+appId: cx.lpm.mobile
+name: 46-notification-settings
+tags: [demo, settings]
+---
+- runFlow: subflows/enter-demo.yaml
+- runFlow: subflows/open-more-menu.yaml
+- tapOn: "Settings.*"
+- extendedWaitUntil:
+    visible: "Theme"
+    timeout: 5000
+- tapOn: "Notifications"
+- extendedWaitUntil:
+    visible: "Push notifications"
+    timeout: 5000
+- assertVisible: "Waiting for you"
+- assertVisible: "Error or timeout"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-notification-settings

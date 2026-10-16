@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Hands the camera a file to write a note photo into. -->
+        <provider
+            android:name="cx.lpm.mobile.feature.notes.composer.NoteCameraFiles"
+            android:authorities="${applicationId}.notes.camera"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+        <!-- Shares an attachment's bytes straight from memory. -->
+        <provider
+            android:name="cx.lpm.mobile.feature.notes.attachment.NoteShareProvider"
+            android:authorities="${applicationId}.notes.share"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+    </application>
+
+</manifest>

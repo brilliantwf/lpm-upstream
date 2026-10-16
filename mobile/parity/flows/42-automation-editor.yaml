@@ -1,0 +1,43 @@
+appId: cx.lpm.mobile
+name: 42-automation-editor
+tags: [demo, automations]
+---
+- runFlow: subflows/enter-demo.yaml
+- runFlow: subflows/open-more-menu.yaml
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Automations.*"
+      - extendedWaitUntil:
+          visible: "Nightly tests"
+          timeout: 5000
+# New: an empty prompt job that runs on its own until a project is picked.
+- tapOn: "New automation"
+- extendedWaitUntil:
+    visible: "New job"
+    timeout: 5000
+- assertVisible: "No project selected — runs on its own in your home folder."
+- assertVisible: "AI prompt"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-new-job
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    notVisible: "New job"
+    timeout: 5000
+# Edit: the form seeded from the job's YAML body.
+- tapOn: "Nightly tests"
+- extendedWaitUntil:
+    visible: "Run history"
+    timeout: 5000
+- tapOn: "Edit automation"
+- extendedWaitUntil:
+    visible: "Edit job"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "npm test"
+    timeout: 5000
+- assertVisible: "Command"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-edit-job

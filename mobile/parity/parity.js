@@ -156,7 +156,8 @@ function androidUp({ headless }) {
   }
   adb(serial, "shell", "settings", "put", "global", "sysui_demo_allowed", "1");
   for (const c of [["enter"], ["clock", "-e", "hhmm", "0941"], ["battery", "-e", "level", "100", "-e", "plugged", "false"],
-    ["network", "-e", "wifi", "show", "-e", "level", "4", "-e", "mobile", "show", "-e", "datatype", "none", "-e", "level", "4"],
+    ["network", "-e", "wifi", "show", "-e", "level", "4", "-e", "fully", "true"],
+    ["network", "-e", "mobile", "show", "-e", "datatype", "none", "-e", "level", "4", "-e", "fully", "true"],
     ["notifications", "-e", "visible", "false"]]) {
     adb(serial, "shell", "am", "broadcast", "-a", "com.android.systemui.demo", "-e", "command", ...c);
   }
@@ -165,12 +166,28 @@ function androidUp({ headless }) {
   return serial;
 }
 
-function devices() {
-  const sim = findSim();
-  if (!sim || sim.state !== "Booted") throw new Error(`simulator "${IOS.name}" isn't running: run \`up\` first`);
-  const serial = emulatorSerial();
-  if (!serial) throw new Error(`emulator ${ANDROID.avd} isn't running: run \`up\` first`);
-  return { ios: sim.udid, android: serial };
+function platforms(only) {
+  return only ? [only] : ["ios", "android"];
+}
+
+function devices(only) {
+  const d = {};
+  if (platforms(only).includes("ios")) {
+    const sim = findSim();
+    if (!sim || sim.state !== "Booted") throw new Error(`simulator "${IOS.name}" isn't running: run \`up\` first`);
+    d.ios = sim.udid;
+  }
+  if (platforms(only).includes("android")) {
+    const serial = emulatorSerial();
+    if (!serial) throw new Error(`emulator ${ANDROID.avd} isn't running: run \`up\` first`);
+    d.android = serial;
+  }
+  return d;
+}
+
+function up(opts) {
+  if (platforms(opts.only).includes("ios")) iosUp(opts);
+  if (platforms(opts.only).includes("android")) androidUp(opts);
 }
 
 function down() {
@@ -216,11 +233,11 @@ function build(which) {
   }
 }
 
-function install() {
-  const d = devices();
-  simctl("install", d.ios, IOS_APP);
-  adb(d.android, "install", "-r", APK);
-  console.log("installed on both devices");
+function install(only) {
+  const d = devices(only);
+  if (d.ios) simctl("install", d.ios, IOS_APP);
+  if (d.android) adb(d.android, "install", "-r", APK);
+  console.log(`installed on ${Object.keys(d).join(" + ")}`);
 }
 
 // ---- test / report ---------------------------------------------------------
@@ -300,13 +317,13 @@ table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:4px 10px}.ok{
 }
 
 async function test(args, opts) {
-  const d = devices();
+  const d = devices(opts.only);
   const flows = args.length ? args.map((a) => path.resolve(FLOWS, a.endsWith(".yaml") ? a : `${a}.yaml`)) : [FLOWS];
   const stamp = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19);
   const runDir = path.join(CACHE, "runs", stamp);
-  const platforms = opts.only ? [opts.only] : ["ios", "android"];
-  console.log(`running ${args.length ? args.join(", ") : "all flows"} on ${platforms.join(" + ")}…`);
-  await Promise.all(platforms.map((p) => maestro(p, d[p], flows, path.join(runDir, p))));
+  const targets = platforms(opts.only);
+  console.log(`running ${args.length ? args.join(", ") : "all flows"} on ${targets.join(" + ")}…`);
+  await Promise.all(targets.map((p) => maestro(p, d[p], flows, path.join(runDir, p))));
   const latest = path.join(CACHE, "runs", "latest");
   try { fs.unlinkSync(latest); } catch {}
   fs.symlinkSync(runDir, latest);
@@ -324,6 +341,7 @@ const USAGE = `usage: node mobile/parity/parity.js <command>
   up [--headless]            boot (or create) the iPhone simulator and the Android emulator
   build [ios|android]        Debug builds of both apps (iOS into ${CACHE}/ios-dd)
   install                    install both builds on the running devices
+                             (up, install, test and all take --only ios|android)
   test [flow…] [--only ios|android] [--open]
                              run flows (default: all in flows/) on both devices at once,
                              then write a side-by-side report
@@ -339,12 +357,12 @@ async function main() {
   const opts = { headless: flags.has("--headless"), open: flags.has("--open"), only };
   switch (cmd) {
     case "doctor": return doctor();
-    case "up": iosUp(opts); androidUp(opts); return;
+    case "up": return up(opts);
     case "build": return build(args[0]);
-    case "install": return install();
+    case "install": return install(only);
     case "test": return test(args, opts);
     case "report": return console.log(report(args[0] || fs.realpathSync(path.join(CACHE, "runs", "latest"))).file);
-    case "all": iosUp(opts); androidUp(opts); build(); install(); return test([], opts);
+    case "all": up(opts); build(only); install(only); return test([], opts);
     case "down": return down();
     default: console.log(USAGE); if (cmd) process.exitCode = 1;
   }

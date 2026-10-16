@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      A WebView reports prefers-color-scheme from its context theme's
+      android:isLightTheme, so the Markdown page follows the app's appearance
+      rather than the system's.
+    -->
+    <style name="LpmWeb.Light" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="LpmWeb.Dark" parent="android:Theme.Material.NoActionBar" />
+</resources>

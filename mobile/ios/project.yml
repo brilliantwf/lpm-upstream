@@ -35,6 +35,10 @@ targets:
       # relative paths (xterm/xterm.js …) intact.
       - path: ../shared/web
         type: folder
+      # Demo Mode's sample files, shared with the Android demo so both describe the
+      # same attachments.
+      - path: ../shared/demo
+        type: folder
     # Built-in Tailscale: the Go node in ../../tailnet/ios, compiled by
     # build-tailnet.sh into a static library for the SDK being built and imported
     # into Swift as the LpmTailnet module. Needs Go (`brew install go`).

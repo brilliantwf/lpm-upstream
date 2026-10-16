@@ -1,0 +1,37 @@
+appId: cx.lpm.mobile
+name: 72-action-inputs
+tags: [demo, actions]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "blog"
+- extendedWaitUntil:
+    visible: "Tap a service for its logs."
+    timeout: 5000
+- tapOn: "Actions"
+- extendedWaitUntil:
+    visible: "New post"
+    timeout: 5000
+# An action with inputs asks for them first; Run waits for the required one.
+- tapOn: "New post"
+- extendedWaitUntil:
+    visible: "Post title"
+    timeout: 5000
+- assertVisible: "Cancel"
+- assertVisible: "Run"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-inputs
+- tapOn: "Post title"
+- inputText: "Hello world"
+- tapOn: "Run"
+# A background action: its live output, polled from the Mac until it ends.
+- extendedWaitUntil:
+    visible: "(?s).*Creating a new draft….*"
+    timeout: 10000
+- extendedWaitUntil:
+    visible: "Done"
+    timeout: 15000
+- assertVisible: "(?s).*posts/hello-world.md created.*"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-run-done

@@ -1,0 +1,39 @@
+appId: cx.lpm.mobile
+name: 54-git-pull-request
+tags: [demo, git]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Git"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+# On iOS a tap while the menu is still settling can miss: tap again if nothing changed.
+- tapOn:
+    text: "Git"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Create Pull Request…"
+    timeout: 5000
+- tapOn: "Create Pull Request…"
+- extendedWaitUntil:
+    visible: "Generate with AI"
+    timeout: 5000
+- assertVisible: "Pull Request"
+- takeScreenshot: 1-pull-request
+- tapOn: "Generate with AI"
+- extendedWaitUntil:
+    visible: "Redesign the checkout flow"
+    timeout: 10000
+- takeScreenshot: 2-drafted
+- tapOn: "Create"
+- extendedWaitUntil:
+    visible: "Pull request created"
+    timeout: 10000
+- assertVisible: "https://github.com/demo/storefront/pull/42"
+- takeScreenshot: 3-created

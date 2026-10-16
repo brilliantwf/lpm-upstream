@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="actions_run">Run</string>
+    <string name="actions_next">Next</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+
+    <!-- The ⚡ sheet -->
+    <string name="actions_title">Actions</string>
+    <string name="actions_new">New Action</string>
+    <string name="actions_header">Header</string>
+    <string name="actions_footer">Footer</string>
+    <string name="actions_menu">Menu</string>
+    <string name="actions_edit">Edit Action…</string>
+    <string name="actions_more">More %1$s Actions</string>
+    <string name="actions_zone_no_actions">No actions</string>
+    <string name="actions_zone_layer">Layer</string>
+
+    <!-- Running one -->
+    <string name="actions_run_confirm">Run %1$s?</string>
+
+    <!-- A background run -->
+    <string name="actions_run_close">Close</string>
+    <string name="actions_run_stop">Stop</string>
+    <string name="actions_run_waiting">Waiting for output…</string>
+    <string name="actions_run_no_output">No output.</string>
+    <string name="actions_run_gone">This run is no longer available.</string>
+    <string name="actions_run_starting">Starting…</string>
+    <string name="actions_run_running">Running</string>
+    <string name="actions_run_stopped">Stopped</string>
+    <string name="actions_run_failed">Failed</string>
+    <string name="actions_run_done">Done</string>
+    <string name="actions_run_not_started">Couldn\'t start</string>
+    <string name="actions_runs_header">Background runs</string>
+
+    <!-- The action editor -->
+    <string name="actions_editor_add">Add Action</string>
+    <string name="actions_editor_edit">Edit Action</string>
+    <string name="actions_editor_loading">Loading action…</string>
+    <string name="actions_editor_save_failed">Couldn\'t save action</string>
+    <string name="actions_editor_load_failed">Couldn\'t load action</string>
+    <string name="actions_editor_delete">Delete action</string>
+    <string name="actions_editor_delete_title">Delete this action?</string>
+    <string name="actions_editor_delete_message">Remove it from this project. This can\'t be undone.</string>
+    <string name="actions_editor_name">Name</string>
+    <string name="actions_editor_label_optional">Label (optional)</string>
+    <string name="actions_editor_emoji_optional">Emoji (optional)</string>
+    <string name="actions_editor_basics_footer">The name is how this action is stored. The label is what you see on the button.</string>
+    <string name="actions_editor_type">Type</string>
+    <string name="actions_editor_kind_command">Command button</string>
+    <string name="actions_editor_kind_menu">Menu of sub-actions</string>
+    <string name="actions_editor_command">Command</string>
+    <string name="actions_editor_cwd">Working directory</string>
+    <string name="actions_editor_runs_in">Runs in</string>
+    <string name="actions_editor_run_popup">Pop-up window</string>
+    <string name="actions_editor_run_terminal">New terminal tab</string>
+    <string name="actions_editor_run_command">Current terminal</string>
+    <string name="actions_editor_run_background">In the background</string>
+    <string name="actions_editor_reuse">Reuse the same tab</string>
+    <string name="actions_editor_confirm">Ask before running</string>
+    <string name="actions_editor_hint_popup">Runs once and shows the output in a pop-up.</string>
+    <string name="actions_editor_hint_reuse">Reuses the same terminal each time.</string>
+    <string name="actions_editor_hint_terminal">Opens a new terminal each time.</string>
+    <string name="actions_editor_hint_command">Runs in the terminal you\'re currently using.</string>
+    <string name="actions_editor_hint_background">Runs quietly and notifies you when it\'s done.</string>
+    <string name="actions_editor_input">Input</string>
+    <string name="actions_editor_input_remove">Remove input</string>
+    <string name="actions_editor_input_add">Add input</string>
+    <string name="actions_editor_inputs_footer">Values you\'re asked for before the action runs, filled into the command.</string>
+    <string name="actions_editor_input_kind">Kind</string>
+    <string name="actions_editor_input_text">Text</string>
+    <string name="actions_editor_input_choice">Choice</string>
+    <string name="actions_editor_input_required">Required</string>
+    <string name="actions_editor_option_value">Value</string>
+    <string name="actions_editor_option_add">Add choice</string>
+    <string name="actions_editor_input_placeholder">Placeholder (optional)</string>
+    <string name="actions_editor_input_default">Default value (optional)</string>
+    <string name="actions_editor_item_label">Label</string>
+    <string name="actions_editor_item">Menu item</string>
+    <string name="actions_editor_item_remove">Remove item</string>
+    <string name="actions_editor_item_add">Add item</string>
+    <string name="actions_editor_items_footer">Each item runs its own command from the menu.</string>
+    <string name="actions_editor_primary">Button runs</string>
+    <string name="actions_editor_primary_menu">Nothing, opens the menu</string>
+    <string name="actions_editor_primary_last_used">Last used item</string>
+    <string name="actions_editor_primary_footer">A split button runs that item with one tap; its arrow opens the rest.</string>
+    <string name="actions_editor_placement">Placement</string>
+    <string name="actions_placement_top">Top bar</string>
+    <string name="actions_placement_bottom">Bottom bar</string>
+    <string name="actions_placement_unknown_zone">Zone “%1$s”</string>
+    <string name="actions_placement_layer">%1$s › %2$s</string>
+    <string name="actions_placement_hint_top">In the %1$s zone of the top bar.</string>
+    <string name="actions_placement_hint_bottom">In the %1$s zone of the bottom bar.</string>
+    <string name="actions_editor_color">Color</string>
+    <string name="actions_color_none">No color</string>
+    <string name="actions_color_custom">Custom color</string>
+    <string name="actions_color_deep">Deep %1$s</string>
+    <string name="actions_color_deeper">Deeper shade</string>
+</resources>

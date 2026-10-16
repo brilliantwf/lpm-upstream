@@ -1,0 +1,60 @@
+# Session memory: a project's sessions, newest first, one session's document, and
+# its editor.
+appId: cx.lpm.mobile
+name: 64-memory
+tags: [demo, memory]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Memory"
+    timeout: 5000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Memory"
+      - extendedWaitUntil:
+          visible: "Checkout redesign"
+          timeout: 5000
+- assertVisible: "Payments module"
+- assertVisible: "Cart badge not updating"
+- assertVisible: "claude · 2 hours ago"
+- assertVisible: "New session"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-memory
+- tapOn: "Checkout redesign"
+- extendedWaitUntil:
+    visible: "Updated 2 hours ago by claude"
+    timeout: 5000
+- assertVisible: "checkout-redesign"
+- assertVisible: "Current state"
+- assertVisible: "Edit"
+- assertVisible: "Delete session"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-memory-session
+- tapOn: "Edit"
+- extendedWaitUntil:
+    visible: "Save"
+    timeout: 5000
+- assertVisible: "Cancel"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 3-memory-editor
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    notVisible: "Save"
+    timeout: 5000
+- tapOn: "Delete session"
+- extendedWaitUntil:
+    visible: "Delete session?"
+    timeout: 5000
+- assertVisible: "“Checkout redesign” will be gone for good — agents won't be able to pick this work up again."
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 4-memory-delete

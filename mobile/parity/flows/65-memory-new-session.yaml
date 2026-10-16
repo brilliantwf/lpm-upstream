@@ -1,0 +1,46 @@
+# "New session": the title becomes the short name agents resume it by, and Create
+# opens the new session.
+appId: cx.lpm.mobile
+name: 65-memory-new-session
+tags: [demo, memory]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Memory"
+    timeout: 5000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Memory"
+      - extendedWaitUntil:
+          visible: "Checkout redesign"
+          timeout: 5000
+- tapOn: "New session"
+- extendedWaitUntil:
+    visible: "What is this session about?"
+    timeout: 5000
+- assertVisible: "Agents pick a session up by its short name, so give it a few plain words."
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-new-session
+- tapOn: "What is this session about?"
+- inputText: "Release notes"
+- extendedWaitUntil:
+    visible: "release-notes"
+    timeout: 5000
+- assertVisible: "Any agent working in storefront can pick this session up by that name."
+- takeScreenshot: 2-new-session-named
+- tapOn: "Create"
+- extendedWaitUntil:
+    visible: "Updated .*"
+    timeout: 10000
+- assertVisible: "Release notes"
+- assertVisible: "Current state"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 3-created-session

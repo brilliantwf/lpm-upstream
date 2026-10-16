@@ -1,0 +1,39 @@
+appId: cx.lpm.mobile
+name: 52-git-ask-agent
+tags: [demo, git, terminal]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Review Changes.*"
+      - extendedWaitUntil:
+          visible: "components/CheckoutForm.tsx"
+          timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 3000
+# The first file's "…" menu.
+- tapOn:
+    text: "More"
+    index: 0
+- tapOn: "Ask agent…"
+- extendedWaitUntil:
+    visible: "Ask Agent"
+    timeout: 5000
+- assertVisible: "Instruction"
+- assertVisible: "Context"
+- assertVisible: "Terminal 1"
+- takeScreenshot: 1-ask-agent
+- inputText: "Explain this change"
+- tapOn: "Send"
+- extendedWaitUntil:
+    notVisible: "Ask Agent"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-sent

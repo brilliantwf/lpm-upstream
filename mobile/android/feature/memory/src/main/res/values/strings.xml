@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="back">Back</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="delete">Delete</string>
+    <string name="try_again">Try Again</string>
+
+    <!-- MemoryScreen -->
+    <string name="memory_title">Memory</string>
+    <string name="memory_new_session">New session</string>
+    <string name="memory_shared_with">Shared with %1$s</string>
+    <string name="memory_stamp">%1$s · %2$s</string>
+    <string name="memory_load_failed">Couldn\'t load memory</string>
+    <string name="memory_empty">No memory yet</string>
+    <string name="memory_empty_description">Ask an agent to remember the session, or start one here — any agent can pick it up later and continue the work.</string>
+    <string name="memory_empty_action">New Session</string>
+    <string name="memory_delete_title">Delete session?</string>
+    <string name="memory_delete_message">“%1$s” will be gone for good — agents won\'t be able to pick this work up again.</string>
+    <string name="memory_delete_failed">Couldn\'t delete session</string>
+
+    <!-- MemorySessionView -->
+    <string name="memory_session_updated">Updated %1$s</string>
+    <string name="memory_session_updated_by">Updated %1$s by %2$s</string>
+    <string name="memory_session_dismiss">Dismiss</string>
+    <string name="memory_session_edit">Edit</string>
+    <string name="memory_session_delete">Delete session</string>
+    <string name="memory_session_open_failed">Can\'t open this session</string>
+
+    <!-- MemoryCreateSheet -->
+    <string name="memory_create_title">New Session</string>
+    <string name="memory_create_header">Title</string>
+    <string name="memory_create_placeholder">What is this session about?</string>
+    <string name="memory_create_hint">Agents pick a session up by its short name, so give it a few plain words.</string>
+    <string name="memory_create_pick_up">Any agent working in %1$s can pick this session up by that name.</string>
+    <string name="memory_create_exists">%1$s already has a session with that name — Create opens it.</string>
+    <string name="memory_create_confirm">Create</string>
+    <string name="memory_create_failed">Couldn\'t create session</string>
+
+    <!-- MemoryEditorSheet -->
+    <string name="memory_editor_save">Save</string>
+    <string name="memory_editor_discard_title">Discard changes?</string>
+    <string name="memory_editor_discard">Discard</string>
+    <string name="memory_editor_keep_editing">Keep Editing</string>
+    <string name="memory_editor_conflict_title">Session changed on your Mac</string>
+    <string name="memory_editor_save_failed">Couldn\'t save session</string>
+
+    <!-- ComposerMemorySheet -->
+    <string name="memory_picker_remember">Remember this conversation</string>
+    <string name="memory_picker_remember_description">The agent writes down the goal, decisions, and next steps — and keeps it updated as you work. Any agent can continue from it later.</string>
+    <string name="memory_picker_continue">Continue a session</string>
+    <string name="memory_picker_search">Search sessions</string>
+    <string name="memory_picker_preview">Preview</string>
+    <string name="memory_picker_empty">Nothing saved yet</string>
+    <string name="memory_picker_empty_description">Sessions you save show up here.</string>
+    <string name="memory_picker_delete_message">%1$s will be gone for good — agents won\'t be able to pick this work up again.</string>
+    <string name="memory_picker_no_results">No Results for “%1$s”</string>
+    <string name="memory_picker_no_results_description">Check the spelling or try a new search.</string>
+</resources>

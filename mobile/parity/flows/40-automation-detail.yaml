@@ -1,0 +1,34 @@
+appId: cx.lpm.mobile
+name: 40-automation-detail
+tags: [demo, automations]
+---
+- runFlow: subflows/enter-demo.yaml
+- runFlow: subflows/open-more-menu.yaml
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Automations.*"
+      - extendedWaitUntil:
+          visible: "Nightly tests"
+          timeout: 5000
+- tapOn: "Nightly tests"
+- extendedWaitUntil:
+    visible: "Run history"
+    timeout: 5000
+- assertVisible: "Edit automation"
+- assertVisible: "Run now"
+- assertVisible: "Problem during the run"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-automation-detail
+# Both groups open: the switch, next and last run, and the command in full.
+- tapOn: "Schedule"
+- tapOn: "Does"
+- extendedWaitUntil:
+    visible: "Automation on"
+    timeout: 5000
+- assertVisible: "Next run"
+- assertVisible: "Last run"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-automation-groups-open

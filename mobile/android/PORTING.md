@@ -20,7 +20,19 @@ side by side (see `mobile/parity/README.md`).
   palette (terminal themes, action tints, agent-state colors, usage meters).
 - **Allowed platform differences** (keep the list short and write each one here):
   system back instead of the nav-bar back button; Android permission dialogs;
-  "phone" where iOS copy says "iPhone"/"iPad"; FCM instead of APNs.
+  "phone" where iOS copy says "iPhone"/"iPad"; FCM instead of APNs; the platform
+  font and Material Symbols instead of SF Pro and SF Symbols (Apple licenses both for
+  Apple platforms only); the terminal's soft keyboard sends key events
+  (`TYPE_NULL`) because xterm.js loses fast-typed characters from Android's composed
+  text input, so the keyboard shows no suggestions there and CJK composition in the
+  terminal itself is limited (the composer is unaffected); "Open in Browser" where iOS
+  says "Open in Safari" (a created pull request); the file preview shows images, PDFs,
+  video and audio in its own viewers, so a file only Quick Look reads (office documents,
+  Keynote/Pages/Numbers, SVG, 3D) shows "No preview" with Share, and its code view has
+  no Find bar; read aloud's voices are the phone's text-to-speech voices, named by
+  language and voice code, and the basic-voices note points to Android's "Text-to-speech
+  output" settings (Android's engine can't pause, so resuming starts again at the word
+  it stopped on).
 - **Same persisted keys and semantics** as iOS (table below), so behavior and
   defaults match.
 - Desktop changes that touch the phone now update both apps (AGENTS.md).
@@ -90,6 +102,26 @@ the code is idiomatic Android.
   backup and device transfer: Keystore keys never leave the device, so copied credentials
   could not be decrypted on a new phone.
 
+### Porting patterns
+
+How each iOS construct lands, so every feature is ported the same way:
+
+| iOS | Android |
+|---|---|
+| `AppModel` core: connection, saved Macs, pairing, Demo Mode, identity, push | `MacSession` (`:core:data`); owns the `LpmClient`, exposes `state: StateFlow<SessionState>`, `link: LinkStore`, `alerts`, `whenConnected(verb, project) { client -> }` |
+| An `AppModel` area (its properties, its `wireX(_:)`, its methods) or an iOS `*Store` class | one store per area, exposing one `StateFlow<XState>` (an immutable data class whose defaults are the iOS initial values) plus methods; it mutates with `_state.update { it.copy(…) }` |
+| `wire(c)` assigning `c.onX = { … }` | the store implements `SessionStore` (`wire(client)`, `reset()`, optional `onReady(client)` / `onConnectionReset()`) and takes its `MacSession` in the constructor; contribute `SessionStore.Factory(::XStore)` with Hilt `@IntoSet`. Every session (the live one and each machine visit, iOS's second `AppModel`) builds its own store set; `session.store<XStore>()` |
+| A view reading `model` inside a visit | `NavKey`s carry `session: SessionKey = SessionKey.Live`; ViewModels use the Navigation 3 assisted pattern (`hiltViewModel<VM, VM.Factory>(creationCallback = { it.create(key) })`) and resolve `MacSessions[key.session]?.store<XStore>()` |
+| Main queue | everything runs on the main thread: the client delivers callbacks on `Dispatchers.Main.immediate`, stores need no locking |
+| `DispatchQueue.main.asyncAfter`, `DispatchWorkItem`, `GenerationTimeout` | `Job`s in the injected `@ApplicationScope` `CoroutineScope` (Main.immediate), cancelled where Swift cancels |
+| UserDefaults | `AppPreferences` over Preferences DataStore with the same keys, loaded before the first frame (splash `setKeepOnScreenCondition`), then read synchronously from memory and written asynchronously |
+| Keychain | `CredentialStore`: Keystore AES-GCM, ciphertext in DataStore |
+| SwiftUI `View` reading `model` | `XScreen` (stateless: state + lambdas) + `XRoute` (`hiltViewModel()`), the ViewModel combining store flows into `XUiState` and forwarding actions to stores |
+| `@State` / `@Binding` inside a view | `remember { mutableStateOf(…) }` / state + lambda parameters |
+| `NavigationStack` push | Navigation 3 back stack; `@Serializable` `NavKey`s in `:core:navigation` (`<Feature>Keys.kt` when a feature has several, `<Key>.kt` for a single one, as ktlint names files); each feature exposes `fun EntryProviderScope<NavKey>.xEntries(navigator: Navigator)`, registered in `:app` `LpmApp` |
+| `.sheet`, `Menu`, `.alert`, `.confirmationDialog` | the `:core:designsystem` sheet, menu and dialog components |
+| SF Symbol | Material Symbols Rounded (`tools/add-icon.sh`, table in `core/designsystem/ICONS.md`) |
+
 ### Modules
 
 Modularized by layer and feature; create a module when its milestone starts.
@@ -103,6 +135,7 @@ Modularized by layer and feature; create a module when its milestone starts.
 | `:core:data` | Android | repositories, Mac session, DataStore, Keystore, NSD discovery, connectivity |
 | `:core:navigation` | JVM | `NavKey`s |
 | `:core:designsystem` | Android | theme, iOS palette, shared components (exists) |
+| `:core:ui` | Android | shared UI that needs domain types (agent tones, elapsed time, notification access) |
 | `:core:web` | Android | WebView host, `WebViewAssetLoader`, the `window.webkit` shim |
 | `:core:testing` | Android | fakes, test rules, Hilt test runner |
 | `:core:push`, `:core:tailnet` | Android | FCM, built-in Tailscale |
@@ -166,11 +199,10 @@ Port order is top to bottom within each milestone below. Lines are iOS sizes.
 | Demo Mode → `:core:demo` | DemoServer, DemoWorld, DemoProjects, DemoTerminals, DemoGit, DemoGitAuto, DemoJobs, DemoConfig, DemoMemory, DemoNotes(+Fixtures), DemoStats, DemoLimits, DemoClaudeAccounts, DemoAutoPull, DemoServiceLogs, DemoUploads | 5,883 |
 | Pairing → `:feature:pairing` | PairingView, EnterCodeView, QRScannerView, ApprovalPairingSheet, NearbyMacsView, AwayFromHomeCard, PairedSummarySheet, IdentityCheckSheet, Keychain | 1,461 |
 | Connection / discovery → `:core:data`, `:feature:connection` | MacDiscovery, HostProbe, NetworkWatcher, LinkStore, AppModel+Link, ConnectionIssue, ConnectionSheet(s), ConnectionStatusBar, EditEndpointView, AddressKind, ProjectSnapshots | 2,312 |
-| Machines → `:feature:mac` | MacRecord, MacStore, MacSwitcherMenu, MacTitle, ManageMacsView, MacUnpair, MacUpdate*, MachineHeader/Importer/Section, MachineVisitScreen, AppModel+Visit, RemoteMachine, PairDirectlyMenuItems | 1,947 |
-| Projects → `:feature:projects` | ProjectDetailView, ProjectMenu, ProjectAgents, ProjectTerminalDeck/Row, AddProjectSheet, DirBrowserView, DuplicateOptionsView, ProjectConfigView, ProjectConfigErrorView, YamlConfigEditorSheet, ProfileEditorSheet, WorkStatus* | 2,717 |
-| Services → `:feature:services` | ServiceEditorSheet, ServiceLogsSheet | 510 |
-| Terminal → `:feature:terminal`, `:core:web` | WebTerminalView, WKWebView+NoAccessoryBar, TerminalScreens, TerminalTitle, TerminalTheme, TerminalSettingsSheet, TerminalEndedBanner, TabRow, TabPeek, KeyboardSteadyFrame, WindowTouchObserver | 1,004 |
-| Composer → `:feature:composer` | TerminalComposer, ComposerStore(+Files), ComposerAttachments, ComposerTabStrip, ComposerActionsSheet, ComposerVariantsSheet, HistoryScreen, ChunkedUpload, UploadScratch, PlainPunctuation, HardwareReturn | 2,830 |
+| Machines, lpm updates → `:feature:mac`, `:feature:projects` (machine sections, visits), `:core:data` (MachineImporter) | MacRecord, MacStore, MacSwitcherMenu, MacTitle, ManageMacsView, MacUnpair, MacUpdate*, MachineHeader/Importer/Section, MachineVisitScreen, AppModel+Visit, RemoteMachine, PairDirectlyMenuItems | 1,947 |
+| Projects, services, Auto Pull → `:feature:projects` | ProjectDetailView, ProjectMenu, ProjectAgents, ProjectTerminalDeck/Row, DuplicateOptionsView, ProjectConfigErrorView, WorkStatus*, ServiceEditorSheet, ServiceLogsSheet, AutoPullMenu, AutoPullModel, AppModel+AutoPull | 2,287 |
+| Project config → `:feature:config` | ProjectConfigView, YamlConfigEditorSheet, ProfileEditorSheet, AddProjectSheet, DirBrowserView, CodeEditorTextView | 1,192 |
+| Terminal + composer → `:feature:terminal`, `:core:web` | WebTerminalView, WKWebView+NoAccessoryBar, TerminalScreens, TerminalTitle, TerminalTheme, TerminalSettingsSheet, TerminalEndedBanner, TabRow, TabPeek, KeyboardSteadyFrame, WindowTouchObserver, TerminalComposer, ComposerStore(+Files), ComposerAttachments, ComposerTabStrip, ComposerActionsSheet, ComposerVariantsSheet, HistoryScreen, ChunkedUpload, UploadScratch, PlainPunctuation, HardwareReturn | 3,844 |
 | Actions → `:feature:actions` | ActionColorPicker, ActionEditorSheet, ActionInputsSheet, ActionPlacement, ActionTint, ActionZoneView, ActionZones, DesktopActionButton, ProjectActionsSheet(+Host), BackgroundRunSheet | 1,840 |
 | Activity → `:feature:activity` | ActivityBuild, ActivityChrome, ActivityModel, ActivityRowViews, ActivityScreen, AgentStateStyle | 1,322 |
 | Automations → `:feature:automations` | AutomationConversationView, AutomationDetailRows, AutomationDetailView, AutomationEditorSheet, AutomationFormat, AutomationViews | 2,283 |
@@ -180,12 +212,11 @@ Port order is top to bottom within each milestone below. Lines are iOS sizes.
 | Files / preview → `:feature:files`, `:core:web` | FileFetch, FilePreviewContent, FilePreviewKind, FilePreviewPlatformViews, FilePreviewSheet, MarkdownWebView, MarkdownImageLoader, MarkdownLink | 854 |
 | Usage / stats → `:feature:usage` | Usage*, StatsFormat, StatsScreen | 2,722 |
 | Claude accounts → `:feature:claudeaccount` | ClaudeAccountConsent, ClaudeAccountMenu, ClaudeAccountModel, ClaudeInUse, AppModel+ClaudeAccount | 493 |
-| Auto-pull → `:feature:autopull` | AutoPullMenu, AutoPullModel, AppModel+AutoPull | 149 |
 | Speech (read aloud) → `:feature:speech` | SpeechBar, SpeechClip, SpeechPrefs, SpeechSettingsView, SpeechStore, SpeechText | 1,171 |
 | Settings → `:feature:settings` | SettingsSheet, AppearanceMode | 112 |
 | Push → `:core:push` | AppDelegate, PushRegistrar, NotificationSettingsSheet, Shared/PushKey, Shared/PushPayload, NotificationService | 661 |
 | Built-in Tailscale → `:core:tailnet` | BuiltInTailscale, TailnetSettingsView (+ Go `tailnet/`) | 452 |
-| Shared UI → `:core:designsystem` | CodeEditorTextView, DarkKeyboard, ElapsedText, FollowingScrollView, Haptics, KeyboardObserver, MarkdownText, SkeletonViews, SwipeDownDismissesKeyboard, SafariView | 791 |
+| Shared UI → `:core:designsystem`, `:core:ui` | DarkKeyboard, ElapsedText, FollowingScrollView, Haptics, KeyboardObserver, MarkdownText, SkeletonViews, SwipeDownDismissesKeyboard, SafariView | 688 |
 
 ## Platform services
 
@@ -248,16 +279,16 @@ build Android until the same flows pass there.
 
 | # | Scope | Parity flows |
 |---|---|---|
-| 0 | Scaffold, toolchain, harness, build-logic, CI (done) | 01–11 pass on iOS; 12 waits on the iOS exit-demo fix |
-| 1 | Shared demo seed (iOS first), `:core:model`, `:core:protocol`, `:core:demo`, `:core:data`, `:core:navigation` | — (unit tests against PROTOCOL.md frames) |
-| 2 | Pairing screen, Enter a Code, demo entry/exit | 01, 02, 12 |
-| 3 | Projects list, project detail, project menu, services | 03, 04, 05 |
-| 4 | Terminal (WebView + shim) and composer | 06 |
-| 5 | Activity, Automations, Stats, Usage, Settings | 07–11 |
-| 6 | Git review, Notes, Memory, Actions, config editors, file preview, Claude accounts, auto-pull, speech, machines | new flows per screen |
-| 7 | Real Mac: OkHttp client + pin, Bonjour, QR, approve-on-Mac, reconnect | flows against the running desktop app (emulator reaches the Mac at `10.0.2.2`; no Bonjour through emulator NAT, use Enter a Code) |
-| 8 | Push (FCM) | needs the items below |
-| 9 | Built-in Tailscale | `tailnet/android` AAR |
+| 0 | Scaffold, toolchain, harness, build-logic, CI (done) | the harness itself (`parity.js`) |
+| 1 | `:core:model`, `:core:protocol`, `:core:demo` (iOS golden replay), `:core:data`, `:core:navigation` (done) | — (unit tests against PROTOCOL.md frames and the iOS demo goldens) |
+| 2 | Pairing screen, Enter a Code, demo entry/exit (done) | 01, 02, 12–16 |
+| 3 | Projects list, project detail, project menu, services (done) | 03–05, 30–34 |
+| 4 | Terminal (WebView + shim) and composer (done) | 06, 17 |
+| 5 | Activity, Automations, Stats, Usage, Settings (done) | 07–11, 35–37, 40–42, 45–47 |
+| 6 | Git review (50–55), Notes and Memory (60–66), Actions (70–76), config editors (80–87), file preview (90–94), Claude accounts and Auto Pull (95–99), speech (100–101), machines and lpm updates (unit and Robolectric tests: Demo Mode has neither) (done) | as listed |
+| 7 | Real Mac: OkHttp client + pin, Bonjour, QR, approve-on-Mac, reconnect (client built and unit-tested against PROTOCOL.md; not yet run against the desktop app) | flows against the running desktop app (emulator reaches the Mac at `10.0.2.2`; no Bonjour through emulator NAT, use Enter a Code) |
+| 8 | Push (FCM) (not started) | needs the items below |
+| 9 | Built-in Tailscale (not started; `:core:tailnet` is a stub) | `tailnet/android` AAR |
 
 ## Decisions
 
@@ -269,10 +300,15 @@ build Android until the same flows pass there.
    HTTP v1 sender: a desktop + website + PROTOCOL.md change in milestone 8.
 2. **Play: App Bundle, Play App Signing**, with a separate upload key kept outside the
    repo. Package `cx.lpm.mobile`, the iOS bundle id; it can't change after the first upload.
-3. **Demo seed: one source of truth.** The static seed (projects, git changes, notes,
-   memory, history, accounts, usage, stats) moves to `mobile/shared/demo/*.json`, read by
-   both apps; each keeps only its `DemoServer` logic. iOS goes first, guarded by flows
-   01–11 and the App Store screenshot build, which renders demo data. Part of milestone 1.
+3. **Demo seed: kept identical by a test, not shared.** `:core:demo` is a line-by-line
+   port of `Demo*.swift`, and `IosParityTest` replays a fixed script of 408 frames into it
+   and compares every reply with goldens recorded from the iOS demo code itself, compiled
+   on a Mac (`core/demo/ios-parity/generate.sh`, needs `swiftc`). A change to
+   `Demo*.swift` is ported to `:core:demo` and the goldens regenerated in the same change;
+   any difference fails the test. Moving the static seed into shared JSON stays possible
+   but isn't needed for parity. Binary sample files live once in `mobile/shared/demo`
+   (bundled by iOS as `demo/`, read by `:core:demo` as resources), e.g. the Notes
+   attachment `summary-card.png`.
 4. **Icon-only controls** (list below) get the same accessible name on both apps in the
    change that ports their screen; iOS gains VoiceOver labels.
 5. **Tailscale ABIs: `arm64-v8a` + `x86_64`** (emulators, ChromeOS). Play delivers only
@@ -290,9 +326,11 @@ Needs an account:
 ## iOS controls with no accessible name
 
 Flows can't reach these by text until both apps label them the same way (adding
-the label on iOS also helps VoiceOver): composer "+" menu, send, SpecialKeyBar
-arrows/paste/dismiss-keyboard, attachment remove, composer tab close, rewrite run
-and variant steppers, memory-session eye, history new-folder; Notes new chat
-(`square.and.pencil`), error-banner close, attach menu, download; Git review jump
-menu, per-file select / viewed / menu, new branch; QR scanner close. The project "…"
-menu already reads "More" through SwiftUI's default symbol label.
+the label on iOS also helps VoiceOver). Done: the composer's send ("Send"), key bar
+("Up", "Down", "Left", "Right", "Paste", "Hide keyboard"), attachment "Remove",
+prompt tab "Close", mention "Preview", history "New folder", the Git review jump
+menu ("Jump to file"), per-file "Select" / "Viewed" / "More" and the branch sheet's
+"New branch", Notes "New Chat", error-banner "Close", "Attach", "Send", "Remove",
+"Download" and the memory picker's "Preview" eye. Still unlabeled: composer rewrite
+run and variant steppers; QR scanner close. The project "…" menu already reads
+"More" through SwiftUI's default symbol label.

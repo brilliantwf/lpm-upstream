@@ -1,0 +1,187 @@
+package cx.lpm.mobile.feature.terminal.composer
+
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import cx.lpm.mobile.core.designsystem.component.ActivityIndicator
+import cx.lpm.mobile.core.designsystem.component.ActivityIndicatorSize
+import cx.lpm.mobile.core.designsystem.component.LinkButton
+import cx.lpm.mobile.core.designsystem.theme.LpmTheme
+import cx.lpm.mobile.core.model.SlashCommand
+import cx.lpm.mobile.feature.terminal.R
+
+private const val MENU_ANIMATION_MS = 120
+
+// A phone on its side is short of height, not width: below this the keys share
+// the field's row and the terminal keeps two more lines.
+private val CompactHeight = 480.dp
+
+/** What the composer's rows do. */
+internal class ComposerCallbacks(
+    val onFocusChanged: (Boolean) -> Unit,
+    val onSend: () -> Unit,
+    val onHideKeyboard: () -> Unit,
+    val onKey: (String) -> Unit,
+    val onPaste: () -> Unit,
+    val onSwitchTab: (Int) -> Unit,
+    val onCloseTab: (Int) -> Unit,
+    val onRetryUpload: (String) -> Unit,
+    val onRemoveAttachment: (String) -> Unit,
+    val onCancelRewrite: () -> Unit,
+    val onPickSlash: (SlashCommand) -> Unit,
+    val mentions: MentionActions
+)
+
+/**
+ * The terminal input composer: prompt tabs, attachment chips, a multi-line field
+ * with "+" and Send (whose long press offers more), over a row of the special keys
+ * the soft keyboard can't produce. Its ground is the terminal's, so the two read
+ * as one surface. Without the terminal's tools it's a plain reply box: no keys,
+ * slash commands or terminal output.
+ */
+@Composable
+internal fun TerminalComposer(
+    state: ComposerUiState,
+    input: TextFieldState,
+    look: ComposerLook,
+    focusRequester: FocusRequester,
+    callbacks: ComposerCallbacks,
+    plusMenu: @Composable () -> Unit,
+    sendButton: @Composable () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val composer = state.composer
+    Column(modifier.background(look.background).animateContentSize(tween(MENU_ANIMATION_MS))) {
+        when {
+            composer.transforming -> {
+                RewriteLockBar(onCancel = callbacks.onCancelRewrite)
+                ComposerDivider()
+            }
+
+            state.slashMatches.isNotEmpty() -> {
+                SlashMenu(state.slashMatches, onPick = callbacks.onPickSlash)
+                ComposerDivider()
+            }
+
+            state.showsMentionMenu -> {
+                MentionMenu(
+                    state.mentions,
+                    callbacks.mentions,
+                    includeTerminalOutput = state.terminalTools
+                )
+                ComposerDivider()
+            }
+        }
+        ComposerTabStrip(
+            items = composer.tabStripItems,
+            activeIndex = composer.activeIndex,
+            onSwitch = callbacks.onSwitchTab,
+            onClose = callbacks.onCloseTab
+        )
+        ComposerAttachments(
+            attachments = composer.attachments,
+            onRetry = callbacks.onRetryUpload,
+            onRemove = callbacks.onRemoveAttachment
+        )
+        KeysAndInput(state, input, look, focusRequester, callbacks, plusMenu, sendButton)
+    }
+}
+
+@Composable
+private fun KeysAndInput(
+    state: ComposerUiState,
+    input: TextFieldState,
+    look: ComposerLook,
+    focusRequester: FocusRequester,
+    callbacks: ComposerCallbacks,
+    plusMenu: @Composable () -> Unit,
+    sendButton: @Composable () -> Unit
+) {
+    val heightDp = with(LocalDensity.current) {
+        LocalWindowInfo.current.containerSize.height.toDp()
+    }
+    val keys = @Composable { modifier: Modifier ->
+        SpecialKeyBar(
+            onKey = callbacks.onKey,
+            onPaste = callbacks.onPaste,
+            onHideKeyboard = callbacks.onHideKeyboard,
+            modifier = modifier
+        )
+    }
+    val pill = @Composable { modifier: Modifier ->
+        ComposerPill(
+            input = input,
+            state = state,
+            look = look,
+            focusRequester = focusRequester,
+            onFocusChanged = callbacks.onFocusChanged,
+            onSend = callbacks.onSend,
+            onHideKeyboard = callbacks.onHideKeyboard,
+            plusMenu = plusMenu,
+            sendButton = sendButton,
+            modifier = modifier
+        )
+    }
+    if (!state.terminalTools) {
+        Column {
+            ComposerDivider()
+            pill(Modifier)
+        }
+    } else if (heightDp < CompactHeight) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            keys(Modifier.weight(1f).padding(bottom = 8.dp))
+            pill(Modifier.weight(1f))
+        }
+    } else {
+        Column {
+            keys(Modifier)
+            ComposerDivider()
+            pill(Modifier)
+        }
+    }
+}
+
+@Composable
+private fun RewriteLockBar(onCancel: () -> Unit) {
+    Row(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ActivityIndicator(
+            size = ActivityIndicatorSize.Small,
+            color = LpmTheme.colors.secondaryLabel
+        )
+        Text(
+            text = stringResource(R.string.composer_rewriting),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = LpmTheme.colors.secondaryLabel
+        )
+        Spacer(Modifier.weight(1f))
+        LinkButton(
+            text = stringResource(R.string.composer_cancel),
+            onClick = onCancel,
+            textStyle = LpmTheme.typography.footnote.copy(fontWeight = FontWeight.SemiBold)
+        )
+    }
+}

@@ -1,0 +1,54 @@
+# The file preview from an automation run's reply field (light, as the system
+# appearance is): the blog's README.md rendered, then its source.
+appId: cx.lpm.mobile
+name: 93-file-preview-followup-markdown
+tags: [demo, automations, files]
+---
+- runFlow: subflows/enter-demo.yaml
+- runFlow: subflows/open-more-menu.yaml
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Automations.*"
+      - extendedWaitUntil:
+          visible: "Weekly dependency check"
+          timeout: 5000
+- tapOn: "Weekly dependency check"
+- extendedWaitUntil:
+    visible: "Turn on"
+    timeout: 5000
+- tapOn: "Turn on"
+- extendedWaitUntil:
+    visible: "Run now"
+    timeout: 5000
+- tapOn: "Run now"
+- extendedWaitUntil:
+    visible: "Checked 24 dependencies.*"
+    timeout: 30000
+- tapOn: "Checked 24 dependencies.*"
+- extendedWaitUntil:
+    visible: "Reply to this run"
+    timeout: 10000
+- tapOn: "Reply to this run"
+- inputText: "@READ"
+- extendedWaitUntil:
+    visible: "README.md"
+    timeout: 5000
+- tapOn: "Preview"
+- extendedWaitUntil:
+    visible: "Notes for the blog project."
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-markdown
+- tapOn: "Source"
+- extendedWaitUntil:
+    visible: "# README.md"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-source
+- tapOn: "Done"
+- extendedWaitUntil:
+    notVisible: "Source"
+    timeout: 5000

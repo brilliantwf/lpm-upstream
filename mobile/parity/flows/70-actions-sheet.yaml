@@ -1,0 +1,34 @@
+appId: cx.lpm.mobile
+name: 70-actions-sheet
+tags: [demo, actions]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+# ⚡ is icon-only, labelled "Actions" on both platforms.
+- tapOn: "Actions"
+- extendedWaitUntil:
+    visible: "Fix tests"
+    timeout: 5000
+# The header row: the Checks zone (Test, Lint) and the Agents zone, whose
+# Claude layer shows first.
+- assertVisible: "Header"
+- assertVisible: "Test"
+- assertVisible: "Lint"
+- assertVisible: "Review"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-actions-sheet
+# A sideways swipe on a zone with layers opens the next one (Codex).
+- swipe:
+    from: "Fix tests"
+    direction: LEFT
+- extendedWaitUntil:
+    visible: "Codex"
+    timeout: 5000
+- assertVisible: "Review"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-codex-layer

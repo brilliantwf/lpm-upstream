@@ -1,0 +1,13 @@
+appId: cx.lpm.mobile
+name: 30-folder-collapse
+tags: [demo, projects]
+---
+- runFlow: subflows/enter-demo.yaml
+- assertVisible: "blog"
+# Tapping a folder's header shuts it; its projects leave the list.
+- tapOn: "Client Work"
+- assertNotVisible: "blog"
+- assertNotVisible: "design-system"
+- takeScreenshot: 1-folder-shut
+- tapOn: "Client Work"
+- assertVisible: "design-system"

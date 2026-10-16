@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="done">Done</string>
+    <string name="ok">OK</string>
+    <string name="delete">Delete</string>
+    <string name="back">Back</string>
+
+    <string name="config_title">Configuration</string>
+    <string name="config_update_failed">Couldn\'t update configuration</string>
+    <string name="config_services">Services</string>
+    <string name="config_port">Port %1$d</string>
+    <string name="config_add_service">Add Service</string>
+    <string name="config_profiles">Profiles</string>
+    <plurals name="config_service_count">
+        <item quantity="one">%1$d service</item>
+        <item quantity="other">%1$d services</item>
+    </plurals>
+    <string name="config_add_profile">Add Profile</string>
+    <string name="config_actions">Actions</string>
+    <string name="config_menu">Menu</string>
+    <string name="config_add_action">Add Action</string>
+    <string name="config_edit_file">Edit Configuration File</string>
+    <string name="config_action_title">"%1$s  %2$s"</string>
+
+    <string name="config_profile_name">Name</string>
+    <string name="config_profile_no_services">Add a service first, then group services into profiles.</string>
+    <string name="config_profile_footer">Starting this profile runs exactly these services.</string>
+    <string name="config_profile_edit">Edit Profile</string>
+    <string name="config_profile_save_failed">Couldn\'t save profile</string>
+    <string name="config_profile_delete_title">Delete this profile?</string>
+    <string name="config_profile_delete_message">Remove it from this project. The services themselves stay. This can\'t be undone.</string>
+    <string name="config_profile_delete">Delete profile</string>
+
+    <string name="config_layer_project">This Project</string>
+    <string name="config_layer_repo">Shared</string>
+    <string name="config_layer_global">All Projects</string>
+    <string name="config_loading">Loading…</string>
+    <string name="config_yaml_load_failed">Couldn\'t load configuration</string>
+    <string name="config_yaml_unavailable">Not available for this project</string>
+    <string name="config_yaml_unavailable_message">This configuration can\'t be edited from here.</string>
+    <string name="config_try_again">Try Again</string>
+    <string name="config_yaml_unsaved">Unsaved changes</string>
+    <string name="config_yaml_save_failed">Couldn\'t save configuration</string>
+
+    <string name="config_add_project">Add Project</string>
+    <string name="config_mode_local">Local</string>
+    <string name="config_mode_clone">Clone</string>
+    <string name="config_mode_ssh">SSH</string>
+    <string name="config_create">Create</string>
+    <string name="config_add">Add</string>
+    <string name="config_add_failed">Couldn\'t add project</string>
+    <string name="config_local_folder">Folder on your Mac</string>
+    <string name="config_local_footer">Point lpm at a folder on your Mac — an existing project to pick up where you left off, or a new folder to start something fresh.</string>
+    <string name="config_project_folder">Project folder</string>
+    <string name="config_repo_address">Repository address</string>
+    <string name="config_clone_into">Clone into</string>
+    <string name="config_branch">Branch (optional)</string>
+    <string name="config_clone_footer">Downloads a copy of the repository onto your Mac. A large repository can take a little while.</string>
+    <string name="config_ssh_loading">Looking for saved hosts…</string>
+    <string name="config_ssh_pick">Connect to host</string>
+    <string name="config_ssh_select">Select…</string>
+    <string name="config_ssh_manual">Enter manually</string>
+    <string name="config_ssh_pick_footer">Pick a saved host to fill in its details, or enter a new one.</string>
+    <string name="config_ssh_host_label">%1$s — %2$s</string>
+    <string name="config_ssh_connection">Connection</string>
+    <string name="config_ssh_host">Host</string>
+    <string name="config_ssh_user">User</string>
+    <string name="config_ssh_port">Port</string>
+    <string name="config_ssh_connection_footer">Creates a project that runs on a remote host. Its services, actions, and terminals run over this connection.</string>
+    <string name="config_ssh_identity">Identity file (optional)</string>
+    <string name="config_ssh_dir">Remote directory (optional)</string>
+    <string name="config_ssh_identity_footer">Leave the identity file blank to use your existing connection defaults. The remote directory is where the shell will start.</string>
+    <string name="config_project_name">Project name</string>
+    <string name="config_name_footer">Used to label the project. Filled in from your choice above — edit it if you like.</string>
+    <string name="config_choose">Choose…</string>
+
+    <string name="config_dirs_up">Up</string>
+    <string name="config_dirs_empty">No folders here.</string>
+    <string name="config_dirs_error">Can\'t open that folder</string>
+    <string name="config_dirs_use">Use This Folder</string>
+    <string name="config_dirs_no_path">…</string>
+</resources>

@@ -211,11 +211,14 @@ final class SpeechStore {
             refreshClipProgress()
             return
         }
-        guard isActive, !segments.isEmpty else { return }
+        // While the Mac renders, its clip is about to take over; the lock screen's
+        // next/previous commands can still land here.
+        guard isActive, !segments.isEmpty, pendingReqId == nil else { return }
         var target = index + delta
         if delta < 0, elapsed - elapsedAtSegmentStart > 3 { target = index }
+        let wasPaused = mode == .paused
         speak(from: max(0, min(segments.count - 1, target)))
-        if mode == .paused { mode = .speaking; startTicker() }
+        if wasPaused { startTicker() }
         updateNowPlaying()
     }
 
@@ -258,8 +261,11 @@ final class SpeechStore {
             clip.setRate(rate)
             return
         }
+        // The Mac's clip, still rendering, picks the new rate up when it arrives.
+        guard pendingReqId == nil else { return }
+        let wasPaused = mode == .paused
         speak(from: index) // rate is fixed per utterance, so re-queue from here
-        if mode == .paused { mode = .speaking; startTicker() }
+        if wasPaused { startTicker() }
     }
 
     private func pause() {

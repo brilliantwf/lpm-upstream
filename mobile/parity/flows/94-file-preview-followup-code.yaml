@@ -1,0 +1,47 @@
+# A JSON file from an automation run's reply field: its keys, strings and
+# numbers in the code colors, then "Done".
+appId: cx.lpm.mobile
+name: 94-file-preview-followup-code
+tags: [demo, automations, files]
+---
+- runFlow: subflows/enter-demo.yaml
+- runFlow: subflows/open-more-menu.yaml
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Automations.*"
+      - extendedWaitUntil:
+          visible: "Weekly dependency check"
+          timeout: 5000
+- tapOn: "Weekly dependency check"
+- extendedWaitUntil:
+    visible: "Turn on"
+    timeout: 5000
+- tapOn: "Turn on"
+- extendedWaitUntil:
+    visible: "Run now"
+    timeout: 5000
+- tapOn: "Run now"
+- extendedWaitUntil:
+    visible: "Checked 24 dependencies.*"
+    timeout: 30000
+- tapOn: "Checked 24 dependencies.*"
+- extendedWaitUntil:
+    visible: "Reply to this run"
+    timeout: 10000
+- tapOn: "Reply to this run"
+- inputText: "@package"
+- extendedWaitUntil:
+    visible: "package.json"
+    timeout: 5000
+- tapOn: "Preview"
+- extendedWaitUntil:
+    visible: ".*\"name\": \"blog\".*"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-code
+- tapOn: "Done"
+- extendedWaitUntil:
+    notVisible: ".*\"name\": \"blog\".*"
+    timeout: 5000

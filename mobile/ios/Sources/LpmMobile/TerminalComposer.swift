@@ -274,7 +274,8 @@ struct TerminalComposer: View {
                     branches: cachedBranches, services: cachedServices,
                     pickPath: pickPath, pickBranch: pickBranch,
                     includeTerminalOutput: terminalTools,
-                    pickTerminalOutput: pickTerminalOutput, pickServiceLog: pickServiceLog)
+                    pickTerminalOutput: pickTerminalOutput, pickServiceLog: pickServiceLog,
+                    previewColorScheme: systemColorScheme)
                 Divider().opacity(0.5)
             }
             ComposerTabStrip(items: tabStripItems, activeIndex: store.activeIndex,
@@ -552,6 +553,7 @@ struct TerminalComposer: View {
             send()
         }
         .disabled(disabled || (!canSend && !isSendMenuUseful))
+        .accessibilityLabel("Send")
     }
 
     private var sendForeground: SwiftUI.Color {
@@ -877,6 +879,8 @@ private struct ComposerMentionMenu: View {
     let includeTerminalOutput: Bool
     let pickTerminalOutput: () -> Void
     let pickServiceLog: (ServiceInfo) -> Void
+    // The composer forces dark for the terminal; the preview sheet follows the system.
+    let previewColorScheme: ColorScheme
     // The file to preview (tapped via the eye button, distinct from the row's
     // primary insert-mention tap).
     @State private var previewTarget: FilePreviewTarget?
@@ -912,6 +916,7 @@ private struct ComposerMentionMenu: View {
         .frame(maxHeight: 260)
         .sheet(item: $previewTarget) { target in
             FilePreviewSheet(target: target).environment(model)
+                .environment(\.colorScheme, previewColorScheme)
         }
     }
 
@@ -953,6 +958,7 @@ private struct ComposerMentionMenu: View {
                         .frame(width: 44).padding(.vertical, 9).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Preview")
             } else {
                 Spacer().frame(width: 16)
             }
@@ -1016,19 +1022,19 @@ private struct SpecialKeyBar: View {
                     cap("⌃C") { key("\u{03}") }
                     cap("⏎") { key("\r") }
                     Divider().frame(height: 18)
-                    arrow("chevron.up") { key("\u{1b}[A") }
-                    arrow("chevron.down") { key("\u{1b}[B") }
-                    arrow("chevron.left") { key("\u{1b}[D") }
-                    arrow("chevron.right") { key("\u{1b}[C") }
+                    arrow("chevron.up", "Up") { key("\u{1b}[A") }
+                    arrow("chevron.down", "Down") { key("\u{1b}[B") }
+                    arrow("chevron.left", "Left") { key("\u{1b}[D") }
+                    arrow("chevron.right", "Right") { key("\u{1b}[C") }
                     Divider().frame(height: 18)
-                    arrow("doc.on.clipboard", action: onPaste)
+                    arrow("doc.on.clipboard", "Paste", action: onPaste)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
             }
             if keyboard.isShown {
                 Divider().frame(height: 18)
-                arrow("keyboard.chevron.compact.down", action: Keyboard.dismiss)
+                arrow("keyboard.chevron.compact.down", "Hide keyboard", action: Keyboard.dismiss)
                     .padding(.horizontal, 12)
             }
         }
@@ -1049,7 +1055,7 @@ private struct SpecialKeyBar: View {
         .foregroundStyle(.primary)
     }
 
-    private func arrow(_ systemName: String, action: @escaping () -> Void) -> some View {
+    private func arrow(_ systemName: String, _ label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 13, weight: .semibold))
@@ -1059,5 +1065,6 @@ private struct SpecialKeyBar: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
+        .accessibilityLabel(label)
     }
 }

@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="back">Back</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="update_failed">Couldn\'t update automation</string>
+
+    <!-- Automations list -->
+    <string name="automations_title">Automations</string>
+    <string name="automations_new_section">New</string>
+    <string name="automations_earlier_section">Earlier</string>
+    <string name="automations_add">New automation</string>
+    <string name="automations_mark_all_read">Mark all read</string>
+    <string name="automations_loading">Loading automations…</string>
+    <string name="automations_empty">No automations</string>
+    <string name="automations_empty_all">Scheduled tasks that check, duplicate, and run agents on their own.</string>
+    <string name="automations_empty_project">Scheduled tasks that run in this project on their own.</string>
+    <string name="row_in_repo">in repo</string>
+    <string name="row_edit">Edit</string>
+    <string name="row_mark_read">Mark read</string>
+    <string name="row_read">Read</string>
+    <string name="row_turn_off">Turn off</string>
+    <string name="row_turn_on">Turn on</string>
+    <string name="row_run">Run</string>
+    <string name="row_stop">Stop</string>
+
+    <!-- Automation page -->
+    <string name="detail_title">Automation</string>
+    <string name="detail_edit">Edit automation</string>
+    <string name="detail_not_found">Automation not found</string>
+    <string name="detail_not_found_hint">It may have been removed or renamed.</string>
+    <string name="detail_cant_run">This automation can\'t run.</string>
+    <string name="detail_running_for">Running for %1$s</string>
+    <string name="detail_schedule">Schedule</string>
+    <string name="detail_enabled">Automation on</string>
+    <string name="detail_next_run">Next run</string>
+    <string name="detail_last_run">Last run</string>
+    <string name="detail_does">Does</string>
+    <string name="detail_agent">Agent</string>
+    <string name="detail_fresh_copy">Works in a fresh copy of the project</string>
+    <string name="detail_runs_in">Runs in</string>
+    <string name="detail_live_output">Live output</string>
+    <string name="detail_waiting_output">Waiting for output…</string>
+    <string name="detail_history">Run history</string>
+    <string name="detail_mark_read">Mark read</string>
+    <string name="detail_no_runs">No runs yet. Start one to see what it does.</string>
+    <plurals name="detail_show_all">
+        <item quantity="one">Show all %1$d run</item>
+        <item quantity="other">Show all %1$d runs</item>
+    </plurals>
+    <string name="detail_new_badge">New</string>
+    <string name="run_stop">Stop run</string>
+    <plurals name="run_stop_many">
+        <item quantity="one">Stop %1$d run</item>
+        <item quantity="other">Stop %1$d runs</item>
+    </plurals>
+    <string name="run_turn_on">Turn on</string>
+    <string name="run_now">Run now</string>
+    <plurals name="run_in_projects">
+        <item quantity="one">Run in %1$d project</item>
+        <item quantity="other">Run in %1$d projects</item>
+    </plurals>
+
+    <!-- Run conversation -->
+    <string name="chat_title">Automation chat</string>
+    <string name="chat_reply_placeholder">Reply to this run</string>
+    <string name="chat_running_placeholder">Automation is running…</string>
+    <string name="chat_waiting_reply">Waiting for reply…</string>
+    <string name="chat_replying">Replying…</string>
+    <string name="chat_copy">Copy message</string>
+    <string name="chat_copied">Copied</string>
+    <string name="chat_condensed">Condensed</string>
+    <string name="chat_send_failed">Couldn\'t send message</string>
+    <string name="chat_send">Send</string>
+
+    <!-- Editor -->
+    <string name="editor_new_title">New job</string>
+    <string name="editor_edit_title">Edit job</string>
+    <string name="editor_save">Save</string>
+    <string name="editor_loading">Loading job…</string>
+    <string name="editor_save_failed">Couldn\'t save automation</string>
+    <string name="editor_load_failed">Couldn\'t load automation</string>
+    <string name="editor_delete_title">Delete this job?</string>
+    <string name="editor_delete_confirm">Delete</string>
+    <string name="editor_delete_global">Remove it from every project. This can\'t be undone.</string>
+    <string name="editor_delete_project">Remove it from this project. This can\'t be undone.</string>
+    <string name="editor_delete_copies">Also remove the copies its runs created</string>
+    <string name="editor_delete_job">Delete job</string>
+    <string name="editor_name">Name this job</string>
+    <string name="editor_emoji">Emoji (optional)</string>
+    <string name="editor_runs_in">Runs in</string>
+    <string name="editor_every_project">Every project</string>
+    <string name="editor_standalone_footer">No project selected — runs on its own in your home folder.</string>
+    <string name="editor_target_footer">Runs in the selected project.</string>
+    <string name="editor_targets_footer">Runs in the selected projects.</string>
+    <string name="editor_does">Does</string>
+    <string name="editor_mode_prompt">AI prompt</string>
+    <string name="editor_mode_cmd">Command</string>
+    <string name="editor_mode_action">Action</string>
+    <string name="editor_action">Action</string>
+    <string name="editor_prompt">What should the agent do?</string>
+    <string name="editor_agent">Agent</string>
+    <string name="editor_agent_default">Default</string>
+    <string name="editor_agent_claude">Claude</string>
+    <string name="editor_agent_codex">Codex</string>
+    <string name="editor_agent_gemini">Gemini</string>
+    <string name="editor_agent_opencode">OpenCode</string>
+    <string name="editor_model">Model (optional)</string>
+    <string name="editor_effort">Effort</string>
+    <string name="editor_effort_low">Low</string>
+    <string name="editor_effort_medium">Medium</string>
+    <string name="editor_effort_high">High</string>
+    <string name="editor_effort_xhigh">Extra High</string>
+    <string name="editor_effort_max">Max</string>
+    <string name="editor_effort_ultra">Ultra</string>
+    <string name="editor_access">Access</string>
+    <string name="editor_access_full">Full access</string>
+    <string name="editor_access_read">Read only</string>
+    <string name="editor_access_footer">Full access lets the agent edit files and run commands unattended; read only looks around and reports.</string>
+    <string name="editor_frequency">Frequency</string>
+    <string name="editor_kept_schedule">Set on your Mac</string>
+    <string name="editor_kept_footer">This schedule was set on your Mac. Change it there; everything else can be edited here.</string>
+    <string name="editor_repeat">Repeat</string>
+    <string name="editor_repeat_daily">Every day</string>
+    <string name="editor_repeat_days">On certain days</string>
+    <string name="editor_repeat_interval">On an interval</string>
+    <string name="editor_repeat_manual">Manually</string>
+    <string name="editor_use">Use</string>
+    <string name="editor_use_all">All of them</string>
+    <plurals name="editor_use_random">
+        <item quantity="one">%1$d random day a week</item>
+        <item quantity="other">%1$d random days a week</item>
+    </plurals>
+    <string name="editor_random_window">A random time in a window</string>
+    <string name="editor_at">At</string>
+    <string name="editor_between">Between</string>
+    <string name="editor_and">And</string>
+    <string name="editor_runs_a_day">Runs a day</string>
+    <string name="editor_every">Every</string>
+    <string name="editor_vary_gap">Vary the gap</string>
+    <string name="editor_unit_minutes">Minutes</string>
+    <string name="editor_unit_hours">Hours</string>
+    <string name="editor_unit_days">Days</string>
+    <string name="editor_check_header">Only when there\'s work (optional)</string>
+    <string name="editor_check_footer">A command that decides whether the job has anything to do — it runs only when this succeeds. Leave blank to run every time.</string>
+    <string name="editor_verify_header">Check the work afterwards (optional)</string>
+    <string name="editor_verify_footer">Runs where the job ran, once the run finishes. If it fails, the run is reported as needing a look instead of done. Leave blank and the run isn\'t checked.</string>
+</resources>

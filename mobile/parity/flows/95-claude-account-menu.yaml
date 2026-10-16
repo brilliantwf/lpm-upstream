@@ -1,0 +1,53 @@
+appId: cx.lpm.mobile
+name: 95-claude-account-menu
+tags: [demo, projects, claude]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Claude Account"
+    timeout: 5000
+# Which login new Claude sessions use: the main accounts, one account always, or a
+# list to take turns on, each account with its usage. iOS reads a row as one
+# "Title, subtitle" element, Android as two, hence the "(Title, )?subtitle" patterns.
+# Under load iOS can drop a tap on a menu that's still settling; tap again if so.
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Claude Account"
+      - extendedWaitUntil:
+          visible: "Always use one account"
+          timeout: 5000
+# The choice in effect wears the checkmark (named "selected").
+- assertVisible:
+    text: "selected"
+    above: "Always use one account"
+- assertVisible: "Main accounts"
+- assertVisible: "Main login.*"
+- assertVisible: "(Work, )?5h .*"
+- assertVisible: "(Old laptop, )?Not signed in"
+- assertVisible: "(Choose Accounts, )?Take turns on up to 3, in order"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-claude-account
+# Accounts that can't take turns say why, and picking one does nothing.
+- tapOn: "Choose Accounts.*"
+- extendedWaitUntil:
+    visible: "Take turns, in this order"
+    timeout: 5000
+- assertVisible: "(Client, )?Allow it in lpm on your Mac first"
+- assertVisible: "(Old laptop, )?Sign in on your Mac first"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-choose-accounts
+- tapOn: "(Client, )?Allow it in lpm on your Mac first"
+- assertVisible: "Take turns, in this order"
+# Its header leads back one level, to the account choices.
+- tapOn: "Choose Accounts.*"
+- extendedWaitUntil:
+    visible: "Always use one account"
+    timeout: 5000

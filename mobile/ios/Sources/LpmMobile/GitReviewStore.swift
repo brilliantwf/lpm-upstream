@@ -580,6 +580,7 @@ final class GitReviewStore {
             branchError[project] = error
         } else {
             checkoutTick[project, default: 0] += 1
+            forgetBranches(project)
             load(project)
             loadBranches(project)
             client?.requestProjects()
@@ -597,11 +598,19 @@ final class GitReviewStore {
             // dismiss the sheet, refresh the snapshot + project list.
             Haptics.success()
             checkoutTick[project, default: 0] += 1
+            forgetBranches(project)
             load(project)
             loadBranches(project)
             client?.requestProjects()
             client?.requestSidebar()
         }
+    }
+
+    /// The branch list and current branch changed on the Mac: drop the stale copy so
+    /// the switch-branch sheet loads them again next time it opens.
+    private func forgetBranches(_ project: String) {
+        branches[project] = nil
+        currentBranch[project] = nil
     }
 
     private func armTimeout(_ op: String, _ project: String, seconds: Double, _ fire: @escaping () -> Void) {

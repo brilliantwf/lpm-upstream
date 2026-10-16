@@ -62,6 +62,7 @@ private struct AttachmentChip: View {
                     .foregroundStyle(.white, .black.opacity(0.55))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Remove")
             .offset(x: 6, y: -6)
         }
     }

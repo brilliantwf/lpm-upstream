@@ -1,0 +1,47 @@
+appId: cx.lpm.mobile
+name: 84-config-yaml-save
+tags: [demo, config]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+# The project's "…" menu; tap Configure… once it has settled.
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Configure…"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Configure…"
+      - extendedWaitUntil:
+          visible: "Configuration"
+          timeout: 5000
+- scrollUntilVisible:
+    element: "Edit Configuration File"
+- tapOn: "Edit Configuration File"
+- extendedWaitUntil:
+    visible: "This Project"
+    timeout: 5000
+# An edit to the shared file marks it unsaved; Save writes it and closes the editor.
+- tapOn: "All Projects"
+- extendedWaitUntil:
+    visible: "(?s)# Applies to every project.*"
+    timeout: 5000
+- tapOn: "(?s)# Applies to every project.*"
+- inputText: " ok"
+- extendedWaitUntil:
+    visible: "Unsaved changes"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-unsaved
+- tapOn: "Save"
+- extendedWaitUntil:
+    notVisible: "All Projects"
+    timeout: 5000
+- assertVisible: "Configuration"

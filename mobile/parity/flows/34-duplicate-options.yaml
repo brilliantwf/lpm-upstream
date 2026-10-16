@@ -1,0 +1,21 @@
+appId: cx.lpm.mobile
+name: 34-duplicate-options
+tags: [demo, projects]
+---
+- runFlow: subflows/enter-demo.yaml
+# A project's long-press menu: status, folder, Duplicate.
+- longPressOn: "api-gateway"
+- extendedWaitUntil:
+    visible: "Duplicate"
+    timeout: 5000
+- assertVisible: "Move to folder"
+- takeScreenshot: 1-row-menu
+- tapOn: "Duplicate"
+- extendedWaitUntil:
+    visible: "Duplicate api-gateway"
+    timeout: 5000
+- assertVisible: "Create 1 copy"
+- assertVisible: "Committed work only"
+- takeScreenshot: 2-duplicate-options
+- tapOn: "Cancel"
+- assertNotVisible: "Duplicate api-gateway"

@@ -1,0 +1,38 @@
+appId: cx.lpm.mobile
+name: 75-action-editor-new
+tags: [demo, actions, config]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "Actions"
+- extendedWaitUntil:
+    visible: "Lint"
+    timeout: 5000
+- tapOn: "New Action"
+- extendedWaitUntil:
+    visible: "Add Action"
+    timeout: 5000
+- assertVisible: "The name is how this action is stored. The label is what you see on the button."
+- assertVisible: "npm run deploy"
+- assertVisible: "Opens a new terminal each time."
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-add-action
+- tapOn: "Name"
+- inputText: "deploy"
+- tapOn: "npm run deploy"
+- inputText: "npm run deploy"
+- tapOn: "Save"
+# Saved on the Mac, the new button joins the header row.
+- extendedWaitUntil:
+    notVisible: "Add Action"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "deploy"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-saved

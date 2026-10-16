@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="files_done">Done</string>
+    <string name="files_share">Share</string>
+    <string name="files_share_toolbar">Share…</string>
+    <string name="files_retry">Retry</string>
+    <string name="files_open_failed">Couldn\'t open the file</string>
+    <string name="files_progress">%1$s of %2$s</string>
+    <string name="files_view_preview">Preview</string>
+    <string name="files_view_source">Source</string>
+    <string name="files_empty">Empty file</string>
+    <string name="files_no_preview">No preview</string>
+    <string name="files_no_preview_message">%1$s can\'t show this kind of file. Share it to open it in another app.</string>
+    <string name="files_truncated">Showing the first 1 MB — this file is larger.</string>
+</resources>

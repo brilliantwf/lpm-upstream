@@ -1,0 +1,21 @@
+appId: cx.lpm.mobile
+name: 33-service-logs
+tags: [demo, projects, services]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tap a service for its logs."
+    timeout: 5000
+# The service's name opens its logs; the switch beside it doesn't.
+- tapOn: "web"
+- extendedWaitUntil:
+    visible: "Close"
+    timeout: 5000
+- assertVisible: "Running"
+- assertVisible: "Stop"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-service-logs
+- tapOn: "Close"
+- assertVisible: "Tap a service for its logs."

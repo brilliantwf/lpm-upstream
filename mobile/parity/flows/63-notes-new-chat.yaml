@@ -1,0 +1,42 @@
+# Starting a chat: name it, and it opens empty, ready for its first note.
+appId: cx.lpm.mobile
+name: 63-notes-new-chat
+tags: [demo, notes]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Notes"
+    timeout: 5000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Notes"
+      - extendedWaitUntil:
+          visible: "Checkout redesign"
+          timeout: 5000
+- tapOn: "New Chat"
+- extendedWaitUntil:
+    visible: "Create"
+    timeout: 3000
+- inputText: "Launch plan"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-new-chat
+- tapOn: "Create"
+- extendedWaitUntil:
+    visible: "No notes here yet"
+    timeout: 5000
+- assertVisible: "Write the first note in this chat below."
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-empty-chat
+- runFlow: subflows/back.yaml
+- extendedWaitUntil:
+    visible: "Launch plan"
+    timeout: 5000
+- takeScreenshot: 3-list-with-new-chat

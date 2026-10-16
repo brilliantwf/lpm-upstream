@@ -897,8 +897,10 @@ final class AppModel {
     /// then restore whatever real pairing state was on disk (usually none — the demo
     /// is offered on the fresh pairing screen).
     func exitDemo() {
-        demoMode = false
+        // Tear down while still in Demo Mode: the disconnect's bookkeeping persists
+        // the active Mac, and only `demoMode` keeps the demo Mac off disk.
         resetSessionState()
+        demoMode = false
         macs = MacStore.loadRecords()
         activeMacId = MacStore.loadActiveId() ?? macs.first?.localId
         restoreSnapshot()

@@ -1,0 +1,24 @@
+appId: cx.lpm.mobile
+name: 32-rename-project
+tags: [demo, projects]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Rename…"
+    timeout: 5000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Rename…"
+      - extendedWaitUntil:
+          visible: "Rename project"
+          timeout: 5000
+- assertVisible: "Set a display name for this project. Leave it blank to use the project id."
+- takeScreenshot: 1-rename-project
+- tapOn: "Cancel"
+- assertNotVisible: "Rename project"
