@@ -646,6 +646,7 @@ extension DemoServer {
             guard let self, self.demoTerminal(id) != nil else { return nil }
             let text = ack + "\r\n\r\n\(bold)>\(reset) "
             self.appendBuffer(id, text)
+            self.demoRecordAnswer(id, ansi: ack)
             self.updateTerminal(id) { $0.responding = false }
             self.demoSetAgentStatus(project: project, entries: [self.statusEntry(id, "Waiting", 30)])
             self.push(["t": "o", "id": id, "d": text])
@@ -665,6 +666,7 @@ extension DemoServer {
             pushAfter(step.0) { [weak self] in
                 guard let self, self.demoTerminal(id) != nil else { return nil }
                 self.appendBuffer(id, step.1)
+                if step.1.hasPrefix(textDot) { self.demoRecordAnswer(id, ansi: step.1) }
                 guard last else { return ["t": "o", "id": id, "d": step.1] }
                 self.updateTerminal(id) { $0.scriptFinished = true }
                 self.demoSetAgentStatus(project: project,
