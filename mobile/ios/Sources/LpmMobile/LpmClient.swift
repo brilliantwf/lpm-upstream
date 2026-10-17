@@ -41,6 +41,7 @@ final class LpmClient: NSObject {
     var onSpeech: ((_ reqId: String, _ audio: String?, _ error: String?) -> Void)?
     var onTerminals: ((_ project: String, _ terminals: [TerminalInfo]) -> Void)?
     var onSlash: ((_ id: String, _ commands: [SlashCommand]) -> Void)?
+    var onAnswers: ((_ reqId: String, _ answers: [RecentAnswer]?, _ error: String?) -> Void)?
     var onUpload: ((_ id: String, _ reqId: String, _ path: String) -> Void)?
     var onUploadStep: ((UploadStep) -> Void)?
     var onMentions: ((_ project: String, _ entries: [MentionEntry]) -> Void)?
@@ -236,6 +237,7 @@ final class LpmClient: NSObject {
     private(set) var hostFeatures = Set<String>()
     static let serviceLogsWatchFeature = "serviceLogsWatch"
     static let serviceRestartFeature = "serviceRestart"
+    static let agentAnswersFeature = "agentAnswers"
 
     // Requests made while the link is down or half-dead, delivered on the next
     // `ready`. iOS kills the socket seconds after backgrounding and the
@@ -472,7 +474,7 @@ final class LpmClient: NSObject {
             if case .ready = self.state { return }
             self.injectInbound(Wire.json([
                 "t": "ready", "serverId": DemoServer.serverId, "serverName": DemoServer.serverName,
-                "features": [ChunkedUpload.feature, Self.serviceLogsWatchFeature],
+                "features": [ChunkedUpload.feature, Self.serviceLogsWatchFeature, Self.agentAnswersFeature],
             ]))
         }
     }
@@ -840,6 +842,9 @@ final class LpmClient: NSObject {
     func requestSpeech(reqId: String, text: String) { send(Wire.ttsSpeak(reqId: reqId, text: text)) }
     func requestTerminals(project: String) { send(Wire.terminals(project: project)) }
     func requestSlash(id: String, project: String) { send(Wire.slash(id: id, project: project)) }
+    func requestAnswers(id: String, project: String, limit: Int, reqId: String) {
+        send(Wire.answers(id: id, project: project, limit: limit, reqId: reqId))
+    }
     func uploadBlob(_ id: String, _ b64: String, mime: String, name: String?, reqId: String) {
         send(Wire.upload(id: id, data: b64, mime: mime, name: name, reqId: reqId))
     }
@@ -1336,6 +1341,7 @@ final class LpmClient: NSObject {
             case .ttsSpeak(let reqId, let audio, let error): self.onSpeech?(reqId, audio, error)
             case .terminals(let proj, let t): self.onTerminals?(proj, t)
             case .slash(let id, let cmds): self.onSlash?(id, cmds)
+            case .answers(_, let reqId, let answers, let error): self.onAnswers?(reqId, answers, error)
             case .upload(let id, let reqId, let path): self.onUpload?(id, reqId, path)
             case .uploadStep(let step): self.onUploadStep?(step)
             case .mentions(let proj, let entries): self.onMentions?(proj, entries)

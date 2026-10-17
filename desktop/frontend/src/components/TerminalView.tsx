@@ -22,7 +22,7 @@ import {
   type TerminalInstance,
   type AdoptedTabOpts,
 } from "../paneTree";
-import { agentSessionOf } from "../agentSession";
+import { agentSessionOf, type AgentSessionRef } from "../agentSession";
 import { scanMemoryInvocation } from "../terminalMemory";
 import { detectAICLI } from "../slashCommands";
 import { PaneLayout } from "./PaneLayout";
@@ -58,7 +58,7 @@ import { registerProjectSubmit, useTerminalTargets } from "../store/terminalTarg
 import { useTTSHotkeys } from "../hooks/useTTSHotkeys";
 import { TTSControls } from "./TTSControls";
 import { joinAbs } from "../path";
-import { isPeerName } from "../peer/markers";
+import { isPeerName, peerSlugOf } from "../peer/markers";
 import { retainPeerSession } from "../peer/retainedSessions";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
 import { blockingDialogOpen } from "./ui/blockingDialog";
@@ -358,10 +358,20 @@ export function TerminalView({ projectName, projectRoot, services, terminalTheme
   // unchanged. Non-PTY tabs (browser, review) have no xterm session, so they're
   // left out.
   // {id, label, cli}: cli is detected from each terminal's launch command (empty
-  // for plain shells), used only by the remote push. Identity-stabilized (the tree
-  // gets a fresh reference each drag frame) so consumers/effects don't churn.
+  // for plain shells), used only by the remote push, as is agentSession — the
+  // conversation whose transcript the phone's copy key reads, so only for tabs
+  // whose transcripts are on this Mac. Identity-stabilized (the tree gets a fresh
+  // reference each drag frame) so consumers/effects don't churn.
   const allTerminalsRef = useRef<
-    { id: string; label: string; cli: string; pinned: boolean; emoji: string; historyKey: string }[]
+    {
+      id: string;
+      label: string;
+      cli: string;
+      pinned: boolean;
+      emoji: string;
+      historyKey: string;
+      agentSession: AgentSessionRef | null;
+    }[]
   >([]);
   const allTerminals = useMemo(() => {
     const next = tree
@@ -376,6 +386,8 @@ export function TerminalView({ projectName, projectRoot, services, terminalTheme
             // Same fallback the composer uses: an older persisted tree can carry
             // a tab that predates history keys.
             historyKey: t.historyKey ?? t.id,
+            agentSession:
+              localSessions && peerSlugOf(t.id) === null ? agentSessionOf(t) : null,
           }))
       : [];
     const prev = allTerminalsRef.current;
@@ -388,14 +400,16 @@ export function TerminalView({ projectName, projectRoot, services, terminalTheme
           p.cli === next[i].cli &&
           p.pinned === next[i].pinned &&
           p.emoji === next[i].emoji &&
-          p.historyKey === next[i].historyKey,
+          p.historyKey === next[i].historyKey &&
+          p.agentSession?.provider === next[i].agentSession?.provider &&
+          p.agentSession?.sessionId === next[i].agentSession?.sessionId,
       )
     ) {
       return prev;
     }
     allTerminalsRef.current = next;
     return next;
-  }, [tree]);
+  }, [tree, localSessions]);
 
   // Mirror the live id -> {label, cli} mapping to the remote server so paired
   // phones show the same terminal names and offer the same slash commands. It is

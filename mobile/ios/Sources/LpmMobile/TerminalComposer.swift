@@ -301,7 +301,8 @@ struct TerminalComposer: View {
             : AnyLayout(VStackLayout(spacing: 0))
         return layout {
             if terminalTools {
-                SpecialKeyBar(key: key, onPaste: pasteClipboard)
+                SpecialKeyBar(key: key, onPaste: pasteClipboard,
+                              answers: model.answerSource(terminal: termId, project: project))
                     .padding(.bottom, sideBySide ? 8 : 0)
             }
             if !sideBySide {
@@ -1007,16 +1008,22 @@ private struct ComposerMentionMenu: View {
 /// sends its raw escape/control sequence to the terminal immediately — independent
 /// of the compose field — so Ctrl-C, Esc, and arrow navigation work without
 /// composing a message. Paste inserts the clipboard string into the field. While
-/// the keyboard is open, a key pinned at the end closes it.
+/// the keyboard is open, a key pinned at the end closes it. For an agent whose
+/// answers the Mac can read, the bar leads with a copy key.
 private struct SpecialKeyBar: View {
     let key: (String) -> Void
     let onPaste: () -> Void
+    let answers: AnswerSource?
     @StateObject private var keyboard = KeyboardObserver()
 
     var body: some View {
         HStack(spacing: 0) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
+                    if let answers {
+                        CopyAnswerKey(source: answers)
+                        Divider().frame(height: 18)
+                    }
                     cap("esc") { key("\u{1b}") }
                     cap("tab") { key("\t") }
                     cap("⌃C") { key("\u{03}") }

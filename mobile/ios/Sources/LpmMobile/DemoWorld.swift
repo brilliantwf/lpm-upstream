@@ -127,6 +127,15 @@ struct DemoWorld {
 
     var terminals: [String: [Terminal]] = [:] // project -> terminals
 
+    struct AgentAnswer {
+        var text: String
+        var at: Int // unix millis
+    }
+
+    // Terminal id -> the answers its scripted agent has printed, oldest first, as
+    // the markdown a real transcript would hold.
+    var agentAnswers: [String: [AgentAnswer]] = [:]
+
     struct ComposerDraft {
         var text: String
         var rev: Int

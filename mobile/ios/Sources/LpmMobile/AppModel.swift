@@ -335,6 +335,8 @@ final class AppModel {
 
     // Routes byte ranges to the file preview that asked for them.
     @ObservationIgnored let fileFetches = FileFetchRouter()
+    // Hands each terminal agent's answers back to the copy that asked for them.
+    @ObservationIgnored let answerRequests = AnswerRequests()
 
     @ObservationIgnored private(set) var client: LpmClient?
     // The hex APNs device token (once registration succeeds). The token and a live
@@ -1299,6 +1301,7 @@ final class AppModel {
         macUpdate = MacUpdateStore()
         macUpdate.model = self
         fileFetches.cancelAll()
+        answerRequests.failAll()
         pendingAgentPrompt = [:]
     }
 
@@ -2294,6 +2297,7 @@ final class AppModel {
         usage.handleConnectionReset()
         macUpdate.handleConnectionReset()
         fileFetches.handleConnectionReset()
+        answerRequests.failAll()
         historyPending = []
         historyLoadingMore = false
         if historyActive {
@@ -2493,6 +2497,7 @@ final class AppModel {
         wireMacUpdate(c)
         wireAutoPull(c)
         wireClaudeAccounts(c)
+        wireAnswers(c)
     }
 
     private func wireConnection(_ c: LpmClient) {

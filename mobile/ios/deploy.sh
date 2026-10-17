@@ -7,24 +7,8 @@ EXPORT_DIR="build/export"
 
 cd "$(dirname "$0")"
 
-# Same team resolution as run.sh, but uploads need a distribution identity,
-# so prefer "Apple Distribution" when falling back to the keychain.
-TEAM="${DEVELOPMENT_TEAM:-$(cat .team 2>/dev/null || true)}"
-if [ -z "$TEAM" ]; then
-  # The ID in the identity's name is the person's, not the team's; the team is
-  # the certificate's OU.
-  IDENTITY=$(security find-identity -v -p codesigning \
-    | sed -nE 's/.*"(Apple (Distribution|Development): [^"]+)".*/\1/p' | head -1)
-  if [ -n "$IDENTITY" ]; then
-    TEAM=$(security find-certificate -c "$IDENTITY" -p | openssl x509 -noout -subject \
-      | sed -nE 's/.*OU ?= ?([A-Z0-9]{10}).*/\1/p' || true)
-  fi
-fi
-if [ -z "$TEAM" ]; then
-  echo "No signing team found. Set one with DEVELOPMENT_TEAM=XXXXXXXXXX ./deploy.sh" >&2
-  echo "or write it to mobile/ios/.team." >&2
-  exit 1
-fi
+# Uploads need a distribution identity, so match "Apple Distribution" too.
+source ./team.sh "Apple (Distribution|Development)"
 
 # App Store Connect rejects re-used build numbers; project.yml pins "1",
 # so stamp each upload with a unique timestamp unless overridden.

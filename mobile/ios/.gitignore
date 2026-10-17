@@ -6,8 +6,10 @@ NotificationService-Info.plist
 LpmMobile.entitlements
 LpmMobileNotificationService.entitlements
 
-# Local signing team override for run.sh (personal; never committed).
+# Local signing team: the override for team.sh, and the xcconfig it writes
+# (personal; never committed).
 .team
+Team.xcconfig
 
 # Swift/Xcode build artifacts
 .build/

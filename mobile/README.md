@@ -16,7 +16,7 @@ mobile/
 
 | | Build | Run |
 |---|---|---|
-| iOS | `cd mobile/ios && xcodegen generate && open LpmMobile.xcodeproj` | `mobile/ios/run.sh` (physical iPhone) |
+| iOS | `mobile/ios/open.sh` | `mobile/ios/run.sh` (physical iPhone) |
 | Android | `cd mobile/android && ./gradlew assembleDebug` | `mobile/android/run.sh` (device or emulator) |
 | Both, compared | `node mobile/parity/parity.js all --open` | iPhone simulator + Android emulator, report with paired screenshots |
 

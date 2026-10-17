@@ -55,6 +55,9 @@ extension DemoServer {
         list[i].scriptStarted = true
         list[i].scriptFinished = true
         world.terminals["storefront"] = list
+        for (_, text) in claudeScriptSteps() where text.hasPrefix("\u{1B}[38;5;153m⏺") {
+            demoRecordAnswer("demo-storefront-claude", ansi: text)
+        }
         if let p = world.projectIndex("storefront") {
             world.projects[p].status = [DemoWorld.Status(
                 key: "claude_code_demo-storefront-claude", value: "Waiting", priority: 30,

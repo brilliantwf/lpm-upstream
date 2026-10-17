@@ -527,6 +527,8 @@ enum Wire {
         case ttsSpeak(reqId: String, audio: String?, error: String?)
         case terminals(project: String, [TerminalInfo])
         case slash(id: String, [SlashCommand])
+        /// A terminal agent's recent answers, newest first; nil `answers` on failure.
+        case answers(id: String, reqId: String, answers: [RecentAnswer]?, error: String?)
         case mentions(project: String, [MentionEntry])
         case history(project: String, [HistoryRow])
         case upload(id: String, reqId: String, path: String)
@@ -761,6 +763,12 @@ enum Wire {
             case "slash":
                 return .slash(id: obj["id"] as? String ?? "",
                               (obj["commands"] as? [[String: Any]] ?? []).map(SlashCommand.init))
+            case "answers":
+                let ok = obj["ok"] as? Bool ?? false
+                return .answers(id: obj["id"] as? String ?? "",
+                                reqId: Wire.reqIdString(obj["reqId"]),
+                                answers: ok ? (obj["answers"] as? [[String: Any]] ?? []).map(RecentAnswer.init) : nil,
+                                error: ok ? nil : (obj["error"] as? String ?? "Couldn't read the agent's answers."))
             case "mentions":
                 return .mentions(project: obj["project"] as? String ?? "",
                                  (obj["entries"] as? [[String: Any]] ?? []).map(MentionEntry.init))

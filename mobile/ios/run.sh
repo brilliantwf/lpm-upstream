@@ -8,25 +8,7 @@ DERIVED="build/DerivedData"
 
 cd "$(dirname "$0")"
 
-# Signing team, in order of preference: an explicit env var, an untracked local
-# mobile/ios/.team file, else the first "Apple Development" identity in the keychain.
-# Kept out of project.yml so the committed spec stays team-agnostic.
-TEAM="${DEVELOPMENT_TEAM:-$(cat .team 2>/dev/null || true)}"
-if [ -z "$TEAM" ]; then
-  # The ID in the identity's name is the person's, not the team's; the team is
-  # the certificate's OU.
-  IDENTITY=$(security find-identity -v -p codesigning \
-    | sed -nE 's/.*"(Apple Development: [^"]+)".*/\1/p' | head -1)
-  if [ -n "$IDENTITY" ]; then
-    TEAM=$(security find-certificate -c "$IDENTITY" -p | openssl x509 -noout -subject \
-      | sed -nE 's/.*OU ?= ?([A-Z0-9]{10}).*/\1/p' || true)
-  fi
-fi
-if [ -z "$TEAM" ]; then
-  echo "No signing team found. Set one with DEVELOPMENT_TEAM=XXXXXXXXXX ./run.sh" >&2
-  echo "or write it to mobile/ios/.team (find it in Xcode → Signing & Capabilities → Team)." >&2
-  exit 1
-fi
+source ./team.sh "Apple Development"
 
 # First connected physical device (its UDID), else a paired one devicectl can
 # reach over the network, unless overridden. The `|| true` guards matter: grep

@@ -140,6 +140,7 @@ const PHONE_FEATURES: &[&str] = &[
     crate::peeruploadhost::FILE_UPLOAD_FEATURE,
     crate::remote_service_logs::WATCH_FEATURE,
     SERVICE_RESTART_FEATURE,
+    crate::remote_answers::FEATURE,
 ];
 
 /// The phone may send `restartService` / `stopService`.
@@ -260,6 +261,11 @@ struct HubInner {
     // from the terminal's launch command; empty/absent for plain shells. Drives
     // the mobile composer's slash-command autocomplete.
     clis: Mutex<HashMap<String, String>>,
+    // Live terminal id -> the agent conversation it runs, when its transcript is
+    // on this Mac. Replaced on every push (a /clear or fork mints a new id), and
+    // what the phone's copy key reads: the phone names the terminal, never the
+    // session.
+    agent_sessions: Mutex<HashMap<String, crate::remote_answers::AgentSession>>,
     // Live terminal id -> pinned, pushed from the frontend tab tree so the phone
     // can show the pin state and offer Pin/Unpin in the tab menu.
     pinned: Mutex<HashMap<String, bool>>,
@@ -4441,6 +4447,11 @@ fn handle_msg(
             crate::remote_update::handle(app, out, t, &v)
         }
         "claudeAccounts" | "setClaudeAccount" => crate::remote_claude::handle(app, out, t, &v),
+        "answers" => {
+            let id = str_field("id").unwrap_or_default();
+            let session = hub.inner.agent_sessions.lock().unwrap().get(&id).cloned();
+            crate::remote_answers::handle(out, &v, session)
+        }
         "uploadBegin" | "uploadChunk" | "uploadDone" | "uploadAbort" => {
             crate::remote_upload::handle(app, out, t, &v)
         }
@@ -6051,6 +6062,7 @@ pub fn remote_set_terminal_labels(
     let mut cli_map = hub.inner.clis.lock().unwrap();
     let mut pin_map = hub.inner.pinned.lock().unwrap();
     let mut emoji_map = hub.inner.emojis.lock().unwrap();
+    let mut session_map = hub.inner.agent_sessions.lock().unwrap();
     let mut ids: Vec<String> = Vec::new();
     for item in &labels {
         let id = item.get("id").and_then(Value::as_str).unwrap_or("");
@@ -6077,8 +6089,15 @@ pub fn remote_set_terminal_labels(
                 .unwrap_or("")
                 .to_string(),
         );
+        match item
+            .get("agentSession")
+            .and_then(crate::remote_answers::AgentSession::from_value)
+        {
+            Some(session) => session_map.insert(id.to_string(), session),
+            None => session_map.remove(id),
+        };
     }
-    drop((label_map, cli_map, pin_map, emoji_map));
+    drop((label_map, cli_map, pin_map, emoji_map, session_map));
     if project.is_empty() {
         return;
     }

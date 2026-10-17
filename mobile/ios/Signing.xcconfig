@@ -1,0 +1,3 @@
+// Your signing team, kept out of the repo: team.sh (run by run.sh, deploy.sh and
+// open.sh) writes it to the untracked Team.xcconfig next to this file.
+#include? "Team.xcconfig"
