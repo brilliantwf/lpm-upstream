@@ -12,8 +12,27 @@ val firebase = firebaseResources(
     packageName = "cx.lpm.mobile"
 )
 
+// The Play upload key, kept outside the repo: `lpmUploadStoreFile`, `…StorePassword`,
+// `…KeyAlias` and `…KeyPassword` in ~/.gradle/gradle.properties (CI:
+// ORG_GRADLE_PROJECT_lpmUpload… variables). Without it a release build is unsigned.
+val uploadKey = listOf("StoreFile", "StorePassword", "KeyAlias", "KeyPassword")
+    .associateWith { providers.gradleProperty("lpmUpload$it").orNull }
+    .takeIf { key -> key.values.all { it != null } }
+    ?.mapValues { it.value!! }
+
 android {
     namespace = "cx.lpm.mobile"
+
+    signingConfigs {
+        uploadKey?.let { key ->
+            create("upload") {
+                storeFile = file(key.getValue("StoreFile"))
+                storePassword = key.getValue("StorePassword")
+                keyAlias = key.getValue("KeyAlias")
+                keyPassword = key.getValue("KeyPassword")
+            }
+        }
+    }
 
     buildFeatures {
         resValues = true
@@ -21,14 +40,16 @@ android {
 
     defaultConfig {
         applicationId = "cx.lpm.mobile"
+        // Bumped for every Play upload; the name follows iOS's MARKETING_VERSION.
         versionCode = 1
-        versionName = "0.1"
+        versionName = "1.57"
         // The values the google-services plugin would generate, read by Firebase at launch.
         firebase.forEach { (name, value) -> resValue("string", name, value) }
     }
 
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("upload")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
@@ -37,12 +58,18 @@ android {
 }
 
 val hasFirebase = firebase.isNotEmpty()
+val hasUploadKey = uploadKey != null
 tasks.matching { it.name == "bundleRelease" }.configureEach {
-    // A local copy: the configuration cache can't keep a reference to this script.
-    val present = hasFirebase
+    // Local copies: the configuration cache can't keep a reference to this script.
+    val firebasePresent = hasFirebase
+    val signed = hasUploadKey
     doFirst {
-        check(present) {
+        check(firebasePresent) {
             "app/google-services.json is missing: a Play build without it has no push notifications"
+        }
+        check(signed) {
+            "The Play upload key isn't set: add lpmUploadStoreFile, lpmUploadStorePassword, " +
+                "lpmUploadKeyAlias and lpmUploadKeyPassword to ~/.gradle/gradle.properties"
         }
     }
 }

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { MOBILE_PATH, PRIVACY_PATH, REPO_URL } from "@/lib/links";
 
 const DESCRIPTION =
-  "Privacy policy for lpm: what the desktop app, the lpm Link iPhone app, and the lpm.cx website collect, how optional push notifications work, and your rights.";
+  "Privacy policy for lpm: what the desktop app, the lpm Link apps for iPhone and Android, and the lpm.cx website collect, how optional push notifications work, and your rights.";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -32,7 +32,7 @@ export default function PrivacyPage() {
         Privacy Policy
       </h1>
       <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-        Last updated: October 6, 2026
+        Last updated: October 17, 2026
       </p>
 
       <section className="mt-10 space-y-4 text-sm leading-relaxed text-gray-700 dark:text-gray-300">
@@ -41,11 +41,14 @@ export default function PrivacyPage() {
         </h2>
         <p>
           lpm is an open-source project. The <strong>software itself</strong>{" "}
-          (the lpm desktop app and the lpm Link iOS app) runs on your own
-          machines. It does not collect, transmit, or share any personal data,
-          telemetry, or usage information. Two things reach the network on
-          their own: the desktop app&rsquo;s update check and, if you pair an
-          iPhone, push notifications. Both are described below.
+          (the lpm desktop app and the lpm Link apps for iPhone and Android)
+          runs on your own machines. It does not collect, transmit, or share
+          any personal data, telemetry, or usage information. Two things reach
+          the network on their own: the desktop app&rsquo;s update check and,
+          if you pair a phone, push notifications. On Android, two Google
+          components the app is built with also talk to Google: one reads the
+          pairing QR code, the other delivers notifications. All of this is
+          described below.
         </p>
         <p>
           This <strong>website</strong> (lpm.cx) uses a small amount of
@@ -76,19 +79,20 @@ export default function PrivacyPage() {
             you send it. lpm hosts no model of its own.
           </li>
           <li>
-            <strong>Push notifications</strong> are sent only if you pair an{" "}
+            <strong>Push notifications</strong> are sent only if you pair a{" "}
             <Link
               href={MOBILE_PATH}
               className="underline hover:text-gray-900 dark:hover:text-gray-100"
             >
-              iPhone
+              phone
             </Link>
-            . Apple requires a signing key to deliver them, so those
-            notifications are relayed through a server we run. The contents are
-            sealed on your computer (or the Linux server your phone is paired
-            with)
-            and can only be opened by your iPhone — we can see that a
-            notification was relayed and to which device, never what it says.
+            . Apple and Google require a signing key to deliver them, so those
+            notifications are relayed through a server we run, which hands them
+            to Apple Push Notification service or Firebase Cloud Messaging. The
+            contents are sealed on your computer (or the Linux server your phone
+            is paired with) and can only be opened by your phone — we, Apple and
+            Google can see that a notification was relayed and to which device,
+            never what it says.
             Terminal output, keystrokes, diffs, and files go straight from your
             computer to your phone.
           </li>
@@ -123,7 +127,80 @@ export default function PrivacyPage() {
             go only to the computer or server you paired with.
           </li>
           <li>
+            <strong>Built-in Tailscale</strong> is off unless you turn it on.
+            Then the phone joins your tailnet through Tailscale&rsquo;s servers
+            and you sign in with your own Tailscale account, under{" "}
+            <a
+              href="https://tailscale.com/privacy-policy"
+              className="underline hover:text-gray-900 dark:hover:text-gray-100"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              Tailscale&rsquo;s privacy policy
+            </a>
+            . lpm turns off Tailscale&rsquo;s own logging, so its logs stay on
+            the phone.
+          </li>
+          <li>
             The pairing credential is stored in the iOS Keychain on your device.
+          </li>
+          <li>No account is required.</li>
+        </ul>
+      </section>
+
+      <section className="mt-8 space-y-4 text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          The Android app (lpm Link)
+        </h2>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>
+            No analytics, tracking, or telemetry of our own. The app talks only
+            to the machines you pair it with, over whatever route reaches them
+            (your home network, Tailscale, or an address you enter). Nothing is
+            sent to any server we control.
+          </li>
+          <li>
+            <strong>Local network</strong>: on Android 17 and later the app asks
+            for &ldquo;nearby devices&rdquo; access. It uses it only to find and
+            reach your computers on the same Wi-Fi.
+          </li>
+          <li>
+            <strong>Camera</strong> access is used to scan the pairing QR code
+            and, when you tap Take Photo, to attach a photo to a prompt or a
+            project note. Photos go only to the computer or server you paired
+            with. The QR code is read on the phone by Google&rsquo;s ML Kit,
+            which sends Google diagnostic data about its own use (device model
+            and Android version, app version, a per-install identifier, and
+            performance figures such as how long a scan took) — never the
+            camera image or what the code says.
+          </li>
+          <li>
+            <strong>Notifications</strong>: once you allow notifications, the
+            app registers with Google&rsquo;s Firebase Cloud Messaging, which
+            gives this install an identifier. The app sends that identifier to
+            the computers you paired with so they can address notifications to
+            it, as described above. Until you allow notifications, the app
+            doesn&rsquo;t contact Firebase at all.
+          </li>
+          <li>
+            <strong>Built-in Tailscale</strong> is off unless you turn it on.
+            Then the phone joins your tailnet through Tailscale&rsquo;s servers
+            and you sign in with your own Tailscale account, under{" "}
+            <a
+              href="https://tailscale.com/privacy-policy"
+              className="underline hover:text-gray-900 dark:hover:text-gray-100"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              Tailscale&rsquo;s privacy policy
+            </a>
+            . lpm turns off Tailscale&rsquo;s own logging, so its logs stay on
+            the phone.
+          </li>
+          <li>
+            The pairing credential is encrypted with a key in the Android
+            Keystore, which never leaves your phone, and the app&rsquo;s data
+            is excluded from cloud backups.
           </li>
           <li>No account is required.</li>
         </ul>

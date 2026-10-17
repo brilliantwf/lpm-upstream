@@ -8,6 +8,10 @@
         <meta-data
             android:name="firebase_messaging_installation_id_enabled"
             android:value="true" />
+        <!-- Nothing reaches Google until notifications are allowed (FcmPushTokens.register). -->
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
 
         <service
             android:name=".LpmMessagingService"

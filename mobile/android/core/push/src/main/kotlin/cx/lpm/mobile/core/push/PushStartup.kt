@@ -48,7 +48,10 @@ class PushStartup @Inject constructor(
     }
 
     /** The app is back on screen: notifications may have been allowed meanwhile. */
-    fun resumed() = registrar.refreshPermission()
+    fun resumed() {
+        tokens.register()
+        registrar.refreshPermission()
+    }
 }
 
 @Module

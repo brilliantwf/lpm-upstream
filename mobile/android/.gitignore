@@ -11,3 +11,7 @@ captures/
 
 # Firebase client config (Firebase console → Project settings → Your apps)
 app/google-services.json
+
+# Signing keys never live in the repo
+*.jks
+*.keystore

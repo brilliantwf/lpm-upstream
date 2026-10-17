@@ -332,10 +332,34 @@ build Android until the same flows pass there.
 
 Needs an account:
 
-- **Firebase project** (`google-services.json`) before milestone 8.
+- **Firebase project** `lpm-link` (Spark plan, no Analytics), Android app `cx.lpm.mobile`.
+  Its `google-services.json` goes in `app/` (gitignored). The relay's service-account key
+  lives only in Vercel (`FCM_*`, Production).
 - **Play Console.** A personal account created after 13 Nov 2023 must run a closed
   test with at least 12 opted-in testers for 14 consecutive days before production;
   organization accounts are exempt. Start the closed test once milestone 3 works.
+
+## Play release
+
+- **Upload key**, made once and kept outside the repo (back it up; Play App Signing holds
+  the app signing key, and a lost upload key can be reset in Play Console):
+  `keytool -genkeypair -keystore ~/keys/lpm-upload.jks -alias upload -keyalg RSA -keysize 4096 -validity 10000`.
+  Then in `~/.gradle/gradle.properties`: `lpmUploadStoreFile`, `lpmUploadStorePassword`,
+  `lpmUploadKeyAlias`, `lpmUploadKeyPassword` (CI: `ORG_GRADLE_PROJECT_lpmUpload…`).
+- **Build**: `./gradlew bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`.
+  It refuses to run without the upload key or `google-services.json`; `assembleRelease`
+  (CI) still builds unsigned. Bump `versionCode` for every upload; `versionName` follows
+  iOS's `MARKETING_VERSION`.
+- **Data safety** (matches lpm.cx/privacy): data is encrypted in transit; no account, so
+  nothing to delete. Collected, all by Google SDKs, none shared, none for ads:
+  - *Device or other IDs* — the FCM installation ID (App functionality, optional: only once
+    notifications are allowed) and ML Kit's per-install ID (Analytics).
+  - *App info and performance → Diagnostics* — ML Kit's device model, Android version, app
+    version and scan timings (Analytics).
+  - Photos, files and terminal text go only to the user's own paired computer, never to us.
+- **Store listing**: 512 px icon, 1024×500 feature graphic, phone screenshots (Demo Mode,
+  as for iOS), privacy policy `https://lpm.cx/privacy`; then add the Play link beside the
+  App Store one in `desktop/frontend/src/mobile/links.ts`.
 
 ## iOS controls with no accessible name
 

@@ -28,11 +28,12 @@ class FcmPushTokens @Inject constructor(@param:ApplicationContext private val co
     private val configured: Boolean get() = FirebaseApp.getApps(context).isNotEmpty()
 
     /**
-     * Register with FCM, which answers with the current token in
-     * [LpmMessagingService.onRegistered] — and again whenever the token rotates.
+     * Register with FCM once the phone lets lpm Link post notifications — before that
+     * the app doesn't contact Google at all. FCM answers with the current token in
+     * [LpmMessagingService.onRegistered], and again whenever the token rotates.
      */
     fun register() {
-        if (configured) FirebaseMessaging.getInstance().register()
+        if (configured && notificationsAllowed()) FirebaseMessaging.getInstance().register()
     }
 
     fun update(token: String?) {
