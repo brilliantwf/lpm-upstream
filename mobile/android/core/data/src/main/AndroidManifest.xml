@@ -4,5 +4,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- Android 17: a Mac on this Wi-Fi is reachable only once the user allows it. -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
 </manifest>

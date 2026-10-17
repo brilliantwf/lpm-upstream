@@ -109,6 +109,11 @@ interface FcmErrorBody {
   };
 }
 
+// A Firebase Installation ID, which FCM hands Android apps since
+// firebase-messaging 26: 22 URL-safe base64 characters, so it can't be mistaken
+// for a (much longer) legacy registration token, which goes in `token`.
+const FID_RE = /^[cdef][A-Za-z0-9_-]{21}$/;
+
 // Sends a data-only message: the app decrypts `blob` itself and posts the
 // notification, so FCM never shows one on its own. Alerts go out at high
 // priority so a dozing phone wakes for them; background (withdrawal) messages
@@ -141,7 +146,13 @@ export async function sendFcmPush(
           authorization: `Bearer ${bearer.value}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ message: { token: deviceToken, data, android } }),
+        body: JSON.stringify({
+          message: {
+            ...(FID_RE.test(deviceToken) ? { fid: deviceToken } : { token: deviceToken }),
+            data,
+            android,
+          },
+        }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       },
     );

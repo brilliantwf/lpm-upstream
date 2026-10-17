@@ -27,7 +27,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * NSD reports TXT records only on resolve, so each found service is resolved (one
  * at a time — older NsdManagers refuse concurrent resolves) before it's listed.
  */
-class NsdMacBrowser(context: Context, private val scope: CoroutineScope) : MacBrowser {
+class NsdMacBrowser(private val context: Context, private val scope: CoroutineScope) :
+    MacBrowser {
     private val nsd = context.getSystemService(NsdManager::class.java)
     private val wifi = context.getSystemService(WifiManager::class.java)
     private val state = MutableStateFlow(Browse())
@@ -43,6 +44,12 @@ class NsdMacBrowser(context: Context, private val scope: CoroutineScope) : MacBr
 
     override fun start() {
         if (listener != null || nsd == null) return
+        // Browsing without it would only bring up the system's one-Mac picker.
+        if (!LocalNetwork.granted(context)) {
+            state.update { it.copy(denied = true) }
+            return
+        }
+        state.update { it.copy(denied = false) }
         lock = wifi?.createMulticastLock("lpm-discovery")?.apply {
             setReferenceCounted(false)
             acquire()

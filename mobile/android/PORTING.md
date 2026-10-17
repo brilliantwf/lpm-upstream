@@ -34,7 +34,11 @@ side by side (see `mobile/parity/README.md`).
   output" settings (Android's engine can't pause, so resuming starts again at the word
   it stopped on); a terminal opened from a notification or an Activity row stays on
   screen after its tab leaves the list, where iOS shows "Terminal unavailable" (tab
-  restore needs the screen to stay, as iOS's tab-list path does).
+  restore needs the screen to stay, as iOS's tab-list path does); Android 17 keeps an app
+  targeting it off the local network until it holds `ACCESS_LOCAL_NETWORK`, so the app asks
+  for it ("nearby devices") when the pairing screen opens, or at launch with a Mac saved,
+  where iOS shows Local Network on first use by itself — a refusal shows iOS's "Allow Local
+  Network access" row.
 - **Same persisted keys and semantics** as iOS (table below), so behavior and
   defaults match.
 - Desktop changes that touch the phone now update both apps (AGENTS.md).
@@ -288,8 +292,8 @@ build Android until the same flows pass there.
 | 5 | Activity, Automations, Stats, Usage, Settings (done) | 07–11, 35–37, 40–42, 45–47 |
 | 6 | Git review (50–55), Notes and Memory (60–66), Actions (70–76), config editors (80–87), file preview (90–94), Claude accounts and Auto Pull (95–99), speech (100–101), machines and lpm updates (unit and Robolectric tests: Demo Mode has neither) (done) | as listed |
 | 7 | Real Mac: OkHttp client + pin, Bonjour, QR, approve-on-Mac, reconnect (done on the emulator against the desktop app: Bonjour, approve-on-Mac, Enter a Code at `10.0.2.2`, services, logs, terminal, Git commit, reconnect after a network drop, a cold start, a Mac restart and backgrounding, and the R8 release build; QR with a real camera and a physical phone still untested) | by hand against an isolated debug desktop app (`.claude/skills/app-review-video/scripts/review.js setup`, port 8792; a code from `remote_start_pairing` through its `eval`) |
-| 8 | Push (FCM) (built and unit-tested: `PushRegistrar` registers over the live link with `pushToken` and sweeps the other saved Macs; `:core:push` opens the sealed blob, posts it on the channel of its Settings → Notifications kind, withdraws cleared and stale ones, and a tap opens the project, terminal or automation on its Mac) | needs the items below |
-| 9 | Built-in Tailscale (built: `tailnet/android` bound with gomobile, `DefaultBuiltInTailscale` mirroring iOS — switch, sign-in, restart after the app was frozen, network changes, loopback bridge routing; on the emulator the node starts and opens a real Tailscale sign-in page, debug and R8 release; dialing a Mac over the tailnet needs a signed-in account) | `tailnet/android` |
+| 8 | Push (FCM) (done: `PushRegistrar` registers the FCM installation ID over the live link with `pushToken` and sweeps the other saved Macs; `:core:push` opens the sealed blob, posts it on the channel of its Settings → Notifications kind, withdraws cleared and stale ones, and a tap opens the project, terminal or automation on its Mac. Verified on an emulator signed in to Google, through a local relay: registration, delivery, tap-through, withdrawal. firebase-messaging 26 needs Google Play services 26.12+; an emulator without a Google account gets no FCM ID) | needs the items below |
+| 9 | Built-in Tailscale (done: `tailnet/android` bound with gomobile, `DefaultBuiltInTailscale` mirroring iOS — switch, sign-in, restart after the app was frozen, network changes, loopback bridge routing. Verified on a 16 KB-page emulator: signed in, connected, reached a Mac at its tailnet address through the bridge, and sign-out left the tailnet) | `tailnet/android` |
 
 ## Decisions
 

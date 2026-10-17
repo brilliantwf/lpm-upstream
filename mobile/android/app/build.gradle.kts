@@ -53,6 +53,7 @@ dependencies {
     implementation(projects.core.designsystem)
     implementation(projects.core.navigation)
     implementation(projects.core.tailnet)
+    implementation(projects.core.ui)
     implementation(projects.core.web)
     implementation(projects.feature.actions)
     implementation(projects.feature.activity)

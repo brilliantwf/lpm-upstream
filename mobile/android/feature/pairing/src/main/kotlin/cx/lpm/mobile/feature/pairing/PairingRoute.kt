@@ -18,6 +18,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cx.lpm.mobile.core.designsystem.component.AlertButton
 import cx.lpm.mobile.core.designsystem.component.AlertRole
 import cx.lpm.mobile.core.designsystem.component.LpmAlert
+import cx.lpm.mobile.core.ui.LocalNetworkAccess
+import cx.lpm.mobile.core.ui.rememberLocalNetworkAccess
 
 /**
  * The pairing screen with its ViewModel, sheets and alerts. [adding] when it's "Add
@@ -40,6 +42,16 @@ fun PairingRoute(
     LifecycleStartEffect(viewModel) {
         viewModel.startDiscovery()
         onStopOrDispose { viewModel.stopDiscovery() }
+    }
+    // Android 17 asks before the phone may look on this Wi-Fi (iOS asks by itself as
+    // it starts looking); browsing starts over once it's allowed.
+    val (localNetwork, askLocalNetwork) = rememberLocalNetworkAccess()
+    LaunchedEffect(localNetwork) {
+        when (localNetwork) {
+            LocalNetworkAccess.NotDetermined -> askLocalNetwork()
+            LocalNetworkAccess.Allowed -> viewModel.startDiscovery()
+            LocalNetworkAccess.Denied -> Unit
+        }
     }
     val enterCode by rememberUpdatedState(onEnterCode)
     LaunchedEffect(state.codeTarget) {

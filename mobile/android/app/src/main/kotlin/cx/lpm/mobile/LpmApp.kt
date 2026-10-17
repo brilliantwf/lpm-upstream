@@ -84,6 +84,7 @@ fun LpmApp(
         // creating the first WebView costs the main thread a second or more.
         val context = LocalContext.current
         LaunchedEffect(Unit) { TerminalWebPool.prewarm(context) }
+        LocalNetworkRequest(session)
         RootStack(
             root = ProjectsKey,
             modifier = modifier,
