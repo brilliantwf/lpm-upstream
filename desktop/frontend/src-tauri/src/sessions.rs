@@ -194,6 +194,11 @@ const RESTART_WAIT: Duration = Duration::from_secs(3);
 /// Run a service's command again in its pane. A run still going is stopped
 /// first, and given until its shell is back at a prompt, so the new line
 /// neither lands in the old process's input nor races it for its port.
+///
+/// On Windows the stop is a typed ^C, and one that lands while MSYS is still
+/// starting the line's next program (the `sleep` after an `echo`) goes
+/// unanswered. A run still going halfway through the wait gets a second ^C,
+/// as panestop.rs gives one at teardown.
 pub fn restart_service_pane(
     pane_id: &str,
     root: &str,
@@ -203,9 +208,14 @@ pub fn restart_service_pane(
     ssh: Option<&config::SshSettings>,
 ) -> Result<(), String> {
     if !pane_ended(pane_id) {
+        let start = Instant::now();
         stop_service_pane(pane_id)?;
-        let deadline = Instant::now() + RESTART_WAIT;
-        while !pane_ended(pane_id) && Instant::now() < deadline {
+        let mut stop_again = cfg!(windows);
+        while !pane_ended(pane_id) && start.elapsed() < RESTART_WAIT {
+            if stop_again && start.elapsed() >= RESTART_WAIT / 2 {
+                stop_again = false;
+                stop_service_pane(pane_id)?;
+            }
             std::thread::sleep(Duration::from_millis(50));
         }
     }
