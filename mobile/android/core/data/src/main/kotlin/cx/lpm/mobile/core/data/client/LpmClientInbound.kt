@@ -88,8 +88,11 @@ internal fun LpmClient.dispatch(frame: Inbound) {
         is Inbound.Error -> when (frame.message) {
             LpmClient.RELAY_OFFLINE_ERROR -> relayUnavailable()
 
-            // The Mac dropped this device's record: retrying is pointless.
+            // The Mac dropped this device's record (or removed this phone outright):
+            // retrying is pointless.
             "unauthorized" -> fatal(LpmClient.UNAUTHORIZED_ERROR)
+
+            "revoked" -> fatal(LpmClient.REVOKED_ERROR)
 
             else -> fatal(frame.message)
         }

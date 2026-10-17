@@ -12,40 +12,41 @@ class WireSessionTest {
     @Test
     fun pairOmitsAnEmptyReplaces() {
         assertFrame(
-            """{ "t": "pair", "code": "AB12-CD34", "name": "My Pixel" }""",
-            Wire.pair("AB12-CD34", "My Pixel")
+            """{ "t": "pair", "code": "AB12-CD34", "name": "My Pixel", "phoneId": "p-1" }""",
+            Wire.pair("AB12-CD34", "My Pixel", "p-1")
         )
         assertFrame(
-            """{ "t": "pair", "code": "AB12-CD34", "name": "My Pixel" }""",
-            Wire.pair("AB12-CD34", "My Pixel", replaces = "")
+            """{ "t": "pair", "code": "AB12-CD34", "name": "My Pixel", "phoneId": "p-1" }""",
+            Wire.pair("AB12-CD34", "My Pixel", "p-1", replaces = "")
         )
         assertFrame(
-            """{ "t": "pair", "code": "AB12-CD34", "name": "My Pixel", "replaces": "d-0" }""",
-            Wire.pair("AB12-CD34", "My Pixel", replaces = "d-0")
+            """{ "t": "pair", "code": "AB12-CD34", "name": "My Pixel", "phoneId": "p-1",
+                 "replaces": "d-0" }""",
+            Wire.pair("AB12-CD34", "My Pixel", "p-1", replaces = "d-0")
         )
         assertFrame(
-            """{ "t": "pairRequest", "name": "My Pixel" }""",
-            Wire.pairRequest("My Pixel", replaces = null)
+            """{ "t": "pairRequest", "name": "My Pixel", "phoneId": "p-1" }""",
+            Wire.pairRequest("My Pixel", "p-1", replaces = null)
         )
         assertFrame(
-            """{ "t": "pairRequest", "name": "My Pixel", "replaces": "d-0" }""",
-            Wire.pairRequest("My Pixel", "d-0")
+            """{ "t": "pairRequest", "name": "My Pixel", "phoneId": "p-1", "replaces": "d-0" }""",
+            Wire.pairRequest("My Pixel", "p-1", "d-0")
         )
     }
 
     @Test
-    fun signIn() {
+    fun signInCarriesThePhoneId() {
         assertFrame(
-            """{ "t": "auth", "deviceId": "d-1", "token": "tok" }""",
-            Wire.auth("d-1", "tok")
+            """{ "t": "auth", "deviceId": "d-1", "token": "tok", "phoneId": "p-1" }""",
+            Wire.auth("d-1", "tok", "p-1")
         )
         assertFrame(
-            """{ "t": "relay", "deviceId": "d-1", "token": "tok", "slug": "box" }""",
-            Wire.relay("d-1", "tok", "box")
+            """{ "t": "relay", "deviceId": "d-1", "token": "tok", "slug": "box", "phoneId": "p-1" }""",
+            Wire.relay("d-1", "tok", "box", "p-1")
         )
         assertFrame(
-            """{ "t": "unpair", "deviceId": "d-1", "token": "tok" }""",
-            Wire.unpair("d-1", "tok")
+            """{ "t": "unpair", "deviceId": "d-1", "token": "tok", "phoneId": "p-1" }""",
+            Wire.unpair("d-1", "tok", "p-1")
         )
         assertFrame("""{ "t": "ping" }""", Wire.ping())
         assertFrame("""{ "t": "presence", "active": false }""", Wire.presence(active = false))

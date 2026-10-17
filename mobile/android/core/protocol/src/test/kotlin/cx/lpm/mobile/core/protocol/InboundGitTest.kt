@@ -25,7 +25,13 @@ class InboundGitTest {
         assertEquals(2, snap.ahead)
         assertEquals(listOf("src/app.ts", "new.txt"), snap.files.map { it.id })
         assertEquals("3 commits on main", snap.autoPulled!!.summary)
+        assertNull(snap.aheadOfDefault)
         assertNull(f.error)
+        val worktree = decode<Inbound.Git>(
+            """{ "t": "git", "project": "storefront-2", "ok": true, "isRepo": true, "branch": "feat/x",
+                 "hasUpstream": false, "defaultBranch": "main", "aheadOfDefault": 3 }"""
+        )
+        assertEquals(3, worktree.snapshot!!.aheadOfDefault)
         val notRepo =
             decode<Inbound.Git>(
                 """{ "t": "git", "project": "notes", "ok": true, "isRepo": false }"""

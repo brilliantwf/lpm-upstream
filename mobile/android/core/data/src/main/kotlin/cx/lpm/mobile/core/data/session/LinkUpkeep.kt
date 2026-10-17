@@ -176,7 +176,9 @@ internal class LinkUpkeep(private val s: MacSession) {
         when (action) {
             IssueAction.Retry -> s.retryConnection()
 
-            IssueAction.PairAgain -> {
+            IssueAction.PairAgain -> if (issue == ConnectionIssue.RemovedOnMac) {
+                s.repairRemovedMac()
+            } else {
                 val identity = issue == ConnectionIssue.IdentityChanged ||
                     issue == ConnectionIssue.IdentityRejected
                 s.repairActiveMac(if (identity) RepairReason.Identity else null)

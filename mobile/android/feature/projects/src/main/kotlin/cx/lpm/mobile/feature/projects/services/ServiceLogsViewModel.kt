@@ -6,7 +6,9 @@ import cx.lpm.mobile.core.data.projects.ProjectsStore
 import cx.lpm.mobile.core.data.services.ServiceLogsStore
 import cx.lpm.mobile.core.data.session.MacSession
 import cx.lpm.mobile.core.data.session.MacSessions
+import cx.lpm.mobile.core.model.Service
 import cx.lpm.mobile.core.model.SessionKey
+import cx.lpm.mobile.core.model.endedServices
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -26,6 +28,8 @@ import kotlinx.coroutines.flow.stateIn
 
 data class ServiceLogsUiState(
     val running: Boolean = false,
+    /** How it ended, while its pane and so its logs are still open; null otherwise. */
+    val ended: Service? = null,
     /** A Start/Stop is out for the service. */
     val pending: Boolean = false,
     /** Its pane, once the services discovery found it (null while stopped). */
@@ -36,9 +40,10 @@ data class ServiceLogsUiState(
 )
 
 /**
- * One service's recent output (iOS `ServiceLogsSheet`): watched while the sheet is
- * open on a Mac that pushes it, polled every few seconds on one that doesn't, and
- * its pane rediscovered until it turns up.
+ * One service's recent output (iOS `ServiceLogsSheet`), while it runs or after its
+ * command ended with its pane still open: watched while the sheet is open on a Mac
+ * that pushes it, polled every few seconds on one that doesn't, and its pane
+ * rediscovered until it turns up.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = ServiceLogsViewModel.Factory::class)
@@ -63,6 +68,7 @@ class ServiceLogsViewModel @AssistedInject constructor(
         val key = pane?.let { s.store<ServiceLogsStore>().key(project, it) }
         ServiceLogsUiState(
             running = p.serviceRunning(project, service),
+            ended = p.project(project)?.endedServices?.get(service),
             pending = p.pendingServiceToggle[project]?.get(service) != null,
             paneIndex = pane,
             ready = session.isReady,
@@ -77,14 +83,14 @@ class ServiceLogsViewModel @AssistedInject constructor(
      * connection's watch.
      */
     suspend fun follow() {
-        uiState.map { Feed(it.running, it.paneIndex, it.ready) }
+        uiState.map { Feed(it.running || it.ended != null, it.paneIndex, it.ready) }
             .distinctUntilChanged()
             .collectLatest(::stream)
     }
 
     private suspend fun stream(feed: Feed) {
         val s = session ?: return
-        if (!feed.running || !feed.ready) return
+        if (!feed.hasPane || !feed.ready) return
         val pane = feed.paneIndex
         val logs = s.store<ServiceLogsStore>()
         when {
@@ -113,6 +119,10 @@ class ServiceLogsViewModel @AssistedInject constructor(
         session?.store<ProjectsStore>()?.toggleService(project, service)
     }
 
+    fun restart() {
+        session?.store<ProjectsStore>()?.restartService(project, service)
+    }
+
     /** The sheet went: its output was a one-off. */
     fun consume() {
         val pane = uiState.value.paneIndex ?: return
@@ -120,7 +130,7 @@ class ServiceLogsViewModel @AssistedInject constructor(
         logs.consume(logs.key(project, pane))
     }
 
-    private data class Feed(val running: Boolean, val paneIndex: Int?, val ready: Boolean)
+    private data class Feed(val hasPane: Boolean, val paneIndex: Int?, val ready: Boolean)
 
     @AssistedFactory
     interface Factory {

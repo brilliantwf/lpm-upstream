@@ -79,7 +79,8 @@ fun ActivityScreen(
             if (visible.isEmpty) {
                 EmptyView(
                     state = state,
-                    narrowed = query.isNotBlank() || kind != ActivityKindFilter.All,
+                    searching = query.isNotBlank(),
+                    kind = kind,
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
@@ -90,8 +91,16 @@ fun ActivityScreen(
 // An empty list means "nothing is running" only when the Mac is actually answering;
 // while it refuses this device there is nothing to report on.
 @Composable
-private fun EmptyView(state: ActivityUiState, narrowed: Boolean, modifier: Modifier = Modifier) {
+private fun EmptyView(
+    state: ActivityUiState,
+    searching: Boolean,
+    kind: ActivityKindFilter,
+    modifier: Modifier = Modifier
+) {
     val macLabel = state.notConnectedTo
+    val all = kind == ActivityKindFilter.All
+    // A filter over nothing at all still means nothing is running.
+    val nothing = state.activity.rows.isEmpty() && state.activity.services.isEmpty()
     val (title, icon, detail) = when {
         macLabel != null -> Triple(
             stringResource(R.string.activity_not_connected, macLabel),
@@ -99,10 +108,19 @@ private fun EmptyView(state: ActivityUiState, narrowed: Boolean, modifier: Modif
             stringResource(R.string.activity_not_connected_detail)
         )
 
-        narrowed -> Triple(
+        (searching || !all) && !nothing -> Triple(
             stringResource(R.string.activity_nothing_matches),
             DesignR.drawable.ic_search,
-            stringResource(R.string.activity_nothing_matches_detail)
+            when {
+                !searching -> stringResource(
+                    R.string.activity_nothing_matches_kind,
+                    kind.label.lowercase()
+                )
+
+                all -> stringResource(R.string.activity_nothing_matches_search)
+
+                else -> stringResource(R.string.activity_nothing_matches_detail)
+            }
         )
 
         else -> Triple(

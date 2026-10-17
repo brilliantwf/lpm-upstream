@@ -114,8 +114,8 @@ internal class GitBranches(
 
     /**
      * A checkout or a new branch (which is checked out) settled. The list is stale
-     * now, so the sheet loads it afresh next time; meanwhile the current branch is
-     * the refreshed snapshot's.
+     * now: it loads afresh, and meanwhile the current branch is the refreshed
+     * snapshot's.
      */
     private fun finishSwitch(project: String, error: String?) {
         if (error != null) {
@@ -131,6 +131,7 @@ internal class GitBranches(
             )
         }
         onSwitched(project)
+        load(project)
         client?.requestProjects()
         client?.requestSidebar()
     }

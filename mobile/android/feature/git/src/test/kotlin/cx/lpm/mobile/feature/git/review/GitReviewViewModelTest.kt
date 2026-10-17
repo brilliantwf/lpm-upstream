@@ -193,4 +193,22 @@ class GitReviewViewModelTest {
         vm.disappear()
         assertEquals(1, socket.sentOf("gitUnwatch").size)
     }
+
+    @Test
+    fun `coming back to the screen fetches what changed while it was away`() = runTest {
+        val t = TestSession(this, setOf(SessionStore.Factory(::GitStore)))
+        val socket = t.connectReady()
+        val vm = review(t)
+        socket.receive(
+            """{"t":"git","ok":true,"project":"storefront","isRepo":true,"branch":"main",""" +
+                """"files":[{"path":"a.ts","status":"conflicted"}]}"""
+        )
+        t.settle(0)
+        assertEquals(listOf("a.ts"), vm.uiState.value.conflicted)
+        vm.disappear()
+
+        vm.appear()
+        assertEquals(2, socket.sentOf("git").size)
+        assertEquals(2, socket.sentOf("gitWatch").size)
+    }
 }

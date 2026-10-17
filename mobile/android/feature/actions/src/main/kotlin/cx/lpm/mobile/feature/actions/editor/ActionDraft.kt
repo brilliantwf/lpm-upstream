@@ -1,9 +1,10 @@
 package cx.lpm.mobile.feature.actions.editor
 
+import cx.lpm.mobile.core.model.ActionInputDraft
+import cx.lpm.mobile.core.model.ActionInputsYaml
 import cx.lpm.mobile.core.model.Zone
 import cx.lpm.mobile.core.model.bool
 import cx.lpm.mobile.core.model.obj
-import cx.lpm.mobile.core.model.objects
 import cx.lpm.mobile.core.model.string
 import cx.lpm.mobile.core.model.trimmingWhitespace
 import java.util.UUID
@@ -21,30 +22,6 @@ enum class ActionRunIn(val typeValue: String?) {
 
     companion object {
         fun from(type: String?): ActionRunIn = entries.firstOrNull { it.typeValue == type } ?: Popup
-    }
-}
-
-data class OptionDraft(
-    val value: String = "",
-    val label: String = "",
-    val id: String = UUID.randomUUID().toString()
-)
-
-data class InputDraft(
-    val key: String = "",
-    val label: String = "",
-    /** "" (text) or "select". */
-    val type: String = "",
-    val required: Boolean = false,
-    val placeholder: String = "",
-    val defaultValue: String = "",
-    val options: List<OptionDraft> = emptyList(),
-    val id: String = UUID.randomUUID().toString()
-) {
-    val isSelect: Boolean get() = type == SELECT
-
-    companion object {
-        const val SELECT = "select"
     }
 }
 
@@ -75,7 +52,7 @@ sealed interface PrimaryChoice {
 }
 
 /** Why an action can't be saved yet; the form only greys Save out. */
-enum class ActionDraftError { NoName, Colon, NameTaken, NoCommand, NoMenuItem }
+enum class ActionDraftError { NoName, Colon, NameTaken, NoCommand, Inputs, NoMenuItem }
 
 /** The action form's draft (iOS `ActionDraft`). */
 data class ActionDraft(
@@ -95,7 +72,7 @@ data class ActionDraft(
      * since it overrides a footer or zone display from another file.
      */
     val seededPlacement: ActionPlacement = ActionPlacement.Header,
-    val inputs: List<InputDraft> = emptyList(),
+    val inputs: List<ActionInputDraft> = emptyList(),
     val children: List<ChildDraft> = emptyList(),
     val color: String = "",
     val primary: PrimaryChoice = PrimaryChoice.Menu
@@ -111,6 +88,9 @@ data class ActionDraft(
 
             kind == ActionKind.Command && cmd.trimmingWhitespace().isEmpty() ->
                 ActionDraftError.NoCommand
+
+            kind == ActionKind.Command && ActionInputsYaml.problem(inputs) != null ->
+                ActionDraftError.Inputs
 
             kind == ActionKind.Menu && children.none {
                 it.hasCommand
@@ -141,7 +121,7 @@ data class ActionDraft(
                 confirm = body.bool("confirm") == true,
                 placement = placement,
                 seededPlacement = placement,
-                inputs = body.objects("inputs")?.map(::input).orEmpty(),
+                inputs = ActionInputsYaml.drafts(body["inputs"]),
                 children = children.orEmpty(),
                 color = body.string("color").orEmpty()
             )
@@ -157,21 +137,6 @@ data class ActionDraft(
         }
 
         const val LAST_USED = "last-used"
-
-        private fun input(o: JsonObject) = InputDraft(
-            key = o.string("key").orEmpty(),
-            label = o.string("label").orEmpty(),
-            type = if (o.string("type") == InputDraft.SELECT) InputDraft.SELECT else "",
-            required = o.bool("required") == true,
-            placeholder = o.string("placeholder").orEmpty(),
-            defaultValue = o.string("default").orEmpty(),
-            options = o.objects("options").orEmpty().map {
-                OptionDraft(
-                    value = it.string("value").orEmpty(),
-                    label = it.string("label").orEmpty()
-                )
-            }
-        )
 
         private fun children(map: JsonObject): List<ChildDraft> = map.mapNotNull { (name, value) ->
             val v = value as? JsonObject ?: return@mapNotNull null

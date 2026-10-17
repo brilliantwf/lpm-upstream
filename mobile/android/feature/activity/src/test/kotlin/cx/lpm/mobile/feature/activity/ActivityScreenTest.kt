@@ -142,6 +142,41 @@ class ActivityScreenTest {
         compose.onNode(hasSetTextAction()).performTextInput("zzz")
         compose.onNodeWithText("Nothing matches").assertIsDisplayed()
         compose.onNodeWithText("Try a different search, or switch back to All.").assertIsDisplayed()
+        compose.onNodeWithText("All").performClick()
+        compose.onNodeWithText("Try a different search.").assertIsDisplayed()
+    }
+
+    @Test
+    fun aKindWithNothingRunningPointsBackToAll() {
+        show()
+        compose.onNodeWithText("Automations").performClick()
+        compose.onNodeWithText("Nothing matches").assertIsDisplayed()
+        compose.onNodeWithText("No automations are running. Switch back to All to see the rest.")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun aFilterOverNothingStillSaysNothingIsRunning() {
+        show(ActivityUiState())
+        compose.onNodeWithText("Agents").performClick()
+        compose.onNodeWithText("Nothing is running").assertIsDisplayed()
+    }
+
+    @Test
+    fun aCrashedServiceChipRestartsIt() {
+        val crashed = build(
+            listOf(
+                project(
+                    "storefront",
+                    running = true,
+                    services = listOf(Service("web", 3000), Service("worker", 0))
+                ).copy(services = listOf(Service("web", 3000, exited = true, exitCode = 1)))
+            )
+        )
+        show(ActivityUiState(activity = crashed))
+        compose.onNodeWithContentDescription("web crashed. Restart it").performClick()
+        compose.onNodeWithContentDescription("Start the worker service").assertIsDisplayed()
+        assertEquals(listOf("chip storefront web"), events)
     }
 
     @Test

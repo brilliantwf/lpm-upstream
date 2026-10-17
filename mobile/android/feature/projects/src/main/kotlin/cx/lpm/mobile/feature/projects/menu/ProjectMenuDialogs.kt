@@ -12,13 +12,18 @@ import cx.lpm.mobile.core.designsystem.component.AlertTextField
 import cx.lpm.mobile.core.designsystem.component.LpmAlert
 import cx.lpm.mobile.core.designsystem.component.LpmConfirmationDialog
 import cx.lpm.mobile.core.model.Project
+import cx.lpm.mobile.core.model.TerminalInfo
 import cx.lpm.mobile.core.model.WorkStatusChoice
 import cx.lpm.mobile.core.model.WorkStatusInput
 import cx.lpm.mobile.feature.projects.R
+import cx.lpm.mobile.feature.projects.detail.TabRenameAlert
 
 /** The alert or sheet the project menu has open. */
 sealed interface MenuDialog {
     data object Rename : MenuDialog
+
+    /** On a terminal's screen Rename names that tab, not the project. */
+    data class RenameTab(val terminal: TerminalInfo) : MenuDialog
 
     data object Discard : MenuDialog
 
@@ -28,7 +33,8 @@ sealed interface MenuDialog {
 }
 
 /**
- * The project menu's presentations: Rename (seeded with the current label), the
+ * The project menu's presentations: Rename (seeded with the current label) or, on a
+ * terminal's screen, Rename Tab, the
  * discard confirmation, a status's note prompt, Terminal Settings, and a failed Git
  * op's alert.
  */
@@ -38,6 +44,7 @@ fun ProjectMenuDialogs(
     state: ProjectMenuUiState,
     project: Project,
     onRename: (String) -> Unit,
+    onRenameTab: (TerminalInfo, String) -> Unit,
     onDiscard: () -> Unit,
     onStatus: (WorkStatusInput) -> Unit,
     onDismissOpError: () -> Unit,
@@ -57,6 +64,12 @@ fun ProjectMenuDialogs(
             },
             buttons = listOf(cancel, AlertButton(stringResource(R.string.save)) { onRename(name) }),
             onDismissRequest = onDismiss
+        )
+
+        is MenuDialog.RenameTab -> TabRenameAlert(
+            term = dialog.terminal,
+            onRename = { onRenameTab(dialog.terminal, it) },
+            onDismiss = onDismiss
         )
 
         MenuDialog.Discard -> LpmConfirmationDialog(

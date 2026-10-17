@@ -7,6 +7,9 @@ import cx.lpm.mobile.feature.git.diff.DiffBlock
 import cx.lpm.mobile.feature.git.diff.DiffBlockKind
 import cx.lpm.mobile.feature.git.diff.ParsedDiff
 
+/** A file Git left with merge conflicts. */
+internal val GitFile.isConflicted: Boolean get() = status == "conflicted"
+
 /** One row of the review list, keyed for the lazy list. */
 @Immutable
 sealed interface ReviewRow {

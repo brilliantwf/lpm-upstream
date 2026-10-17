@@ -74,19 +74,19 @@
     <string name="chat_send">Send</string>
 
     <!-- Editor -->
-    <string name="editor_new_title">New job</string>
-    <string name="editor_edit_title">Edit job</string>
+    <string name="editor_new_title">New Automation</string>
+    <string name="editor_edit_title">Edit Automation</string>
     <string name="editor_save">Save</string>
-    <string name="editor_loading">Loading job…</string>
+    <string name="editor_loading">Loading automation…</string>
     <string name="editor_save_failed">Couldn\'t save automation</string>
     <string name="editor_load_failed">Couldn\'t load automation</string>
-    <string name="editor_delete_title">Delete this job?</string>
+    <string name="editor_delete_title">Delete this automation?</string>
     <string name="editor_delete_confirm">Delete</string>
     <string name="editor_delete_global">Remove it from every project. This can\'t be undone.</string>
     <string name="editor_delete_project">Remove it from this project. This can\'t be undone.</string>
     <string name="editor_delete_copies">Also remove the copies its runs created</string>
-    <string name="editor_delete_job">Delete job</string>
-    <string name="editor_name">Name this job</string>
+    <string name="editor_delete_job">Delete automation</string>
+    <string name="editor_name">Name this automation</string>
     <string name="editor_emoji">Emoji (optional)</string>
     <string name="editor_runs_in">Runs in</string>
     <string name="editor_every_project">Every project</string>
@@ -142,7 +142,7 @@
     <string name="editor_unit_hours">Hours</string>
     <string name="editor_unit_days">Days</string>
     <string name="editor_check_header">Only when there\'s work (optional)</string>
-    <string name="editor_check_footer">A command that decides whether the job has anything to do — it runs only when this succeeds. Leave blank to run every time.</string>
+    <string name="editor_check_footer">A command that decides whether the automation has anything to do — it runs only when this succeeds. Leave blank to run every time.</string>
     <string name="editor_verify_header">Check the work afterwards (optional)</string>
-    <string name="editor_verify_footer">Runs where the job ran, once the run finishes. If it fails, the run is reported as needing a look instead of done. Leave blank and the run isn\'t checked.</string>
+    <string name="editor_verify_footer">Runs where the automation ran, once the run finishes. If it fails, the run is reported as needing a look instead of done. Leave blank and the run isn\'t checked.</string>
 </resources>

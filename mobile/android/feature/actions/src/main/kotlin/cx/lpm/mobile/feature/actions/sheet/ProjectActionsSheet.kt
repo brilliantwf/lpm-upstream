@@ -22,6 +22,7 @@ import cx.lpm.mobile.core.designsystem.R
 import cx.lpm.mobile.core.designsystem.component.GlassIconButton
 import cx.lpm.mobile.core.designsystem.component.LpmTopBar
 import cx.lpm.mobile.core.designsystem.theme.LpmTheme
+import cx.lpm.mobile.core.ui.ActionErrorsNotice
 import cx.lpm.mobile.feature.actions.R as ActionsR
 import cx.lpm.mobile.feature.actions.button.ActionCallbacks
 import cx.lpm.mobile.feature.actions.button.DesktopActionButton
@@ -31,7 +32,8 @@ import cx.lpm.mobile.feature.actions.layout.ActionZoneView
 /**
  * Every project action as the desktop shows them (iOS `ProjectActionsSheet`): the
  * header row and the footer row, each with its zones framed among the buttons, and
- * the menu-only list. "+" adds an action, and a long press edits one.
+ * the menu-only list, under a note naming any the Mac left out for a config problem.
+ * "+" adds an action, and a long press edits one.
  */
 @Composable
 fun ProjectActionsSheet(
@@ -65,6 +67,7 @@ fun ProjectActionsSheet(
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             val rows = state.rows
+            if (state.actionErrors.isNotEmpty()) ActionErrorsNotice(state.actionErrors)
             Section(
                 stringResource(ActionsR.string.actions_header),
                 rows.header,

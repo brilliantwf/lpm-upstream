@@ -9,6 +9,7 @@ import cx.lpm.mobile.core.data.client.notesEditMessage
 import cx.lpm.mobile.core.data.client.notesRenameChat
 import cx.lpm.mobile.core.data.client.requestNotesChats
 import cx.lpm.mobile.core.data.client.requestNotesMessages
+import cx.lpm.mobile.core.data.link.macLabel
 import cx.lpm.mobile.core.data.session.GenerationTimeout
 import cx.lpm.mobile.core.data.session.MacSession
 import cx.lpm.mobile.core.data.session.SessionStore
@@ -141,7 +142,9 @@ class NotesStore(private val session: MacSession, private val clock: Clock = Clo
         }
         client?.requestNotesChats(project)
         arm("chats", project, LOAD_TIMEOUT_MS) {
-            if (project in state.value.chatsLoading) mutable.update { it.chatsTimedOut(project) }
+            if (project in state.value.chatsLoading) {
+                mutable.update { it.chatsTimedOut(project, unanswered) }
+            }
         }
     }
 
@@ -317,7 +320,7 @@ class NotesStore(private val session: MacSession, private val clock: Clock = Clo
         client?.requestNotesMessages(project, chatId, PAGE_SIZE, beforeId)
         arm("page", key, LOAD_TIMEOUT_MS) {
             pendingPage.remove(key)
-            mutable.update { it.pageTimedOut(key) }
+            mutable.update { it.pageTimedOut(key, unanswered) }
         }
     }
 
@@ -350,6 +353,17 @@ class NotesStore(private val session: MacSession, private val clock: Clock = Clo
         }
         return true
     }
+
+    /**
+     * A read that timed out while the link is up: the Mac is there but its notebook
+     * hasn't answered, as when it waits on a Keychain prompt.
+     */
+    private val unanswered: String?
+        get() {
+            if (!session.link.isReady) return null
+            return "No answer from ${session.link.macLabel()} yet. It may be waiting on a " +
+                "prompt on its screen, such as Keychain access."
+        }
 
     private fun arm(op: String, key: String, millis: Long, fire: () -> Unit) =
         timeout.arm(op + "\u0000" + key, millis, fire)

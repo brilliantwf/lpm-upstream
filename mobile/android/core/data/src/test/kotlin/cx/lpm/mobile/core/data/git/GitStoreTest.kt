@@ -62,6 +62,29 @@ class GitStoreTest {
     }
 
     @Test
+    fun `a pull that left conflicts says so and reloads`() = runTest {
+        val h = SessionHarness(this)
+        val socket = h.connectReady()
+        val git = h.session.store<GitStore>()
+        git.pull("storefront")
+        val error = "Pulled, but 2 files have merge conflicts."
+        socket.receive("""{"t":"gitPull","ok":false,"project":"storefront","error":"$error"}""")
+        settle()
+        assertEquals(
+            GitOpError("Pulled with conflicts", error),
+            git.state.value.opError["storefront"]
+        )
+        assertNull(git.state.value.notice["storefront"])
+        assertEquals(1, socket.sentOf("git").size)
+
+        git.pull("storefront")
+        socket.receive("""{"t":"gitPull","ok":false,"project":"storefront","error":"diverged"}""")
+        settle()
+        assertEquals(GitOpError("Pull failed", "diverged"), git.state.value.opError["storefront"])
+        assertEquals(1, socket.sentOf("git").size)
+    }
+
+    @Test
     fun `a failed push surfaces what Git said`() = runTest {
         val h = SessionHarness(this)
         val socket = h.connectReady()

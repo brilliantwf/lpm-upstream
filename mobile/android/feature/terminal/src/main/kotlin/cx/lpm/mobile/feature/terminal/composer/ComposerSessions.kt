@@ -13,6 +13,7 @@ import cx.lpm.mobile.core.data.session.MacSession
 import cx.lpm.mobile.core.data.session.SessionStore
 import cx.lpm.mobile.core.data.terminals.TerminalsStore
 import cx.lpm.mobile.core.model.ComposerAction
+import cx.lpm.mobile.core.model.TerminalInfo
 import java.util.UUID
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -58,6 +59,13 @@ class ComposerSessions(
         stores.getOrPut(termId) {
             ComposerStore(termId, project, label, link, media, session.scope, io, now)
         }
+
+    /** Hand what was typed for a tab to the tab lpm reopened in its place. */
+    fun carryDraft(from: String, to: TerminalInfo) {
+        val draft = stores.remove(from) ?: return
+        store(to.id, to.project, to.label).adoptDraft(draft)
+        draft.dispose()
+    }
 
     fun setVariantCount(key: String, count: Int) =
         counts.update { it + (key to count.coerceIn(1, MAX_VARIANTS)) }

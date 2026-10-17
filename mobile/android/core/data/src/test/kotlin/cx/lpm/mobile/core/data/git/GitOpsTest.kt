@@ -176,6 +176,7 @@ class GitOpsTest {
         assertNull("the list is stale after a switch", git.state.value.branches["storefront"])
         assertNull(git.state.value.currentBranch["storefront"])
         assertEquals(1, socket.sentOf("git").size)
+        assertEquals("the list loads afresh", 2, socket.sentOf("gitBranches").size)
         assertEquals(projectsBefore + 1, socket.sentOf("projects").size)
         assertEquals(sidebarBefore + 1, socket.sentOf("sidebar").size)
     }

@@ -29,6 +29,12 @@ sealed interface ConnectionIssue {
 
     data object NotRecognized : ConnectionIssue
 
+    /**
+     * The machine removed this phone. A Mac it was opened through, or a code another
+     * Mac armed, can't bring it back; only pairing on it can.
+     */
+    data object RemovedOnMac : ConnectionIssue
+
     data object IdentityChanged : ConnectionIssue
 
     data object IdentityRejected : ConnectionIssue
@@ -67,6 +73,7 @@ sealed interface ConnectionIssue {
             if (state == LpmClient.State.Ready) return null
             if (f.identityRejected) return IdentityRejected
             if (f.identityMismatch) return IdentityChanged
+            if (state == LpmClient.State.Failed(LpmClient.REVOKED_ERROR)) return RemovedOnMac
             if (f.needsRepair || f.credentialMissing) return NotRecognized
             if (!f.online) return PhoneOffline
             if (state is LpmClient.State.Failed) {

@@ -31,6 +31,11 @@ data class ProjectsUiState(
     val issue: ConnectionIssue? = null,
     /** When the saved list on screen was last live, once a reconnect drags on. */
     val listAge: Instant? = null,
+    /**
+     * The Mac is up but refuses this phone ([RepairFooter.mac] names it): there's
+     * nothing to wait for until it's paired again.
+     */
+    val repairFooter: RepairFooter? = null,
     val folders: List<ProjectFolder> = emptyList(),
     val duplicateDefaults: DuplicateOptions = DuplicateOptions(),
     val duplicateProgress: DuplicateProgress? = null,
@@ -38,6 +43,8 @@ data class ProjectsUiState(
     val automationsUnread: Int = 0,
     val workStatusMenu: List<WorkStatusChoice> = emptyList()
 )
+
+data class RepairFooter(val device: String, val mac: String)
 
 /** The title: the active Mac's name over how the phone reaches it. */
 data class MacTitleState(
@@ -136,6 +143,8 @@ sealed interface MachineDetail {
     data class Failed(val message: String) : MachineDetail
 
     data object NotOnPhone : MachineDetail
+
+    data object Revoked : MachineDetail
 
     data object NeedsUpdate : MachineDetail
 }

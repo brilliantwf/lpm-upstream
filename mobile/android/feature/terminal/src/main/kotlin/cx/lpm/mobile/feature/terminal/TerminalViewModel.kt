@@ -13,12 +13,14 @@ import cx.lpm.mobile.core.data.session.SessionState
 import cx.lpm.mobile.core.data.terminals.TerminalHooks
 import cx.lpm.mobile.core.data.terminals.TerminalsState
 import cx.lpm.mobile.core.data.terminals.TerminalsStore
+import cx.lpm.mobile.core.data.terminals.restoredTab
 import cx.lpm.mobile.core.model.AgentState
 import cx.lpm.mobile.core.model.Project
 import cx.lpm.mobile.core.model.TerminalInfo
 import cx.lpm.mobile.core.model.agentRowsByTerminal
 import cx.lpm.mobile.core.model.projectAgentRows
 import cx.lpm.mobile.core.navigation.TerminalKey
+import cx.lpm.mobile.feature.terminal.composer.ComposerSessions
 import cx.lpm.mobile.feature.terminal.settings.TerminalLook
 import cx.lpm.mobile.feature.terminal.settings.terminalLook
 import cx.lpm.mobile.feature.terminal.settings.terminalLooks
@@ -27,11 +29,17 @@ import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Clock
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /**
  * One terminal: its stream into the web view (xterm.js renders what the Mac
@@ -53,6 +61,19 @@ class TerminalViewModel @AssistedInject constructor(
     private val terminals = session?.store<TerminalsStore>()
     private val projects = session?.store<ProjectsStore>()
 
+    // The tab lpm reopened in this one's place after restarting: the screen carries on
+    // with it, saying so for a moment. `lastSeen` is the terminal as its list last
+    // had it, so a tab gone from the list still shows how it ended.
+    private val successor = MutableStateFlow<TerminalInfo?>(null)
+    private val lastSeen = MutableStateFlow<TerminalInfo?>(null)
+    private val reopened = MutableStateFlow(false)
+    private var reopenedTimer: Job? = null
+    private var reopenPoll: Job? = null
+    private val screenIds = mutableMapOf<Any, String>()
+
+    /** The terminal on screen: the one opened, or the tab that took its place. */
+    private val currentId: String get() = successor.value?.id ?: key.terminalId
+
     val uiState: StateFlow<TerminalUiState> = if (session == null || terminals == null ||
         projects == null
     ) {
@@ -60,12 +81,12 @@ class TerminalViewModel @AssistedInject constructor(
         MutableStateFlow(TerminalUiState(listLoaded = true))
     } else {
         combine(
-            session.state,
+            combine(session.state, session.link.views, ::Pair),
             terminals.state,
             projects.state,
-            session.link.views,
-            prefs.terminalLooks()
-        ) { s, t, p, link, look -> build(s, t, p, link, look) }
+            prefs.terminalLooks(),
+            combine(lastSeen, reopened, successor) { seen, reopen, _ -> seen to reopen }
+        ) { (s, link), t, p, look, (seen, reopen) -> build(s, t, p, link, look, seen, reopen) }
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5_000),
@@ -74,9 +95,62 @@ class TerminalViewModel @AssistedInject constructor(
                     terminals.state.value,
                     projects.state.value,
                     session.link.view(),
-                    prefs.terminalLook
+                    prefs.terminalLook,
+                    lastSeen.value,
+                    reopened.value
                 )
             )
+    }
+
+    init {
+        if (session != null && terminals != null) {
+            combine(terminals.state, successor, ::Pair)
+                .onEach { (t, next) -> track(t, next) }
+                .launchIn(viewModelScope)
+            // lpm restores a project's tabs as it starts up, so its list can take a
+            // while to hold the one standing in for this.
+            combine(session.state, terminals.state, successor) { s, t, _ ->
+                t.endedTerminals[currentId]?.replaceable == true && (s.demoMode || s.isReady)
+            }
+                .distinctUntilChanged()
+                .onEach { awaiting -> if (awaiting) pollForReopen() else reopenPoll?.cancel() }
+                .launchIn(viewModelScope)
+        }
+    }
+
+    private fun pollForReopen() {
+        reopenPoll?.cancel()
+        reopenPoll = viewModelScope.launch {
+            repeat(REOPEN_POLLS) {
+                terminals?.loadTerminals(key.project)
+                delay(REOPEN_POLL_MS)
+            }
+        }
+    }
+
+    private fun track(t: TerminalsState, next: TerminalInfo?) {
+        val id = next?.id ?: key.terminalId
+        t.terminals[key.project]?.firstOrNull { it.id == id }?.let { lastSeen.value = it }
+        val shown = lastSeen.value?.takeIf { it.id == id } ?: next ?: return
+        t.restoredTab(shown)?.let(::follow)
+    }
+
+    /**
+     * Carry on with the tab lpm reopened: what was typed here goes with it, and so
+     * does control if this phone had it.
+     */
+    private fun follow(next: TerminalInfo) {
+        val store = terminals ?: return
+        val old = currentId
+        if (store.isControlled(old)) store.claimControl(next.id)
+        session?.store<ComposerSessions>()?.carryDraft(from = old, to = next)
+        successor.value = next
+        reopened.value = true
+        reopenedTimer?.cancel()
+        reopenedTimer = viewModelScope.launch {
+            delay(REOPENED_BANNER_MS)
+            reopened.value = false
+        }
     }
 
     private fun build(
@@ -84,22 +158,26 @@ class TerminalViewModel @AssistedInject constructor(
         t: TerminalsState,
         p: ProjectsState,
         link: LinkView,
-        look: TerminalLook
+        look: TerminalLook,
+        seen: TerminalInfo?,
+        reopen: Boolean
     ): TerminalUiState {
+        val id = currentId
         val list = t.terminals[key.project]
-        val terminal = list?.firstOrNull { it.id == key.terminalId }
+        val terminal = list?.firstOrNull { it.id == id } ?: seen?.takeIf { it.id == id }
         val project = p.project(key.project)
         return TerminalUiState(
             terminal = terminal,
             project = project,
             listLoaded = list != null,
-            controlled = terminals?.isControlled(key.terminalId) ?: true,
-            ownerLabel = terminals?.controlOwnerLabel(key.terminalId).orEmpty(),
-            ended = t.endedTerminals[key.terminalId],
+            controlled = terminals?.isControlled(id) ?: true,
+            ownerLabel = terminals?.controlOwnerLabel(id).orEmpty(),
+            ended = t.endedTerminals[id],
+            reopened = reopen,
             connectionReady = s.isReady,
             statusLine = link.statusLine.takeUnless { s.demoMode || s.isReady },
             look = look,
-            agent = agentTiming(project, key.terminalId),
+            agent = agentTiming(project, id),
             activeMacId = s.activeMacId
         )
     }
@@ -114,38 +192,41 @@ class TerminalViewModel @AssistedInject constructor(
 
     /** A screen showing the terminal appeared; it streams through `hooks` until [closeScreen]. */
     fun openScreen(screen: Any, hooks: TerminalHooks) {
-        terminals?.openTerminalScreen(key.terminalId, screen, hooks)
+        // Each screen closes the terminal it opened, even once a reopened tab took over.
+        val id = currentId
+        screenIds[screen] = id
+        terminals?.openTerminalScreen(id, screen, hooks)
     }
 
     fun closeScreen(screen: Any) {
-        terminals?.closeTerminalScreen(key.terminalId, screen)
+        terminals?.closeTerminalScreen(screenIds.remove(screen) ?: currentId, screen)
     }
 
     fun input(data: String) {
-        terminals?.input(key.terminalId, data)
+        terminals?.input(currentId, data)
     }
 
     fun resize(cols: Int, rows: Int) {
-        terminals?.resize(key.terminalId, cols, rows)
+        terminals?.resize(currentId, cols, rows)
     }
 
     /** Back from the background: ask for the output missed meanwhile. */
     fun resync() {
-        terminals?.resync(key.terminalId)
+        terminals?.resync(currentId)
     }
 
     /** The terminal's first content is on screen: a prompt "Ask agent…" queued goes in. */
     fun contentShown() {
-        terminals?.contentShown(key.terminalId)
+        terminals?.contentShown(currentId)
     }
 
     /** The page restarted empty: ask for a full snapshot. */
     fun reseed() {
-        terminals?.reseed(key.terminalId)
+        terminals?.reseed(currentId)
     }
 
     fun claimControl() {
-        terminals?.claimControl(key.terminalId)
+        terminals?.claimControl(currentId)
     }
 
     /**
@@ -158,10 +239,16 @@ class TerminalViewModel @AssistedInject constructor(
 
     /** Someone is looking at the terminal: retire the finish or problem it shows. */
     fun markSeen() {
-        projects?.markTerminalSeen(key.project, key.terminalId)
+        projects?.markTerminalSeen(key.project, currentId)
     }
 
     fun loadTerminals() {
         terminals?.loadTerminals(key.project)
+    }
+
+    private companion object {
+        const val REOPEN_POLLS = 10
+        const val REOPEN_POLL_MS = 4_000L
+        const val REOPENED_BANNER_MS = 4_000L
     }
 }

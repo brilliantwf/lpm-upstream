@@ -44,7 +44,7 @@ class LpmClient internal constructor(
 
     private var endpoint = endpoint
     internal var credential = credential
-    internal val handshake = Handshake(deviceName, relaySlug)
+    internal val handshake = Handshake(deviceName, relaySlug, env.phoneId)
     private var pairGuard: Job? = null
     internal var socket: Socket? = null
     internal val streams = TerminalStreams { sendLive(it) }
@@ -346,6 +346,9 @@ class LpmClient internal constructor(
         const val SERVICE_LOGS_WATCH_FEATURE = "serviceLogsWatch"
         const val FILE_UPLOAD_FEATURE = "fileUpload"
 
+        // `restartService` / `stopService`, and ended services reported as `exited`.
+        const val SERVICE_RESTART_FEATURE = "serviceRestart"
+
         const val OFFLINE_HINT =
             "Can't reach your Mac. On cellular, make sure Tailscale is connected on both devices."
 
@@ -364,6 +367,11 @@ class LpmClient internal constructor(
 
         // The Mac no longer holds a paired record for this phone.
         const val UNAUTHORIZED_ERROR = "device-unauthorized"
+
+        // A Mac that removed this phone, answering a pairing code another Mac armed
+        // for it or a connection carried through another Mac. Only pairing on that
+        // Mac itself lets the phone back in.
+        const val REVOKED_ERROR = "device-revoked"
 
         const val PAIRING_REJECTED_ERROR = "pairing rejected"
         const val PAIRING_UNAVAILABLE_ERROR = "pairing unavailable"

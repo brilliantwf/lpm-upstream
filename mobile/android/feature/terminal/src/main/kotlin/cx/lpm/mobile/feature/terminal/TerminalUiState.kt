@@ -15,6 +15,8 @@ data class TerminalUiState(
     val controlled: Boolean = true,
     val ownerLabel: String = "",
     val ended: TerminalEnding? = null,
+    /** lpm restarted and this is the tab it reopened in the old one's place: say so for a moment. */
+    val reopened: Boolean = false,
     val connectionReady: Boolean = true,
     /** Replaces the agent's timing under the title while the Mac isn't connected. */
     val statusLine: LinkStatusLine? = null,

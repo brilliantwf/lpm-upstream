@@ -49,5 +49,6 @@ private fun statusIcon(status: String): Int = when (status) {
     "deleted" -> DesignR.drawable.ic_do_not_disturb_on
     "renamed" -> DesignR.drawable.ic_arrow_circle_right
     "untracked" -> DesignR.drawable.ic_help
+    "conflicted" -> DesignR.drawable.ic_warning
     else -> DesignR.drawable.ic_edit_circle
 }

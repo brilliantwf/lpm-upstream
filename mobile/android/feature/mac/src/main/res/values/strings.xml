@@ -52,6 +52,8 @@
     <string name="mac_machines_adding">Adding…</string>
     <string name="mac_machines_failed">%1$s Tap to try again.</string>
     <string name="mac_machines_tap_to_add">Tap to add</string>
+    <string name="mac_machines_revoked">Removed this phone. Pair on it to add it.</string>
+    <string name="mac_machines_revoked_detail">It removed this phone. Pair on it to add it again.</string>
     <string name="mac_machines_offline">Offline</string>
     <string name="mac_machines_needs_update">Update lpm on it to add it here</string>
     <string name="mac_machines_pair_directly">Pair Directly with %1$s</string>

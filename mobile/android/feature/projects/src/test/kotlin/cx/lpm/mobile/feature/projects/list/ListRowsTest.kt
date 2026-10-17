@@ -154,6 +154,10 @@ class ListRowsTest {
             detail(section(pending = MachineImportStatus.Removed))
         )
         assertEquals(
+            MachineDetail.Revoked,
+            detail(section(pending = MachineImportStatus.Revoked, throughMac = true))
+        )
+        assertEquals(
             MachineDetail.NeedsUpdate,
             detail(section(pending = MachineImportStatus.NeedsUpdate))
         )

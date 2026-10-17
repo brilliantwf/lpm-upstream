@@ -24,6 +24,7 @@ class LpmClientDemoTest {
                 SchedulerClock(testScheduler),
                 transport,
                 NoTailnet,
+                { "phone-1" },
                 Random(1)
             )
         val c = LpmClientFactory(env).demo("Test Phone")

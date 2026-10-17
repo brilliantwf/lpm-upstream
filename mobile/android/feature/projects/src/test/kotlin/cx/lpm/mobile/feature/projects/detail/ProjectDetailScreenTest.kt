@@ -4,13 +4,17 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import cx.lpm.mobile.core.data.link.QueuedAction
 import cx.lpm.mobile.core.designsystem.theme.LpmTheme
 import cx.lpm.mobile.core.model.Service
 import cx.lpm.mobile.core.model.TerminalInfo
 import cx.lpm.mobile.feature.projects.project
+import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -48,6 +52,9 @@ class ProjectDetailScreenTest {
                     openTerminal = { events += "open ${it.label}" },
                     newTerminal = { events += "new" },
                     toggleService = { events += "toggle ${it.name}" },
+                    restartService = { events += "restart ${it.name}" },
+                    stopService = { events += "stop ${it.name}" },
+                    cancelQueued = { events += "cancel" },
                     openLogs = { events += "logs ${it.name}" },
                     stopAll = { events += "stop all" }
                 )
@@ -79,6 +86,35 @@ class ProjectDetailScreenTest {
     fun newTabIsOffWhileOneIsOnItsWay() {
         show(state.copy(creating = true))
         compose.onNodeWithText("New tab").assertIsNotEnabled()
+    }
+
+    @Test
+    fun anEndedServiceSaysHowAndOffersRestart() {
+        val crashed = Service("api", 4000, exited = true, exitCode = 1)
+        show(
+            state.copy(
+                subtitle = DetailSubtitle.Crashed(listOf(crashed)),
+                services = listOf(
+                    ServiceEntry(Service("web", 3000), running = true, pending = false),
+                    ServiceEntry(crashed, running = false, pending = false, ended = crashed)
+                ),
+                canStopServices = true
+            )
+        )
+        compose.onNodeWithText("api exited with code 1").assertExists()
+        compose.onNodeWithText("exited with code 1").assertExists()
+        compose.onNodeWithContentDescription("Restart api").performClick()
+        compose.onNodeWithText("api").performTouchInput { longClick() }
+        compose.onNodeWithText("Stop").performClick()
+        assertEquals(listOf("restart api", "stop api"), events)
+    }
+
+    @Test
+    fun anActionWaitingForTheMacShowsOverTheTabs() {
+        show(state.copy(queued = listOf(QueuedAction("storefront", "Start", Instant.EPOCH))))
+        compose.onNodeWithText("Start · waiting for the Mac").assertExists()
+        compose.onNodeWithText("Cancel").performClick()
+        assertEquals(listOf("cancel"), events)
     }
 
     @Test

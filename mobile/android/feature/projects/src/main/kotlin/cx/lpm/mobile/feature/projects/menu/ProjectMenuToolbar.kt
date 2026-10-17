@@ -47,8 +47,9 @@ import kotlinx.coroutines.launch
 /**
  * A project's toolbar buttons on any of its screens (iOS `projectMenuToolbar`): ⚡
  * for its actions when it has some, and the "…" menu (green while it runs, a
- * spinner while a Start/Stop is out), plus everything that menu opens.
- * [onSpawnedTerminal] is told about a terminal an action run spawns.
+ * spinner while a Start/Stop is out), plus everything that menu opens. On a
+ * terminal's screen ([terminal]) its Rename names that tab. [onSpawnedTerminal] is
+ * told about a terminal an action run spawns.
  */
 @Composable
 fun ProjectMenuToolbar(
@@ -56,6 +57,7 @@ fun ProjectMenuToolbar(
     session: SessionKey,
     onNavigate: (NavKey) -> Unit,
     modifier: Modifier = Modifier,
+    terminal: TerminalInfo? = null,
     onSpawnedTerminal: (TerminalInfo) -> Unit = {},
     slots: ProjectsSlots = ProjectsSlots(),
     viewModel: ProjectMenuViewModel =
@@ -85,7 +87,7 @@ fun ProjectMenuToolbar(
                 viewModel.setWorkStatus(choice?.input)
             }
         },
-        rename = { dialog = MenuDialog.Rename },
+        rename = { dialog = terminal?.let(MenuDialog::RenameTab) ?: MenuDialog.Rename },
         configure = { onNavigate(ProjectConfigKey(project, session)) },
         terminalSettings = { dialog = MenuDialog.TerminalSettings },
         git = GitMenuActions(
@@ -115,7 +117,7 @@ fun ProjectMenuToolbar(
             onMore = { menuOpen = true }
         )
         ContextMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            ProjectMenuItems(state, live, actions)
+            ProjectMenuItems(state, live, actions, renamesTab = terminal != null)
         }
         GitNoticeBanner(state.notice, Modifier.align(Alignment.BottomCenter))
     }
@@ -124,6 +126,7 @@ fun ProjectMenuToolbar(
         state = state,
         project = live,
         onRename = viewModel::rename,
+        onRenameTab = { term, name -> viewModel.renameTab(term.id, name) },
         onDiscard = viewModel::discardAll,
         onStatus = viewModel::setWorkStatus,
         onDismissOpError = viewModel::dismissOpError,

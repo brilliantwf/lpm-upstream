@@ -4,6 +4,7 @@
     <string name="projects_title">Projects</string>
     <string name="projects_updated">Updated %1$s</string>
     <string name="projects_stale_footer">Projects open read-only until your Mac is back. Start and Stop wait for it, for up to 2 minutes.</string>
+    <string name="projects_unpaired_footer">Projects open read-only until this %1$s is paired with %2$s again.</string>
     <string name="projects_none">No projects</string>
     <string name="projects_more">More</string>
     <string name="projects_more_needs_you">More — an agent needs you</string>
@@ -41,6 +42,7 @@
     <string name="machine_section_adding">Adding to this phone…</string>
     <string name="machine_section_not_on_phone">Not on this phone</string>
     <string name="machine_section_needs_update">Update lpm on it to open it here</string>
+    <string name="machine_section_revoked">Removed this phone. Pair on it to use it here.</string>
     <string name="machine_section_open">Open</string>
     <string name="machine_section_switch">Switch to %1$s</string>
     <string name="visit_unavailable">Project unavailable</string>
@@ -75,6 +77,26 @@
     <string name="save">Save</string>
     <string name="remove_title">Remove duplicate?</string>
     <string name="project_remove_message">This deletes “%1$s” and its folder from disk. This can\'t be undone.</string>
+    <string name="project_remove_worktree_message">This deletes “%1$s”: its worktree folder, everything inside it, and its branch %2$s. This can\'t be undone.</string>
+    <string name="project_remove_checking">Checking for unsaved work…</string>
+    <string name="project_remove_unsaved">Work that exists only here:</string>
+    <string name="project_remove_bullet">• %1$s</string>
+    <plurals name="project_remove_changed">
+        <item quantity="one">%1$d changed file not committed</item>
+        <item quantity="other">%1$d changed files not committed</item>
+    </plurals>
+    <plurals name="project_remove_untracked">
+        <item quantity="one">%1$d untracked file</item>
+        <item quantity="other">%1$d untracked files</item>
+    </plurals>
+    <plurals name="project_remove_not_pushed">
+        <item quantity="one">%1$d commit not pushed</item>
+        <item quantity="other">%1$d commits not pushed</item>
+    </plurals>
+    <plurals name="project_remove_not_on_default">
+        <item quantity="one">%1$d commit not on %2$s</item>
+        <item quantity="other">%1$d commits not on %2$s</item>
+    </plurals>
     <string name="folder_new_title">New folder</string>
     <string name="folder_name">Folder name</string>
     <string name="folder_create">Create</string>
@@ -147,6 +169,7 @@
     </plurals>
     <string name="menu_profiles">Profiles</string>
     <string name="menu_rename">Rename…</string>
+    <string name="menu_rename_tab">Rename Tab…</string>
     <string name="menu_configure">Configure…</string>
     <string name="menu_terminal_settings">Terminal Settings</string>
     <string name="git_pull">Pull</string>
@@ -196,17 +219,33 @@
     <string name="tab_remote">Remote</string>
     <string name="tab_rename_title">Rename terminal</string>
     <string name="tab_rename_field">Name</string>
+    <string name="tab_close_title">Close “%1$s”?</string>
+    <string name="tab_close_confirm">Close Tab</string>
+    <string name="tab_close_message">Whatever is running in it stops.</string>
+
+    <!-- Services that ended -->
+    <string name="service_exit_stopped">stopped</string>
+    <string name="service_exit_exited">exited</string>
+    <string name="service_exit_code">exited with code %1$d</string>
+    <string name="service_exit_summary">%1$s %2$s</string>
+    <string name="service_row_restart">Restart</string>
+    <string name="service_row_restart_named">Restart %1$s</string>
+    <string name="service_row_stop">Stop</string>
 
     <!-- Service logs -->
     <string name="logs_close">Close</string>
     <string name="logs_stop">Stop</string>
     <string name="logs_start">Start</string>
+    <string name="logs_restart">Restart</string>
     <string name="logs_stopping">Stopping…</string>
     <string name="logs_starting">Starting…</string>
     <string name="logs_running">Running</string>
     <string name="logs_stopped">Stopped</string>
+    <string name="logs_exited">Exited</string>
+    <string name="logs_exited_code">Exited with code %1$d</string>
     <string name="logs_waiting">Waiting for output…</string>
     <string name="logs_not_running">This service isn\'t running.</string>
+    <string name="logs_no_output">No output.</string>
 
     <!-- Service editor -->
     <string name="service_add_title">Add Service</string>

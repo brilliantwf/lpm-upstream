@@ -45,6 +45,8 @@ private fun MachineSection.detail(activeMacId: String?): MachineDetail? {
         MachineImportStatus.Removed ->
             if (throughMac) MachineDetail.OpensThroughMac else MachineDetail.NotOnPhone
 
+        MachineImportStatus.Revoked -> MachineDetail.Revoked
+
         MachineImportStatus.NeedsUpdate -> MachineDetail.NeedsUpdate
 
         MachineImportStatus.Offline, null -> null

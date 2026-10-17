@@ -26,6 +26,7 @@ import cx.lpm.mobile.core.designsystem.component.ButtonRow
 import cx.lpm.mobile.core.designsystem.component.GlassIconButton
 import cx.lpm.mobile.core.designsystem.component.LinkButton
 import cx.lpm.mobile.core.designsystem.component.ListDefaults
+import cx.lpm.mobile.core.designsystem.component.ListRow
 import cx.lpm.mobile.core.designsystem.component.ListSection
 import cx.lpm.mobile.core.designsystem.component.ListSectionSpacing
 import cx.lpm.mobile.core.designsystem.component.LpmTopBar
@@ -33,6 +34,7 @@ import cx.lpm.mobile.core.designsystem.theme.LpmTheme
 import cx.lpm.mobile.core.model.Service
 import cx.lpm.mobile.core.model.TerminalInfo
 import cx.lpm.mobile.feature.projects.R as ProjectsR
+import cx.lpm.mobile.feature.projects.list.QueuedActionLine
 
 /** What the project screen's rows do. */
 @Immutable
@@ -44,7 +46,11 @@ class ProjectDetailActions(
     val rename: (TerminalInfo) -> Unit = {},
     val close: (TerminalInfo) -> Unit = {},
     val toggleService: (Service) -> Unit = {},
+    val restartService: (Service) -> Unit = {},
+    val stopService: (Service) -> Unit = {},
     val openLogs: (Service) -> Unit = {},
+    val cancelQueued: (String) -> Unit = {},
+    val retryQueued: (String) -> Unit = {},
     val stopAll: () -> Unit = {},
     val editConfig: () -> Unit = {},
     val retryConfig: () -> Unit = {}
@@ -103,6 +109,7 @@ fun ProjectDetailScreen(
                             .heightIn(min = maxHeight)
                             .padding(top = ListDefaults.ContentTopPadding)
                     ) {
+                        QueuedSection(state, actions)
                         TabsSection(state, actions)
                         ServicesSection(state, actions)
                         belowServices()
@@ -135,8 +142,28 @@ private fun subtitleText(subtitle: DetailSubtitle?): String? = when (subtitle) {
     DetailSubtitle.Running -> stringResource(ProjectsR.string.detail_running)
     DetailSubtitle.Stopped -> stringResource(ProjectsR.string.detail_stopped)
     DetailSubtitle.InvalidConfiguration -> stringResource(ProjectsR.string.detail_invalid_config)
+    is DetailSubtitle.Crashed -> crashSummaryText(subtitle.services)
     is DetailSubtitle.Link -> subtitle.text
     null -> null
+}
+
+/** Starts, stops and runs waiting for the Mac, one row each. */
+@Composable
+private fun QueuedSection(state: ProjectDetailUiState, actions: ProjectDetailActions) {
+    if (state.queued.isEmpty()) return
+    ListSection(spacing = ListSectionSpacing.Compact) {
+        state.queued.forEach { action ->
+            key(action.id) {
+                ListRow {
+                    QueuedActionLine(
+                        action = action,
+                        onCancel = { actions.cancelQueued(action.id) },
+                        onRetry = { actions.retryQueued(action.id) }
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -200,8 +227,13 @@ private fun ServicesSection(state: ProjectDetailUiState, actions: ProjectDetailA
             key(entry.service.name) {
                 ServiceRow(
                     entry = entry,
-                    onToggle = { actions.toggleService(entry.service) },
-                    onOpen = { actions.openLogs(entry.service) }
+                    canStop = state.canStopServices,
+                    actions = ServiceRowActions(
+                        toggle = { actions.toggleService(entry.service) },
+                        restart = { actions.restartService(entry.service) },
+                        stop = { actions.stopService(entry.service) },
+                        open = { actions.openLogs(entry.service) }
+                    )
                 )
             }
         }

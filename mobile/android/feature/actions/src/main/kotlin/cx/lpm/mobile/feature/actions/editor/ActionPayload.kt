@@ -1,7 +1,7 @@
 package cx.lpm.mobile.feature.actions.editor
 
+import cx.lpm.mobile.core.model.ActionInputsYaml
 import cx.lpm.mobile.core.model.trimmingWhitespace
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -36,7 +36,7 @@ fun ActionDraft.payload(editing: Boolean, seedBody: JsonObject?): JsonObject {
     }
     when (kind) {
         ActionKind.Command -> {
-            p["inputs"] = inputsPayload().takeIf { it.isNotEmpty() }?.let(::JsonArray)
+            p["inputs"] = inputsValue(seedBody)
             p["actions"] = null
             p["primary"] = null
         }
@@ -65,29 +65,12 @@ private fun ActionDraft.displayValue(editing: Boolean): String? = when (val p = 
     ActionPlacement.Header -> if (editing) "header" else null
 }
 
-private fun ActionDraft.inputsPayload(): List<JsonObject> = inputs.mapNotNull { input ->
-    val key = input.key.trimmingWhitespace()
-    if (key.isEmpty()) return@mapNotNull null
-    buildJsonObject {
-        put("key", key)
-        input.label.trimmingWhitespace().ifEmpty { null }?.let { put("label", it) }
-        if (input.isSelect) put("type", InputDraft.SELECT)
-        if (input.required) put("required", true)
-        input.placeholder.trimmingWhitespace().ifEmpty { null }?.let { put("placeholder", it) }
-        input.defaultValue.trimmingWhitespace().ifEmpty { null }?.let { put("default", it) }
-        if (input.isSelect) {
-            val options = input.options.mapNotNull { option ->
-                val value = option.value.trimmingWhitespace()
-                if (value.isEmpty()) return@mapNotNull null
-                buildJsonObject {
-                    put("value", value)
-                    option.label.trimmingWhitespace().ifEmpty { null }?.let { put("label", it) }
-                }
-            }
-            if (options.isNotEmpty()) put("options", JsonArray(options))
-        }
-    }
-}
+/**
+ * The inputs mapping, or an empty one once every input saved before has been
+ * removed: the Mac keeps an `inputs` the payload leaves out.
+ */
+private fun ActionDraft.inputsValue(seedBody: JsonObject?): JsonObject? =
+    ActionInputsYaml.map(inputs) ?: seedBody?.get("inputs")?.let { JsonObject(emptyMap()) }
 
 /**
  * The menu's items keyed for YAML, and the key each draft item got. An item from

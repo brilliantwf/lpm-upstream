@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_action_error_title">An action couldn\'t be loaded</string>
+    <string name="ui_action_errors_title">Some actions couldn\'t be loaded</string>
+</resources>

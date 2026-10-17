@@ -24,12 +24,22 @@
         <item quantity="one">Commit %1$d file</item>
         <item quantity="other">Commit %1$d files</item>
     </plurals>
+    <plurals name="git_review_conflicts">
+        <item quantity="one">%1$s has merge conflicts. Resolve the conflict markers (&lt;&lt;&lt;&lt;&lt;&lt;&lt; … &gt;&gt;&gt;&gt;&gt;&gt;&gt;) before committing.</item>
+        <item quantity="other">%1$s have merge conflicts. Resolve the conflict markers (&lt;&lt;&lt;&lt;&lt;&lt;&lt; … &gt;&gt;&gt;&gt;&gt;&gt;&gt;) before committing.</item>
+    </plurals>
+    <string name="git_review_conflicts_more" tools:ignore="PluralsCandidate">%1$s and %2$d more</string>
     <string name="git_review_create_pr">Create Pull Request</string>
     <string name="git_review_not_repo">Not a git repository</string>
     <string name="git_review_not_repo_message">This project isn\'t tracked by git, so there\'s nothing to review.</string>
     <string name="git_review_unreachable">Can\'t reach your Mac</string>
-    <string name="git_file_select">Select</string>
+    <string name="git_file_include">Include in commit</string>
     <string name="git_file_viewed">Viewed</string>
+    <string name="git_file_on">On</string>
+    <string name="git_file_off">Off</string>
+    <string name="git_file_collapsed">Collapsed</string>
+    <string name="git_file_expanded">Expanded</string>
+    <string name="git_file_conflict">Merge conflict</string>
     <string name="git_file_ask_agent">Ask agent…</string>
     <string name="git_file_binary">Binary file</string>
     <string name="git_file_no_changes">No changes to show</string>

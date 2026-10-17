@@ -1,0 +1,24 @@
+appId: cx.lpm.mobile
+name: 130-close-tab
+tags: [demo, projects, terminal]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Terminal 1"
+    timeout: 5000
+# Whatever runs in a tab stops with it, so Close asks first.
+- longPressOn: "Terminal 1"
+- tapOn: "Close"
+- extendedWaitUntil:
+    visible: "Close “Terminal 1”?"
+    timeout: 5000
+- assertVisible: "Whatever is running in it stops."
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-confirm-close
+- tapOn: "Close Tab"
+- extendedWaitUntil:
+    notVisible: "Terminal 1"
+    timeout: 5000
+- assertVisible: "New tab"

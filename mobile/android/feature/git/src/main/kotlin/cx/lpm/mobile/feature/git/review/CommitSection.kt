@@ -59,6 +59,17 @@ internal fun CommitSection(
                 bottom = 12.dp
             )
         )
+        if (state.conflicted.isNotEmpty()) {
+            Text(
+                text = conflictNotice(state.conflicted),
+                style = LpmTheme.typography.footnote,
+                color = LpmTheme.colors.red,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = PlainRowInset, vertical = ListDefaults.RowVerticalPadding)
+            )
+            PlainSeparator()
+        }
         PlainTextField(
             value = state.message,
             onValueChange = actions.setMessage,
@@ -92,6 +103,21 @@ internal fun CommitSection(
             )
         )
     }
+}
+
+/** The desktop's ConflictNotice: which files still have merge conflicts. */
+@Composable
+private fun conflictNotice(paths: List<String>): String {
+    val named = if (paths.size > SHOWN_CONFLICTS) {
+        stringResource(
+            R.string.git_review_conflicts_more,
+            paths.take(SHOWN_CONFLICTS).joinToString(", "),
+            paths.size - SHOWN_CONFLICTS
+        )
+    } else {
+        paths.joinToString(", ")
+    }
+    return pluralStringResource(R.plurals.git_review_conflicts, paths.size, named)
 }
 
 /** `.borderedProminent` across the row: "Commit N files", a spinner while it runs. */
@@ -208,4 +234,5 @@ internal fun PlainSeparator(modifier: Modifier = Modifier) {
 }
 
 private const val DISABLED_ALPHA = 0.4f
+private const val SHOWN_CONFLICTS = 3
 private val COMMIT_BUTTON_HEIGHT = 34.dp

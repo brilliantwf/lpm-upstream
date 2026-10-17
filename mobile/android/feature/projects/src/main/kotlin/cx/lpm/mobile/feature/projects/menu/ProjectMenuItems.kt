@@ -47,7 +47,8 @@ class ProjectMenuActions(
 fun ColumnScope.ProjectMenuItems(
     state: ProjectMenuUiState,
     project: Project,
-    actions: ProjectMenuActions
+    actions: ProjectMenuActions,
+    renamesTab: Boolean = false
 ) {
     val running = project.running
     // A YAML the Mac can't read has nothing to start, as on the desktop.
@@ -126,7 +127,9 @@ fun ColumnScope.ProjectMenuItems(
     }
     ContextMenuDivider()
     ContextMenuItem(
-        title = stringResource(ProjectsR.string.menu_rename),
+        title = stringResource(
+            if (renamesTab) ProjectsR.string.menu_rename_tab else ProjectsR.string.menu_rename
+        ),
         onClick = actions.rename,
         icon = painterResource(R.drawable.ic_edit)
     )

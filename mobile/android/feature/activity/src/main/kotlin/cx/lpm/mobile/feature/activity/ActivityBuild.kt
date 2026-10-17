@@ -5,6 +5,7 @@ import cx.lpm.mobile.core.model.AutomationJob
 import cx.lpm.mobile.core.model.Project
 import cx.lpm.mobile.core.model.StatusEntry
 import cx.lpm.mobile.core.model.agentProviderLabel
+import cx.lpm.mobile.core.model.crashed
 
 // Folds the projects list, its status entries, and the automations list into the
 // Activity screen's rows and service groups. A port of the desktop's fleetRows.ts so
@@ -130,12 +131,22 @@ private fun markDismissable(rows: List<ActivityRow>): List<ActivityRow> {
  * set exactly. A custom mix needs individual service chips so every running process
  * remains visible and independently controllable.
  */
-private fun chips(project: Project, started: Set<String>): List<ActivityChip> {
+private fun chips(
+    project: Project,
+    started: Set<String>,
+    crashed: Set<String>
+): List<ActivityChip> {
     val profiles = project.profiles
     val activeProfile = profiles.firstOrNull { it.name == project.activeProfile }
-    if (activeProfile == null && started.isNotEmpty()) {
+    // A lit profile would hide which of its services crashed.
+    if ((activeProfile == null || crashed.isNotEmpty()) && (started + crashed).isNotEmpty()) {
         return project.allServices.map {
-            ActivityChip(ActivityChip.Kind.Service, it.name, running = it.name in started)
+            ActivityChip(
+                ActivityChip.Kind.Service,
+                it.name,
+                running = it.name in started,
+                crashed = it.name in crashed
+            )
         }
     }
     val covered = profiles.flatMap { it.services }.toSet()
@@ -148,12 +159,19 @@ private fun chips(project: Project, started: Set<String>): List<ActivityChip> {
 
 private fun serviceGroup(project: Project, identity: ActivityIdentity): ActivityServiceGroup? {
     if (!project.running) return null
-    val running = project.services.map { it.name }
+    val running = project.services.filterNot { it.exited }.map { it.name }
     val started = running.toSet()
+    val crashed = project.services.filter { it.crashed }.map { it.name }.toSet()
     val declared = project.allServices.map { it.name }.filterNot { it in started }
     if (running.isEmpty() && declared.isEmpty()) return null
     val ports = project.allServices.filter { it.port > 0 }.associate { it.name to it.port }
-    return ActivityServiceGroup(identity, running, declared, ports, chips(project, started))
+    return ActivityServiceGroup(
+        identity,
+        running,
+        declared,
+        ports,
+        chips(project, started, crashed)
+    )
 }
 
 /**

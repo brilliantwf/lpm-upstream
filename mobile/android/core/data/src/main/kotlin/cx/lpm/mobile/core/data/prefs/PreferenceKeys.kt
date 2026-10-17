@@ -5,6 +5,7 @@ object PreferenceKeys {
     const val MACS = "lpm.macs"
     const val ACTIVE_MAC_ID = "lpm.activeMacId"
     const val MACHINE_IMPORTS = "lpm.machineImports"
+    const val MACHINE_IMPORTS_REVOKED = "lpm.machineImportsRevoked"
 
     const val NOTIFY_ENABLED = "lpm.notify.enabled"
     const val NOTIFY_WAITING = "lpm.notify.waiting"

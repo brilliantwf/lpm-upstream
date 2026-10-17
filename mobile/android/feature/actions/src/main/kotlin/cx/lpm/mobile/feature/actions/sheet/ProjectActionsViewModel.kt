@@ -28,6 +28,8 @@ data class ProjectActionsUiState(
     val project: String = "",
     val zones: List<Zone> = emptyList(),
     val rows: ActionRows = ActionRows(),
+    /** Actions the Mac left out for a config problem, each naming its problem. */
+    val actionErrors: List<String> = emptyList(),
     val memory: ActionMemoryState = ActionMemoryState()
 ) {
     /** The open list among a zone's [lists]: the remembered layer, else the first. */
@@ -58,6 +60,7 @@ class ProjectActionsViewModel @AssistedInject constructor(
             project = key.project,
             zones = project?.zones.orEmpty(),
             rows = ActionRows.of(project?.actions.orEmpty(), project?.zones.orEmpty()),
+            actionErrors = project?.actionErrors.orEmpty(),
             memory = remembered
         )
     }.stateIn(

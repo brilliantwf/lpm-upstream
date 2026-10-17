@@ -14,6 +14,9 @@ sealed interface MachineImportStatus {
     /** The user removed it from this phone; it is never re-added on its own. */
     data object Removed : MachineImportStatus
 
+    /** The machine removed this phone, so a code the Mac arms on it is refused. */
+    data object Revoked : MachineImportStatus
+
     data object Offline : MachineImportStatus
 
     data object NeedsUpdate : MachineImportStatus
@@ -38,7 +41,9 @@ data class MachineImportState(
     val adding: Set<String> = emptySet(),
     val failures: Map<String, MachineImportFailure> = emptyMap(),
     /** `<source>/<slug>` → the record id it was saved as (`lpm.machineImports`). */
-    val ledger: Map<String, String> = emptyMap()
+    val ledger: Map<String, String> = emptyMap(),
+    /** Keys of machines that refused this phone because they removed it. */
+    val revoked: Set<String> = emptySet()
 ) {
     /** The machines of the live Mac that aren't on this phone, with where each stands. */
     fun rows(macs: List<MacRecord>): List<MachineImportRow> {
@@ -48,6 +53,7 @@ data class MachineImportState(
             val failure = failures[key(source, m.slug)]
             val status = when {
                 m.slug in adding -> MachineImportStatus.Adding
+                key(source, m.slug) in revoked -> MachineImportStatus.Revoked
                 failure != null -> MachineImportStatus.Failed(failure.message)
                 wasRemoved(m, source, macs) -> MachineImportStatus.Removed
                 m.state == RemoteMachine.State.Ready -> MachineImportStatus.Adding

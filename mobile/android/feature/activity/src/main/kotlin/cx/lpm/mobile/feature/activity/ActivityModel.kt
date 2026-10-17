@@ -95,7 +95,13 @@ data class ActivityRow(
  * Something the project row can start or stop: a profile shortcut when one matches
  * the running set, or an individual service in a custom running set.
  */
-data class ActivityChip(val kind: Kind, val name: String, val running: Boolean) {
+data class ActivityChip(
+    val kind: Kind,
+    val name: String,
+    val running: Boolean,
+    /** A started service whose command failed; its chip restarts it. */
+    val crashed: Boolean = false
+) {
     enum class Kind { Profile, Service }
 
     val id: String get() = (if (kind == Kind.Profile) "profile/" else "service/") + name

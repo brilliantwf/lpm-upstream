@@ -121,6 +121,7 @@ private fun machineDetailText(detail: MachineDetail): String = when (detail) {
     MachineDetail.Adding -> stringResource(ProjectsR.string.machine_section_adding)
     is MachineDetail.Failed -> detail.message
     MachineDetail.NotOnPhone -> stringResource(ProjectsR.string.machine_section_not_on_phone)
+    MachineDetail.Revoked -> stringResource(ProjectsR.string.machine_section_revoked)
     MachineDetail.NeedsUpdate -> stringResource(ProjectsR.string.machine_section_needs_update)
 }
 

@@ -93,6 +93,20 @@ class PersistenceTest {
     }
 
     @Test
+    fun `the phone id is minted once and kept`() = runTest {
+        val disk = InMemoryDataStore()
+        val credentials = CredentialStore(disk, FakeCipher(), backgroundScope)
+        val id = credentials.phoneId
+        testScheduler.runCurrent()
+
+        assertTrue(Regex("[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}").matches(id))
+        assertEquals(id, credentials.phoneId)
+        assertEquals(setOf("phone-id"), disk.current.asMap().keys.map { it.name }.toSet())
+        val reloaded = CredentialStore(disk, FakeCipher(), backgroundScope).also { it.load() }
+        assertEquals(id, reloaded.phoneId)
+    }
+
+    @Test
     fun `an address-only name is recognized as such`() {
         val byHost =
             MacRecord(

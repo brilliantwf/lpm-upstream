@@ -21,14 +21,15 @@ data class MachinesMenuUiState(
     val pending: List<MachineImportRow> = emptyList(),
     /**
      * The machines this phone opens through the live Mac that it could pair with
-     * directly: one removed from it, or one whose automatic pairing failed.
+     * directly: one removed from it, one whose automatic pairing failed, or one that
+     * removed this phone, which only pairing on the machine itself can bring back.
      */
     val pairDirectly: List<MachineSection> = emptyList()
 )
 
 /** The live Mac's machines in the title's switcher and the projects "…" menu. */
 @HiltViewModel
-class MachinesMenuViewModel @Inject constructor(session: MacSession) : ViewModel() {
+class MachinesMenuViewModel @Inject constructor(private val session: MacSession) : ViewModel() {
     private val importer: MachineImporter = session.store()
 
     val uiState: StateFlow<MachinesMenuUiState> = combine(
@@ -41,10 +42,17 @@ class MachinesMenuViewModel @Inject constructor(session: MacSession) : ViewModel
             pending = imports.rows(s.macs),
             pairDirectly = sections.filter {
                 it.pending == MachineImportStatus.Removed ||
+                    it.pending == MachineImportStatus.Revoked ||
                     it.pending is MachineImportStatus.Failed
             }
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MachinesMenuUiState())
 
-    fun add(slug: String) = importer.add(slug)
+    /** Add a machine here; one that removed this phone is paired on the machine itself. */
+    fun add(slug: String) {
+        val revoked = importer.state.value.rows(session.state.value.macs).any {
+            it.id == slug && it.status == MachineImportStatus.Revoked
+        }
+        if (revoked) session.beginAddMac() else importer.add(slug)
+    }
 }

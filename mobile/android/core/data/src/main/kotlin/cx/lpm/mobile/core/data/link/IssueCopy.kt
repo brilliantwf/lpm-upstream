@@ -117,6 +117,14 @@ fun ConnectionIssue.issueCopy(
             listOf(IssueAction.PairAgain)
         )
 
+        ConnectionIssue.RemovedOnMac -> IssueCopy(
+            "This $device was removed on $mac",
+            "Pair it on that Mac itself to use it here again.",
+            "iphone.slash",
+            problem,
+            listOf(IssueAction.PairAgain)
+        )
+
         ConnectionIssue.IdentityChanged -> IssueCopy(
             "Check that it's $mac",
             "It has a new security identity. Compare a short code before connecting.",

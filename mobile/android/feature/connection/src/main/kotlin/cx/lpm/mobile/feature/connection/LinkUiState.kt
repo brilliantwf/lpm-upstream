@@ -23,11 +23,19 @@ data class LinkUiState(
     val recoveryStatus: String?,
     val device: String
 ) {
-    /** The bar names the machine by kind; a card by its name. */
+    /**
+     * The bar names the machine by kind; a card by its name. A machine that removed
+     * this phone is named even in the bar: it can be one opened through another Mac,
+     * which "your Mac" would read as.
+     */
     fun content(issue: ConnectionIssue, style: IssueStyle): IssueContentState = IssueContentState(
         issue = issue,
         copy = issue.issueCopy(
-            mac = if (style == IssueStyle.Bar) view.macNoun else view.macLabel,
+            mac = if (style == IssueStyle.Card || issue == ConnectionIssue.RemovedOnMac) {
+                view.macLabel
+            } else {
+                view.macNoun
+            },
             device = device
         ),
         recoveryStatus = recoveryStatus?.takeIf { issue.isConnecting },

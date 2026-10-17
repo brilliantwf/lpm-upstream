@@ -1,0 +1,47 @@
+appId: cx.lpm.mobile
+name: 132-action-input-kinds
+tags: [demo, actions, config]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Tabs"
+    timeout: 5000
+- tapOn: "Actions"
+- extendedWaitUntil:
+    visible: "Lint"
+    timeout: 5000
+- tapOn: "New Action"
+- extendedWaitUntil:
+    visible: "Add Action"
+    timeout: 5000
+# An input asks for text, a choice or a secret, as the desktop's wizard does.
+- scrollUntilVisible:
+    element: "Add input"
+- tapOn: "Add input"
+- scrollUntilVisible:
+    element: "Remember the last answer"
+- assertVisible: "Placeholder (optional)"
+- tapOn: "Kind"
+- extendedWaitUntil:
+    visible: "Secret"
+    timeout: 5000
+- tapOn: "Choice"
+- scrollUntilVisible:
+    element: "Starts as"
+- assertVisible: "Add choice"
+- assertVisible: "Nothing selected"
+- assertVisible: "Remember the last answer"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-choice-input
+# A secret is never remembered.
+- tapOn: "Kind"
+- extendedWaitUntil:
+    visible: "Secret"
+    timeout: 5000
+- tapOn: "Secret"
+- scrollUntilVisible:
+    element: "Default value (optional)"
+- assertNotVisible: "Remember the last answer"
+- assertNotVisible: "Starts as"

@@ -14,7 +14,7 @@ tags: [demo, automations]
 # New: an empty prompt job that runs on its own until a project is picked.
 - tapOn: "New automation"
 - extendedWaitUntil:
-    visible: "New job"
+    visible: "New Automation"
     timeout: 5000
 - assertVisible: "No project selected — runs on its own in your home folder."
 - assertVisible: "AI prompt"
@@ -22,8 +22,10 @@ tags: [demo, automations]
     timeout: 3000
 - takeScreenshot: 1-new-job
 - tapOn: "Cancel"
+# Maestro matches text without case, so the list's "New automation" can't tell
+# the sheet is gone; its scope line can.
 - extendedWaitUntil:
-    notVisible: "New job"
+    notVisible: "No project selected — runs on its own in your home folder."
     timeout: 5000
 # Edit: the form seeded from the job's YAML body.
 - tapOn: "Nightly tests"
@@ -32,7 +34,7 @@ tags: [demo, automations]
     timeout: 5000
 - tapOn: "Edit automation"
 - extendedWaitUntil:
-    visible: "Edit job"
+    visible: "Edit Automation"
     timeout: 5000
 - extendedWaitUntil:
     visible: "npm test"

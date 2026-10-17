@@ -8,14 +8,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavKey
 import cx.lpm.mobile.core.designsystem.component.AlertButton
 import cx.lpm.mobile.core.designsystem.component.AlertRole
-import cx.lpm.mobile.core.designsystem.component.AlertTextField
-import cx.lpm.mobile.core.designsystem.component.LpmAlert
+import cx.lpm.mobile.core.designsystem.component.LpmConfirmationDialog
 import cx.lpm.mobile.core.model.Service
 import cx.lpm.mobile.core.model.TerminalInfo
 import cx.lpm.mobile.core.navigation.ProjectKey
@@ -45,10 +46,18 @@ fun ProjectDetailRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val alerts by viewModel.alerts.collectAsStateWithLifecycle()
     var renaming by remember { mutableStateOf<TerminalInfo?>(null) }
+    var closing by remember { mutableStateOf<TerminalInfo?>(null) }
     var logsFor by remember { mutableStateOf<Service?>(null) }
     var refreshing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
     LaunchedEffect(key) { viewModel.load() }
+    // Back from a dropped link, the tabs are asked for again.
+    var wasLive by remember { mutableStateOf(state.live) }
+    LaunchedEffect(state.live) {
+        if (state.live && !wasLive) viewModel.reloadAfterReconnect()
+        wasLive = state.live
+    }
     val openTerminal = { t: TerminalInfo ->
         onNavigate(TerminalKey(key.project, t.id, key.session))
     }
@@ -71,9 +80,17 @@ fun ProjectDetailRoute(
             newTerminal = viewModel::newTerminal,
             pin = { viewModel.pin(it.id) },
             rename = { renaming = it },
-            close = { viewModel.close(it.id) },
+            // Whatever runs in the tab stops with it, so a close is confirmed first.
+            close = {
+                haptics.performHapticFeedback(HapticFeedbackType.Reject)
+                closing = it
+            },
             toggleService = { viewModel.toggleService(it.name) },
+            restartService = { viewModel.restartService(it.name) },
+            stopService = { viewModel.stopService(it.name) },
             openLogs = { logsFor = it },
+            cancelQueued = viewModel::cancelQueued,
+            retryQueued = viewModel::retryQueued,
             stopAll = viewModel::stopAll,
             editConfig = { onNavigate(YamlConfigKey(key.project, key.session)) },
             retryConfig = { scope.launch { viewModel.refreshProjects() } }
@@ -96,10 +113,17 @@ fun ProjectDetailRoute(
     )
 
     renaming?.let { term ->
-        RenameTerminalAlert(
-            initial = term.label,
+        TabRenameAlert(
+            term = term,
             onRename = { viewModel.rename(term.id, it) },
             onDismiss = { renaming = null }
+        )
+    }
+    closing?.let { term ->
+        CloseTabDialog(
+            term = term,
+            onClose = { viewModel.close(term.id) },
+            onDismiss = { closing = null }
         )
     }
     logsFor?.let { service ->
@@ -118,20 +142,17 @@ fun ProjectDetailRoute(
 }
 
 @Composable
-private fun RenameTerminalAlert(
-    initial: String,
-    onRename: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var name by remember { mutableStateOf(initial) }
-    LpmAlert(
-        title = stringResource(R.string.tab_rename_title),
-        textField = {
-            AlertTextField(name, { name = it }, stringResource(R.string.tab_rename_field))
-        },
+private fun CloseTabDialog(term: TerminalInfo, onClose: () -> Unit, onDismiss: () -> Unit) {
+    LpmConfirmationDialog(
+        title = stringResource(R.string.tab_close_title, term.label),
+        message = stringResource(R.string.tab_close_message),
         buttons = listOf(
-            AlertButton(stringResource(R.string.cancel), AlertRole.Cancel),
-            AlertButton(stringResource(R.string.tab_rename)) { onRename(name) }
+            AlertButton(
+                stringResource(R.string.tab_close_confirm),
+                AlertRole.Destructive,
+                onClick = onClose
+            ),
+            AlertButton(stringResource(R.string.cancel), AlertRole.Cancel)
         ),
         onDismissRequest = onDismiss
     )

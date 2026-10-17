@@ -29,7 +29,8 @@ fun PendingMachinesRoute(viewModel: MachinesMenuViewModel = hiltViewModel()) {
 
 /**
  * "Connected to <Mac>": each of its machines not on this phone, tappable only when
- * tapping can help — to retry a failure or re-add a removed one.
+ * tapping can help — to retry a failure, re-add a removed one, or pair on a machine
+ * that removed this phone.
  */
 @Composable
 internal fun PendingMachinesMenu(
@@ -73,6 +74,12 @@ private fun pendingLook(row: MachineImportRow): PendingLook = when (val status =
     MachineImportStatus.Removed -> PendingLook(
         stringResource(R.string.mac_machines_tap_to_add),
         DesignR.drawable.ic_add_circle,
+        true
+    )
+
+    MachineImportStatus.Revoked -> PendingLook(
+        stringResource(R.string.mac_machines_revoked),
+        DesignR.drawable.ic_mobile_off,
         true
     )
 

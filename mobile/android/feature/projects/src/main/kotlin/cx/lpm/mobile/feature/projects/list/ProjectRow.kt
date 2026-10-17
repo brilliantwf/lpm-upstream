@@ -37,7 +37,10 @@ import cx.lpm.mobile.core.designsystem.component.ListRow
 import cx.lpm.mobile.core.designsystem.component.StatusDot
 import cx.lpm.mobile.core.designsystem.theme.LpmTheme
 import cx.lpm.mobile.core.model.Project
+import cx.lpm.mobile.core.model.crashedServices
+import cx.lpm.mobile.core.model.isUp
 import cx.lpm.mobile.feature.projects.R
+import cx.lpm.mobile.feature.projects.detail.crashSummaryText
 
 /**
  * A project in the list: its running dot (a spinner while a Start/Stop is out, red
@@ -126,21 +129,38 @@ private fun ProjectStateDot(project: Project, pending: Boolean, stale: Boolean) 
             )
         }
 
-        else -> RunningDot(running = project.running, stale = stale)
+        else -> {
+            val crashed = project.crashedServices
+            RunningDot(
+                running = project.isUp,
+                stale = stale,
+                crashed = if (crashed.isEmpty()) null else crashSummaryText(crashed)
+            )
+        }
     }
 }
 
 /**
- * The green (running) / gray (stopped) status dot. Last known rather than live, a
- * running project shows as a ring.
+ * The green (running) / gray (stopped) status dot; red when a service it started
+ * crashed, labelled with which ([crashed], "web exited with code 1"). Last known
+ * rather than live, a running project shows as a ring.
  */
 @Composable
 fun RunningDot(
     running: Boolean,
     modifier: Modifier = Modifier,
     size: Dp = 8.dp,
-    stale: Boolean = false
+    stale: Boolean = false,
+    crashed: String? = null
 ) {
+    if (crashed != null && !stale) {
+        StatusDot(
+            color = LpmTheme.colors.red,
+            modifier = modifier.semantics { contentDescription = crashed },
+            size = size
+        )
+        return
+    }
     StatusDot(
         color = if (running && !stale) LpmTheme.colors.green else LpmTheme.colors.secondaryLabel,
         modifier = modifier,

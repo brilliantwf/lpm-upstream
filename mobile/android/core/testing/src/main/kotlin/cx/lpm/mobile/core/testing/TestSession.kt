@@ -46,8 +46,9 @@ class TestSession(test: TestScope, stores: Set<SessionStore.Factory> = emptySet(
     val tailscale = FakeTailscale()
     val device = ThisDevice("Test Phone")
     val snapshotDir: File = Files.createTempDirectory("lpm-snapshots").toFile()
-    val clients =
-        LpmClientFactory(ClientEnvironment(scope, clock, transport, tailscale, Random(SEED)))
+    val clients = LpmClientFactory(
+        ClientEnvironment(scope, clock, transport, tailscale, { credentials.phoneId }, Random(SEED))
+    )
     val env = SessionEnvironment(
         scope = scope,
         clock = clock,
@@ -61,7 +62,7 @@ class TestSession(test: TestScope, stores: Set<SessionStore.Factory> = emptySet(
         clients = clients,
         device = device,
         tailnet = tailscale,
-        unpair = MacUnpair(scope, transport, tailscale),
+        unpair = MacUnpair(scope, transport, tailscale) { credentials.phoneId },
         storeFactories = setOf(
             SessionStore.Factory(::ProjectsStore),
             SessionStore.Factory(::TerminalsStore)

@@ -31,6 +31,8 @@ data class GitBranchUiState(
     val error: String? = null,
     /** The branch being checked out. */
     val checkingOut: String? = null,
+    /** The list is refreshing: its checkmark can still be the last time's. */
+    val loading: Boolean = false,
     val creating: Boolean = false,
     /** A switch went through: the sheet closes. */
     val switched: Boolean = false
@@ -69,6 +71,7 @@ class GitBranchViewModel @AssistedInject constructor(
             current = g.currentBranch[project] ?: g.snapshots[project]?.branch.orEmpty(),
             error = g.branchError[project],
             checkingOut = g.checkingOut[project],
+            loading = project in g.branchesLoading,
             creating = project in g.creatingBranch,
             switched = done
         )
@@ -76,7 +79,7 @@ class GitBranchViewModel @AssistedInject constructor(
 
     init {
         git?.let { store ->
-            if (store.state.value.branches[project] == null) store.loadBranches(project)
+            store.loadBranches(project)
             viewModelScope.launch {
                 store.state.map { it.checkoutTick[project] }.distinctUntilChanged().drop(1)
                     .collect { switched.value = true }

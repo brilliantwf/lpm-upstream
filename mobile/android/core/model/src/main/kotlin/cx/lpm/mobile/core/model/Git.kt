@@ -39,6 +39,9 @@ data class GitSnapshot(
     val ahead: Int,
     val behind: Int,
     val defaultBranch: String,
+    // Commits on HEAD that aren't on the default branch, sent only for a branch with
+    // no upstream; null from a Mac that doesn't count them.
+    val aheadOfDefault: Int? = null,
     val ghCli: Boolean,
     val files: List<GitFile>,
     val autoPulled: AutoPulled?
@@ -52,6 +55,7 @@ data class GitSnapshot(
             ahead = o.int("ahead") ?: 0,
             behind = o.int("behind") ?: 0,
             defaultBranch = o.string("defaultBranch").orEmpty(),
+            aheadOfDefault = o.int("aheadOfDefault"),
             ghCli = o.bool("ghCli") ?: false,
             files = o.list("files", GitFile::parse),
             autoPulled = AutoPulled.parse(o["autoPulled"])

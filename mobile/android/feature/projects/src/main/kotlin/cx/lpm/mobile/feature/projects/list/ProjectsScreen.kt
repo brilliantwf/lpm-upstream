@@ -203,7 +203,16 @@ private fun ProjectsList(
                         },
                         headerStyle = ListHeaderStyle.Title,
                         footer = state.listAge?.let {
-                            stringResource(ProjectsR.string.projects_stale_footer)
+                            val repair = state.repairFooter
+                            if (repair != null) {
+                                stringResource(
+                                    ProjectsR.string.projects_unpaired_footer,
+                                    repair.device,
+                                    repair.mac
+                                )
+                            } else {
+                                stringResource(ProjectsR.string.projects_stale_footer)
+                            }
                         }
                     ) {
                         ProjectsCardRows(state, actions)

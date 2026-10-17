@@ -35,12 +35,14 @@ import cx.lpm.mobile.core.designsystem.component.rememberModalSheetState
 import cx.lpm.mobile.core.designsystem.theme.LpmTheme
 import cx.lpm.mobile.core.model.Service
 import cx.lpm.mobile.core.model.SessionKey
+import cx.lpm.mobile.core.model.crashed
 import cx.lpm.mobile.core.navigation.PresentationScope
 import cx.lpm.mobile.feature.projects.R
 
 /**
- * A service's recent pane output while it runs, the phone's take on the desktop's
- * service pane, with its Start/Stop in the bar. Always dark, like a terminal.
+ * A service's recent pane output while it runs, or after its command ended while its
+ * pane is still open — the phone's take on the desktop's service pane, with its
+ * Start/Stop in the bar, or Restart once it ended. Always dark, like a terminal.
  */
 @Composable
 fun ServiceLogsSheet(
@@ -82,7 +84,8 @@ private fun ServiceLogsContent(
                     service.name,
                     state,
                     onClose = { sheet.dismiss(onDismiss) },
-                    onToggle = viewModel::toggle
+                    onToggle = viewModel::toggle,
+                    onRestart = viewModel::restart
                 )
                 StatusLine(service, state)
                 LogsText(state, Modifier.weight(1f))
@@ -97,6 +100,7 @@ private fun LogsBar(
     state: ServiceLogsUiState,
     onClose: () -> Unit,
     onToggle: () -> Unit,
+    onRestart: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -122,6 +126,12 @@ private fun LogsBar(
         Box(Modifier.align(Alignment.CenterEnd)) {
             if (state.pending) {
                 ActivityIndicator(size = ActivityIndicatorSize.Small)
+            } else if (state.ended != null) {
+                GlassCapsuleButton(
+                    text = stringResource(R.string.logs_restart),
+                    onClick = onRestart,
+                    textStyle = LpmTheme.typography.headline
+                )
             } else {
                 GlassCapsuleButton(
                     text = stringResource(
@@ -135,15 +145,20 @@ private fun LogsBar(
     }
 }
 
-/** Whether the service runs (or is on its way), its port and a spinner while toggling. */
+/**
+ * Whether the service runs (or is on its way), or how it ended, its port and a spinner
+ * while toggling.
+ */
 @Composable
 private fun StatusLine(service: Service, state: ServiceLogsUiState, modifier: Modifier = Modifier) {
     val colors = LpmTheme.colors
+    val ended = state.ended
     val (dot, text) = when {
-        state.pending && state.running -> colors.blue to R.string.logs_stopping
-        state.pending -> colors.blue to R.string.logs_starting
-        state.running -> colors.green to R.string.logs_running
-        else -> colors.gray3 to R.string.logs_stopped
+        state.pending && state.running -> colors.blue to stringResource(R.string.logs_stopping)
+        state.pending -> colors.blue to stringResource(R.string.logs_starting)
+        ended != null -> (if (ended.crashed) colors.red else colors.gray3) to endedStatus(ended)
+        state.running -> colors.green to stringResource(R.string.logs_running)
+        else -> colors.gray3 to stringResource(R.string.logs_stopped)
     }
     Row(
         modifier = modifier
@@ -155,7 +170,7 @@ private fun StatusLine(service: Service, state: ServiceLogsUiState, modifier: Mo
     ) {
         StatusDot(dot)
         Text(
-            text = stringResource(text),
+            text = text,
             style = LpmTheme.typography.subheadline.copy(fontWeight = FontWeight.Medium),
             maxLines = 1
         )
@@ -168,6 +183,17 @@ private fun StatusLine(service: Service, state: ServiceLogsUiState, modifier: Mo
         }
         Box(Modifier.weight(1f))
         if (state.pending) ActivityIndicator(size = ActivityIndicatorSize.Small)
+    }
+}
+
+/** "Exited with code 1", "Exited", or "Stopped" when the shell couldn't say. */
+@Composable
+private fun endedStatus(ended: Service): String {
+    val code = ended.exitCode ?: return stringResource(R.string.logs_stopped)
+    return if (code == 0) {
+        stringResource(R.string.logs_exited)
+    } else {
+        stringResource(R.string.logs_exited_code, code)
     }
 }
 
@@ -194,7 +220,11 @@ private fun LogsText(state: ServiceLogsUiState, modifier: Modifier = Modifier) {
                 if (state.running) ActivityIndicator(size = ActivityIndicatorSize.Small)
                 Text(
                     text = stringResource(
-                        if (state.running) R.string.logs_waiting else R.string.logs_not_running
+                        when {
+                            state.running -> R.string.logs_waiting
+                            state.ended != null -> R.string.logs_no_output
+                            else -> R.string.logs_not_running
+                        }
                     ),
                     style = LpmTheme.typography.body,
                     color = secondary

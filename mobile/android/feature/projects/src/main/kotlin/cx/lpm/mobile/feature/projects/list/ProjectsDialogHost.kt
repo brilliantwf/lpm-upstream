@@ -34,12 +34,14 @@ class ProjectsDialogActions(
 
 /**
  * The open [dialog]: the folder alerts (new, new-and-move, rename), the delete and
- * remove confirmations, the duplicate options sheet and a status's note prompt.
+ * remove confirmations (the latter with the work only the copy holds, from [removal]),
+ * the duplicate options sheet and a status's note prompt.
  */
 @Composable
 fun ProjectsDialogHost(
     dialog: ProjectsDialog?,
     duplicateDefaults: DuplicateOptions,
+    removal: CopyRemovalCheck?,
     actions: ProjectsDialogActions,
     onDismiss: () -> Unit
 ) {
@@ -100,7 +102,7 @@ fun ProjectsDialogHost(
 
         is ProjectsDialog.RemoveDuplicate -> LpmConfirmationDialog(
             title = stringResource(R.string.remove_title),
-            message = stringResource(R.string.project_remove_message, dialog.project.label),
+            message = copyRemovalMessage(dialog.project, removal),
             buttons = listOf(
                 AlertButton(stringResource(R.string.row_remove), AlertRole.Destructive) {
                     actions.remove(dialog.project)

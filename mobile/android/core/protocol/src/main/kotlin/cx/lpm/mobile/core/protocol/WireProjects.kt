@@ -27,6 +27,21 @@ sealed interface WireProjects {
         put("service", service)
     }
 
+    /**
+     * Stop a service's process if it still runs and start it again; also brings back
+     * one that ended. Only for a Mac whose `features` has "serviceRestart".
+     */
+    fun restartService(name: String, service: String): String = frame("restartService") {
+        put("name", name)
+        put("service", service)
+    }
+
+    /** Stop one service whatever its state; never starts one that ended. */
+    fun stopService(name: String, service: String): String = frame("stopService") {
+        put("name", name)
+        put("service", service)
+    }
+
     fun status(project: String): String = frame("status") { put("project", project) }
 
     /**

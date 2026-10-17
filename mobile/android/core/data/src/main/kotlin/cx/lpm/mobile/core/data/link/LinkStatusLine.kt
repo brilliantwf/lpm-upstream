@@ -76,6 +76,8 @@ data class LinkStatusLine(val text: String, val tone: Tone, val pulse: Boolean =
                 ConnectionIssue.NotRecognized, ConnectionIssue.IdentityRejected ->
                     LinkStatusLine("Not paired", Tone.Problem)
 
+                ConnectionIssue.RemovedOnMac -> LinkStatusLine("Removed on that Mac", Tone.Problem)
+
                 ConnectionIssue.IdentityChanged -> LinkStatusLine(
                     "Check its identity",
                     Tone.Problem

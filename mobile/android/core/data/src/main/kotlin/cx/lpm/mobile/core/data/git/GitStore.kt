@@ -240,6 +240,13 @@ class GitStore(private val session: MacSession) : SessionStore {
     private fun finish(copy: GitOpCopy, project: String, error: String?) {
         timeout.cancel(gitTimeoutKey(copy.op.name, project))
         mutable.update { copy.op.mark(it, project, false) }
+        // A pull that went through but left conflicts says so itself ("Pulled,
+        // but…"), so it isn't called a failure and the new state is fetched.
+        if (copy == GitOpCopy.Pull && error != null && error.startsWith("Pulled")) {
+            showOpError(project, GitOpError("Pulled with conflicts", error))
+            load(project)
+            return
+        }
         if (error != null) {
             showOpError(project, GitOpError(copy.failed, error))
             return

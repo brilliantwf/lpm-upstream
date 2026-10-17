@@ -165,6 +165,9 @@ sealed interface Inbound {
     ) : Inbound
 
     data class Remove(val error: String?) : Inbound
+
+    // A restartService/stopService reply; `error` is null when the Mac took it.
+    data class ServiceOp(val error: String?) : Inbound
     data class RenameProject(val project: String, val error: String?) : Inbound
     data class SetWorkStatus(val project: String, val error: String?) : Inbound
     data class SetAutoPull(val project: String, val error: String?) : Inbound

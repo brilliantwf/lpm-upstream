@@ -8,7 +8,6 @@ import cx.lpm.mobile.core.data.session.MacSession
 import cx.lpm.mobile.core.data.session.MacSessions
 import cx.lpm.mobile.core.data.session.SessionAlerts
 import cx.lpm.mobile.core.data.terminals.TerminalsStore
-import cx.lpm.mobile.core.model.trimmingWhitespace
 import cx.lpm.mobile.core.navigation.ProjectKey
 import cx.lpm.mobile.feature.projects.visit.listedProject
 import dagger.assisted.Assisted
@@ -44,27 +43,33 @@ class ProjectDetailViewModel @AssistedInject constructor(
     val alerts: StateFlow<SessionAlerts.Alerts> = sessionAlerts.alerts
 
     private fun detailState(s: MacSession) = combine(
-        combine(s.state, s.link.views, ::Pair),
+        combine(s.state, s.link.views, s.link.state, ::Triple),
         s.store<ProjectsStore>().state,
         s.store<TerminalsStore>().state,
         s.store<ActionsStore>().state,
         sessions.listedProject(key)
-    ) { (session, view), p, t, a, listed ->
-        p.detail(
-            name = key.project,
+    ) { (session, view, link), p, t, a, listed ->
+        val inputs = DetailInputs(
             terminals = t.terminals[key.project],
             creating = key.project in t.creatingTerminals,
             hasBackgroundRuns = a.runs(key.project).isNotEmpty(),
-            subtitleWhenLive = session.demoMode || session.isReady,
+            live = session.demoMode || session.isReady,
             linkText = view.statusLine.text,
-            now = clock.millis(),
-            listed = listed
+            queued = link.queued(key.project),
+            canStopServices = s.store<ProjectsStore>().canRestartServices,
+            now = clock.millis()
         )
+        p.detail(key.project, inputs, listed)
     }
 
     /** The screen came up: ask for its tabs again (a switch or reconnect clears them). */
     fun load() {
         terminals?.loadTerminals(key.project)
+    }
+
+    /** The link is back: an empty list from before may only mean lpm was restarting. */
+    fun reloadAfterReconnect() {
+        terminals?.reloadTerminalsAfterReconnect(key.project)
     }
 
     fun newTerminal() {
@@ -84,13 +89,29 @@ class ProjectDetailViewModel @AssistedInject constructor(
         terminals?.closeTerminal(key.project, id)
     }
 
+    /** [label] is already trimmed and differs from the tab's name (see [tabRenameResult]). */
     fun rename(id: String, label: String) {
-        val name = label.trimmingWhitespace()
-        if (name.isNotEmpty()) terminals?.renameTerminal(key.project, id, name)
+        terminals?.renameTerminal(key.project, id, label)
     }
 
     fun toggleService(service: String) {
         projects?.toggleService(key.project, service)
+    }
+
+    fun restartService(service: String) {
+        projects?.restartService(key.project, service)
+    }
+
+    fun stopService(service: String) {
+        projects?.stopService(key.project, service)
+    }
+
+    fun cancelQueued(id: String) {
+        session?.link?.cancelQueued(id)
+    }
+
+    fun retryQueued(id: String) {
+        session?.link?.retryQueued(id)
     }
 
     fun stopAll() {

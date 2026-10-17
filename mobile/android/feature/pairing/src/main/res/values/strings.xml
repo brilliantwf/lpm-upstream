@@ -66,6 +66,7 @@
     <string name="pairing_subtitle_chosen">Approve this phone on the Mac again. Its name and addresses stay as they are.</string>
     <string name="pairing_subtitle_identity">Pairing again confirms it\'s your Mac. Approve it on the Mac — its name and addresses stay as they are.</string>
     <string name="pairing_subtitle_not_recognized">It no longer recognizes this phone. Approve it on the Mac — its name and addresses stay as they are.</string>
+    <string name="pairing_subtitle_removed">This phone was removed on it. Pair on that Mac itself: approve it there, or use its QR code or pairing code.</string>
     <string name="pairing_subtitle_tailscale">lpm reaches your Mac from anywhere over Tailscale. Set it up first, or pair for this Wi-Fi only.</string>
     <string name="pairing_subtitle_ways">Open lpm on your Mac. Pick it below, then approve on the Mac.</string>
     <string name="pairing_title">Connect to your Mac</string>

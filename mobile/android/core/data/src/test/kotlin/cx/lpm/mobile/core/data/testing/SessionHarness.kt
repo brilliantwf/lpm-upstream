@@ -52,7 +52,7 @@ class SessionHarness(test: TestScope) {
     val prober = FakeHostProber()
     val snapshotDir: File = Files.createTempDirectory("lpm-snapshots").toFile()
     val clients = LpmClientFactory(
-        ClientEnvironment(scope, clock, transport, NoTailnet, Random(SEED))
+        ClientEnvironment(scope, clock, transport, NoTailnet, { credentials.phoneId }, Random(SEED))
     )
     val env = SessionEnvironment(
         scope = scope,
@@ -67,7 +67,7 @@ class SessionHarness(test: TestScope) {
         clients = clients,
         device = ThisDevice("Test Phone"),
         tailnet = NoTailnet,
-        unpair = MacUnpair(scope, transport, NoTailnet),
+        unpair = MacUnpair(scope, transport, NoTailnet) { credentials.phoneId },
         storeFactories = setOf(
             SessionStore.Factory(::ProjectsStore),
             SessionStore.Factory(::TerminalsStore),
@@ -103,15 +103,17 @@ class SessionHarness(test: TestScope) {
     }
 
     /** Connect the session to a saved Mac and bring the link to `ready`. */
-    fun connectReady(): FakeSocket {
+    fun connectReady(features: List<String> = emptyList()): FakeSocket {
         val record = savedMac()
         session.bootstrap()
         scheduler.runCurrent()
         val socket = transport.last
         socket.open()
         scheduler.runCurrent()
+        val answers = features.joinToString(",") { "\"$it\"" }
         socket.receive(
-            """{"t":"ready","serverId":"${record.serverId}","serverName":"Studio Mac"}"""
+            """{"t":"ready","serverId":"${record.serverId}","serverName":"Studio Mac",""" +
+                """"features":[$answers]}"""
         )
         scheduler.runCurrent()
         check(session.state.value.connection == LpmClient.State.Ready)

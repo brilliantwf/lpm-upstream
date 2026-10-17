@@ -23,13 +23,14 @@ import kotlinx.coroutines.withTimeoutOrNull
 class MacUnpair(
     private val scope: CoroutineScope,
     private val transport: SocketTransport,
-    private val tailnet: TailnetRouter
+    private val tailnet: TailnetRouter,
+    private val phoneId: () -> String
 ) {
     fun send(hosts: List<String>, port: Int, credential: LpmClient.Credential, pin: String?) {
         // Without a pin, whoever answers at the address could be anyone; the token
         // isn't handed to them.
         if (pin == null) return
-        val frame = Wire.unpair(credential.deviceId, credential.token)
+        val frame = Wire.unpair(credential.deviceId, credential.token, phoneId())
         scope.launch {
             for (host in hosts) {
                 if (host.isNotEmpty() && deliver(frame, host, port, pin)) return@launch

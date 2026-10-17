@@ -70,24 +70,12 @@ class TerminalsStore(private val session: MacSession) : SessionStore {
     override fun wire(client: LpmClient) {
         val c = client
         c.onTerminals = ::applyTerminals
-        c.onSlash =
-            { id, commands ->
-                mutable.update {
-                    it.copy(
-                        slashCommands =
-                            it.slashCommands + (id to commands)
-                    )
-                }
-            }
-        c.onMentions =
-            { project, entries ->
-                mutable.update {
-                    it.copy(
-                        mentions =
-                            it.mentions + (project to entries)
-                    )
-                }
-            }
+        c.onSlash = { id, commands ->
+            mutable.update { it.copy(slashCommands = it.slashCommands + (id to commands)) }
+        }
+        c.onMentions = { project, entries ->
+            mutable.update { it.copy(mentions = it.mentions + (project to entries)) }
+        }
         c.onHistory = { project, rows ->
             mutable.update {
                 it.copy(
@@ -96,31 +84,18 @@ class TerminalsStore(private val session: MacSession) : SessionStore {
                 )
             }
         }
-        c.onSeed =
-            { id, cols, rows, data, reset ->
-                screens.current(id)?.seed?.invoke(cols, rows, data, reset)
-            }
+        c.onSeed = { id, cols, rows, data, reset ->
+            screens.current(id)?.seed?.invoke(cols, rows, data, reset)
+        }
         c.onOutput = { id, data -> screens.current(id)?.output?.invoke(data) }
         c.onControl = { id, owner ->
             mutable.update {
-                it.copy(
-                    controlOwner = if (owner !=
-                        null
-                    ) {
-                        it.controlOwner + (id to owner)
-                    } else {
-                        it.controlOwner - id
-                    }
-                )
+                val owners = it.controlOwner - id
+                it.copy(controlOwner = if (owner != null) owners + (id to owner) else owners)
             }
         }
         c.onExit = { id, code, gone ->
-            mutable.update {
-                it.copy(
-                    endedTerminals =
-                        it.endedTerminals + (id to TerminalEnding(code, gone))
-                )
-            }
+            mutable.update { it.recordingEnding(id, code, gone, session.env.clock.millis()) }
         }
         // A runAction/newTerminal the Mac couldn't execute: stop the placeholder.
         c.onActionFailed = { project, message ->
@@ -129,6 +104,11 @@ class TerminalsStore(private val session: MacSession) : SessionStore {
             mutable.update { it.copy(creatingTerminals = it.creatingTerminals - project) }
             session.alerts.showError(message)
         }
+    }
+
+    /** The link dropped: terminals that ended just before it went down with lpm. */
+    override fun onConnectionReset() {
+        mutable.update { it.lostWithLink(session.env.clock.millis()) }
     }
 
     override fun reset() {
@@ -146,12 +126,8 @@ class TerminalsStore(private val session: MacSession) : SessionStore {
         closingTerminals[project]?.let { closing ->
             // Ids gone from the list are confirmed closed; the rest stay hidden.
             val still = closing.intersect(terminals.map { it.id }.toSet())
-            if (still.isEmpty()) {
-                closingTerminals.remove(project)
-            } else {
-                closingTerminals[project] =
-                    still
-            }
+            closingTerminals[project] = still
+            if (still.isEmpty()) closingTerminals.remove(project)
             list = list.filterNot { it.id in still }
         }
         mutable.update { it.copy(terminals = it.terminals + (project to list)) }
@@ -281,9 +257,24 @@ class TerminalsStore(private val session: MacSession) : SessionStore {
     }
 
     fun newTerminal(project: String) {
-        client?.newTerminal(project)
-        markTerminalCreating(project)
-        reloadTerminalsSoon(project)
+        session.whenConnected("New tab", project) { c ->
+            c.newTerminal(project)
+            markTerminalCreating(project)
+            reloadTerminalsSoon(project)
+        }
+    }
+
+    /**
+     * Ask for a project's tabs again once the link is back. An empty list from before
+     * the drop may only mean lpm was restarting, so until the Mac answers it reads as
+     * loading rather than as a project with no tabs.
+     */
+    fun reloadTerminalsAfterReconnect(project: String) {
+        mutable.update {
+            val empty = it.terminals[project]?.isEmpty() == true
+            if (empty) it.copy(terminals = it.terminals - project) else it
+        }
+        loadTerminals(project)
     }
 
     /**
@@ -322,12 +313,8 @@ class TerminalsStore(private val session: MacSession) : SessionStore {
             val closing = closingTerminals[project] ?: return@arm
             if (id !in closing) return@arm
             val still = closing - id
-            if (still.isEmpty()) {
-                closingTerminals.remove(project)
-            } else {
-                closingTerminals[project] =
-                    still
-            }
+            closingTerminals[project] = still
+            if (still.isEmpty()) closingTerminals.remove(project)
             loadTerminals(project)
         }
         reloadTerminalsSoon(project)
@@ -352,13 +339,8 @@ class TerminalsStore(private val session: MacSession) : SessionStore {
             val list = s.terminals[project] ?: return@update s
             val byId = list.distinctBy { it.id }.associateBy { it.id }
             val reordered = order.mapNotNull { byId[it] }
-            if (reordered.size ==
-                list.size
-            ) {
-                s.copy(terminals = s.terminals + (project to reordered))
-            } else {
-                s
-            }
+            if (reordered.size != list.size) return@update s
+            s.copy(terminals = s.terminals + (project to reordered))
         }
         client?.reorderTerminals(project, order)
     }

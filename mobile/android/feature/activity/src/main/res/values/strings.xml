@@ -29,11 +29,14 @@
     <string name="activity_stop_everything">Stop everything in %1$s</string>
     <string name="activity_start_chip">Start the %1$s %2$s</string>
     <string name="activity_stop_chip">Stop the %1$s %2$s</string>
+    <string name="activity_crashed_chip">%1$s crashed. Restart it</string>
 
     <string name="activity_not_connected">Not connected to %1$s</string>
     <string name="activity_not_connected_detail">Its activity shows again once it\'s paired.</string>
     <string name="activity_nothing_matches">Nothing matches</string>
     <string name="activity_nothing_matches_detail">Try a different search, or switch back to All.</string>
+    <string name="activity_nothing_matches_kind">No %1$s are running. Switch back to All to see the rest.</string>
+    <string name="activity_nothing_matches_search">Try a different search.</string>
     <string name="activity_nothing_running">Nothing is running</string>
     <string name="activity_nothing_running_detail">Start a supported agent in an open project, or run an automation. Terminal sessions aren\'t tracked.</string>
 </resources>

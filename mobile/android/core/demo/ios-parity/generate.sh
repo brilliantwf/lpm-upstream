@@ -12,7 +12,7 @@ png="$here/../../../../shared/demo/summary-card.png"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-cp "$ios"/Demo*.swift "$ios/WorkStatusModel.swift" "$work/"
+cp "$ios"/Demo*.swift "$ios/WorkStatusModel.swift" "$ios/ActionInputDrafts.swift" "$work/"
 python3 "$here/patch.py" "$work"
 cp "$here/Stubs.swift" "$work/Stubs.swift"
 cp "$here/Harness.swift" "$work/main.swift"

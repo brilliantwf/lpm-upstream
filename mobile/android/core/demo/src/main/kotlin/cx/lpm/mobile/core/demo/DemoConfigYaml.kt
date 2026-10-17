@@ -15,8 +15,10 @@ private val inputKeyOrder = listOf(
     "required",
     "placeholder",
     "default",
+    "persist",
     "options",
-    "value"
+    "value",
+    "position"
 )
 
 /**
@@ -74,14 +76,38 @@ internal fun DemoServer.storedActionBody(project: String, key: String): Dict? {
     return body
 }
 
-/** The action as its config file holds it: a rendered label goes back to its template. */
+/**
+ * The action as its config file holds it: a rendered label goes back to its template,
+ * and inputs to the mapping keyed by name.
+ */
 private fun configBody(action: Dict): Dict {
     val body = action.toMutableMap()
     body.remove("name")
     body.remove("children")
     if (body.containsKey("configLabel")) body["label"] = body.remove("configLabel")
+    body["inputs"].asDictList()?.let { inputs ->
+        val mapping = inputsMapping(inputs)
+        if (mapping == null) body.remove("inputs") else body["inputs"] = mapping
+    }
     return body
 }
+
+/**
+ * An `inputs` mapping as the projects list carries it: in prompt order, each input
+ * with its key and every choice as a label and value.
+ */
+internal fun wireInputs(map: Dict): List<Dict> =
+    orderedInputs(map.mapValues { it.value.asDict() ?: emptyMap() }).map { (key, body) ->
+        val input = body.toMutableMap()
+        input["key"] = key
+        input.remove("position")
+        body.list("options")?.let { options ->
+            input["options"] = options.mapNotNull { option ->
+                option.asString()?.let { mapOf("label" to it, "value" to it) } ?: option.asDict()
+            }
+        }
+        input
+    }
 
 internal fun actionInfoChildren(parent: String, map: Dict): List<Dict> = map
     .mapNotNull { (childKey, value) ->
@@ -189,6 +215,12 @@ private fun yamlEntry(key: String, value: Any?, indent: Int): String {
     }
     value.asDictList()?.let { rows ->
         return "$pad$key:\n" + rows.joinToString("") { yamlListItem(it, indent + 2) }
+    }
+    value.asList()?.let { items ->
+        return "$pad$key:\n" + items.joinToString("") { item ->
+            item.asDict()?.let { yamlListItem(it, indent + 2) }
+                ?: "$pad  - ${yamlScalarString(item) ?: describing(item)}\n"
+        }
     }
     value.asDict()?.let { map ->
         val order = if (key == "actions") actionKeyOrder else inputKeyOrder

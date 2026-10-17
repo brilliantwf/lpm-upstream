@@ -182,6 +182,7 @@ private fun BranchList(state: GitBranchUiState, onCheckout: (GitBranch) -> Unit)
                             branch = branch,
                             current = state.isCurrent(branch),
                             checkingOut = state.checkingOut,
+                            loading = state.loading,
                             onClick = { onCheckout(branch) }
                         )
                     }

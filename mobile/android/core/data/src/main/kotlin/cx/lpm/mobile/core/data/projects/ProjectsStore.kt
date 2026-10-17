@@ -10,6 +10,7 @@ import cx.lpm.mobile.core.data.client.requestProjects
 import cx.lpm.mobile.core.data.client.requestServices
 import cx.lpm.mobile.core.data.client.requestSidebar
 import cx.lpm.mobile.core.data.client.requestStatus
+import cx.lpm.mobile.core.data.client.restartService
 import cx.lpm.mobile.core.data.client.setAutoPull
 import cx.lpm.mobile.core.data.client.setWorkStatus
 import cx.lpm.mobile.core.data.client.sidebarCreateFolder
@@ -18,6 +19,7 @@ import cx.lpm.mobile.core.data.client.sidebarMoveProject
 import cx.lpm.mobile.core.data.client.sidebarRenameFolder
 import cx.lpm.mobile.core.data.client.startProject
 import cx.lpm.mobile.core.data.client.stopProject
+import cx.lpm.mobile.core.data.client.stopService
 import cx.lpm.mobile.core.data.client.toggleService
 import cx.lpm.mobile.core.data.mac.ProjectSnapshots
 import cx.lpm.mobile.core.data.session.MacSession
@@ -26,6 +28,7 @@ import cx.lpm.mobile.core.model.DuplicateOptions
 import cx.lpm.mobile.core.model.Project
 import cx.lpm.mobile.core.model.ProjectFolder
 import cx.lpm.mobile.core.model.WorkStatusInput
+import cx.lpm.mobile.core.model.liveServiceNames
 import cx.lpm.mobile.core.model.nextWorkStatus
 import cx.lpm.mobile.core.model.trimmingWhitespace
 import kotlinx.coroutines.delay
@@ -145,13 +148,7 @@ class ProjectsStore(private val session: MacSession) : SessionStore {
             }
             val toggles = s.pendingServiceToggle.mapValues { (name, pending) ->
                 val project = projects.firstOrNull { it.name == name } ?: return@mapValues pending
-                val runningNow = if (project.running) {
-                    project.services.map {
-                        it.name
-                    }.toSet()
-                } else {
-                    emptySet()
-                }
+                val runningNow = project.liveServiceNames
                 pending.filter { (service, desired) -> (service in runningNow) != desired }
             }
             s.copy(pendingRun = pendingRun, pendingServiceToggle = toggles)
@@ -209,14 +206,51 @@ class ProjectsStore(private val session: MacSession) : SessionStore {
             // A wait for the Mac can outlast the list it was tapped on; the wire verb
             // toggles, so only send it while it still moves the right way.
             if (state.value.serviceRunning(project, service) == desired) return@whenConnected
-            setServiceToggle(project, service, desired)
-            session.scope.launch {
-                delay(PENDING_TIMEOUT_MS)
-                if (state.value.pendingServiceToggle[project]?.get(service) == desired) {
-                    setServiceToggle(project, service, null)
-                }
+            markServicePending(project, service, desired)
+            // A Mac that has `stopService` stops without the toggle's guessing.
+            if (!desired && canRestartServices) {
+                c.stopService(project, service)
+            } else {
+                c.toggleService(project, service)
             }
-            c.toggleService(project, service)
+        }
+    }
+
+    /**
+     * Run a service again: one that ended, or one still running. A Mac without
+     * `restartService` starts an ended service through the toggle instead.
+     */
+    fun restartService(project: String, service: String) {
+        session.whenConnected("Restart $service", project) { c ->
+            markServicePending(project, service, desired = true)
+            if (canRestartServices) {
+                c.restartService(project, service)
+            } else if (!state.value.serviceRunning(project, service)) {
+                c.toggleService(project, service)
+            }
+        }
+    }
+
+    /** Stop a service whatever its state, clearing one that ended. */
+    fun stopService(project: String, service: String) {
+        session.whenConnected("Stop $service", project) { c ->
+            if (!canRestartServices) return@whenConnected
+            markServicePending(project, service, desired = false)
+            c.stopService(project, service)
+        }
+    }
+
+    /** The Mac answers `restartService` and `stopService` and reports services that ended. */
+    val canRestartServices: Boolean
+        get() = client?.hostFeatures?.contains(LpmClient.SERVICE_RESTART_FEATURE) == true
+
+    private fun markServicePending(project: String, service: String, desired: Boolean) {
+        setServiceToggle(project, service, desired)
+        session.scope.launch {
+            delay(PENDING_TIMEOUT_MS)
+            if (state.value.pendingServiceToggle[project]?.get(service) == desired) {
+                setServiceToggle(project, service, null)
+            }
         }
     }
 

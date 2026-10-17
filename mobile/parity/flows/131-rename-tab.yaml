@@ -1,0 +1,40 @@
+appId: cx.lpm.mobile
+name: 131-rename-tab
+tags: [demo, terminal, projects]
+---
+- runFlow: subflows/enter-demo.yaml
+- tapOn: "storefront"
+- extendedWaitUntil:
+    visible: "Terminal 1"
+    timeout: 5000
+- tapOn: "Terminal 1"
+- extendedWaitUntil:
+    visible: "Message"
+    timeout: 10000
+# On a terminal's screen the project menu's Rename names that tab.
+- tapOn: "More"
+- extendedWaitUntil:
+    visible: "Rename Tab…"
+    timeout: 5000
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: "Rename Tab…"
+      - extendedWaitUntil:
+          visible: "Rename terminal"
+          timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 1-rename-tab
+- eraseText: 20
+- inputText: "build"
+- tapOn: "Rename"
+- extendedWaitUntil:
+    notVisible: "Rename terminal"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "build"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 2-renamed

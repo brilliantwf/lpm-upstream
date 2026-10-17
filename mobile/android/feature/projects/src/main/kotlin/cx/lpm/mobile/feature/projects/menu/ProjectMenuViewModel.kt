@@ -11,6 +11,7 @@ import cx.lpm.mobile.core.data.git.GitStore
 import cx.lpm.mobile.core.data.projects.ProjectsStore
 import cx.lpm.mobile.core.data.session.MacSession
 import cx.lpm.mobile.core.data.session.MacSessions
+import cx.lpm.mobile.core.data.terminals.TerminalsStore
 import cx.lpm.mobile.core.model.AutoPullMode
 import cx.lpm.mobile.core.model.AutoPulled
 import cx.lpm.mobile.core.model.GitAutoKind
@@ -129,6 +130,11 @@ class ProjectMenuViewModel @AssistedInject constructor(
     fun rename(name: String) {
         val p = uiState.value.project ?: return
         projects?.renameProject(p, name)
+    }
+
+    /** [label] is already trimmed and differs from the tab's name. */
+    fun renameTab(id: String, label: String) {
+        session?.store<TerminalsStore>()?.renameTerminal(project, id, label)
     }
 
     fun setWorkStatus(input: WorkStatusInput?) = projects?.setWorkStatus(project, input)

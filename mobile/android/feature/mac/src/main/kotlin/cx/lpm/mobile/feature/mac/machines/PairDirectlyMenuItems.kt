@@ -22,18 +22,22 @@ fun PairDirectlyRoute(viewModel: MachinesMenuViewModel = hiltViewModel()) {
 
 /**
  * Rows that pair this phone with a machine it otherwise opens through the live Mac:
- * one removed from this phone, or one whose automatic pairing failed.
+ * one removed from this phone, one whose automatic pairing failed, or one that
+ * removed this phone, which only pairing on the machine itself can bring back.
  */
 @Composable
 internal fun PairDirectlyMenuItems(sections: List<MachineSection>, onPair: (slug: String) -> Unit) {
     if (sections.isEmpty()) return
     ContextMenuDivider()
     sections.forEach { section ->
-        val failure = section.pending as? MachineImportStatus.Failed
+        val pending = section.pending
         ContextMenuItem(
             title = stringResource(R.string.mac_machines_pair_directly, section.machine.name),
-            subtitle = failure?.message
-                ?: stringResource(R.string.mac_machines_pair_directly_detail),
+            subtitle = when (pending) {
+                is MachineImportStatus.Failed -> pending.message
+                MachineImportStatus.Revoked -> stringResource(R.string.mac_machines_revoked_detail)
+                else -> stringResource(R.string.mac_machines_pair_directly_detail)
+            },
             icon = painterResource(DesignR.drawable.ic_link),
             onClick = { onPair(section.machine.slug) }
         )

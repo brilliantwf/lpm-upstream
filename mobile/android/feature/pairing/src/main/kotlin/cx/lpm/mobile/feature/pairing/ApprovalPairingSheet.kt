@@ -58,7 +58,12 @@ internal fun ApprovalPairingContent(
     onEnterCode: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val mac = macName.ifEmpty { stringResource(R.string.your_mac) }
+    // The name kept on one line: wrapped text would break it at a hyphen.
+    val mac = if (macName.isEmpty()) {
+        stringResource(R.string.your_mac)
+    } else {
+        macName.replace('-', '\u2011').replace(' ', '\u00A0')
+    }
     Column(
         modifier.fillMaxWidth().padding(28.dp),
         horizontalAlignment = Alignment.CenterHorizontally

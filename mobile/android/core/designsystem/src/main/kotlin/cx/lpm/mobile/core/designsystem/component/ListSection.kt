@@ -1,5 +1,6 @@
 package cx.lpm.mobile.core.designsystem.component
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -12,7 +13,8 @@ import cx.lpm.mobile.core.designsystem.theme.LpmTheme
 
 /**
  * One section of an inset-grouped list: an optional [header] (with a trailing
- * [headerAction]), the rows in a [ListCard], and an optional [footer]. Sections
+ * [headerAction]), the rows in a [ListCard], and an optional [footer] (or other
+ * [footerContent] in its place). Sections
  * stack with no extra spacing; each leaves the room iOS leaves below it.
  */
 @Composable
@@ -23,6 +25,7 @@ fun ListSection(
     headerAction: (@Composable () -> Unit)? = null,
     footer: String? = null,
     footerColor: Color = LpmTheme.colors.secondaryLabel,
+    footerContent: (@Composable () -> Unit)? = null,
     spacing: ListSectionSpacing = ListSectionSpacing.Regular,
     content: @Composable () -> Unit
 ) {
@@ -35,6 +38,8 @@ fun ListSection(
         ListCard(content = content)
         if (footer != null) {
             ListSectionFooter(footer, color = footerColor)
+        } else if (footerContent != null) {
+            Box(Modifier.padding(ListSectionFooterPadding)) { footerContent() }
         } else {
             Spacer(Modifier.height(if (spacing == ListSectionSpacing.Compact) 16.5.dp else 25.6.dp))
         }

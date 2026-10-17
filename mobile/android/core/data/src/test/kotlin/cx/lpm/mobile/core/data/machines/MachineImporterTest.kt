@@ -1,6 +1,7 @@
 package cx.lpm.mobile.core.data.machines
 
 import cx.lpm.mobile.core.data.prefs.PreferenceKeys
+import cx.lpm.mobile.core.data.session.AdoptedMachine
 import cx.lpm.mobile.core.data.testing.FakeSocket
 import cx.lpm.mobile.core.data.testing.SessionHarness
 import cx.lpm.mobile.core.data.testing.settleAlive
@@ -196,6 +197,52 @@ class MachineImporterTest {
         h.importer.add("build-box")
         settle()
         assertEquals(1, live.sentOf("machinePair").size)
+    }
+
+    @Test
+    fun `a machine that removed this phone is not added again until paired there`() = runTest {
+        val h = SessionHarness(this)
+        val live = h.connectReady()
+        fun status() = h.importer.state.value.rows(h.session.state.value.macs).single().status
+        live.listMachines(machine())
+        settle()
+        live.offer()
+        settle()
+        val pairing = h.transport.last
+        pairing.open()
+        settle()
+        pairing.receive("""{"t":"error","error":"revoked"}""")
+        settle()
+        assertEquals(MachineImportStatus.Revoked, status())
+        assertEquals(
+            """["srv-1/build-box"]""",
+            h.prefs.string(PreferenceKeys.MACHINE_IMPORTS_REVOKED)
+        )
+
+        settleAlive(live, 600_000)
+        live.listMachines(machine())
+        settle()
+        assertEquals(1, live.sentOf("machinePair").size)
+        assertEquals(MachineImportStatus.Revoked, status())
+
+        // Paired on the machine itself: the refusal is over.
+        h.session.adoptMachine(
+            AdoptedMachine(
+                serverId = "srv-linux",
+                serverName = "build-box.local",
+                label = "Build Box",
+                hosts = listOf("10.0.0.9"),
+                port = 8765,
+                platform = "linux",
+                deviceId = "dev-2",
+                token = "tok-2",
+                fingerprint = "ab"
+            )
+        )
+        live.listMachines(machine())
+        settle()
+        assertEquals("[]", h.prefs.string(PreferenceKeys.MACHINE_IMPORTS_REVOKED))
+        assertTrue(h.importer.state.value.rows(h.session.state.value.macs).isEmpty())
     }
 
     @Test

@@ -57,6 +57,22 @@ class GitBranchViewModelTest {
     }
 
     @Test
+    fun `every opening refreshes the list, which can't be picked from meanwhile`() = runTest {
+        val t = demoSession()
+        branches(t)
+        val git = t.store<GitStore>()
+        GitBranchViewModel(GitBranchKey("storefront"), t.sessions)
+        assertTrue("storefront" in git.state.value.branchesLoading)
+        assertEquals(
+            "the last list shows meanwhile",
+            4,
+            git.state.value.branches["storefront"]?.size
+        )
+        t.settle()
+        assertFalse("storefront" in git.state.value.branchesLoading)
+    }
+
+    @Test
     fun `a new branch is created off HEAD, and a taken name says so`() = runTest {
         val t = demoSession()
         val vm = branches(t)

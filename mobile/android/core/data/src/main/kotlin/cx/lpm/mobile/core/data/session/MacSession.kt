@@ -334,6 +334,8 @@ class MacSession internal constructor(
 
     fun repairActiveMac(reason: RepairReason? = null) = pairing.repairActiveMac(reason)
 
+    fun repairRemovedMac() = pairing.repairRemovedMac()
+
     fun repairMac(target: String, reason: RepairReason) = pairing.repairMac(target, reason)
 
     // MARK: saved Macs

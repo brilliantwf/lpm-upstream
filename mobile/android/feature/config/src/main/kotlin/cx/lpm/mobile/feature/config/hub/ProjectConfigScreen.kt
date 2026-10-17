@@ -31,6 +31,7 @@ import cx.lpm.mobile.core.designsystem.component.SwipeActionsBox
 import cx.lpm.mobile.core.designsystem.component.listSeparator
 import cx.lpm.mobile.core.designsystem.theme.LpmTheme
 import cx.lpm.mobile.core.model.Action
+import cx.lpm.mobile.core.ui.ActionErrorsNotice
 import cx.lpm.mobile.feature.config.R
 
 /** Which editor the configuration sheet has open over it. */
@@ -114,7 +115,12 @@ fun ProjectConfigScreen(
             ConfigListSection(
                 header = stringResource(R.string.config_actions),
                 addTitle = stringResource(R.string.config_add_action),
-                onAdd = { onOpen(ConfigEditor.AddAction) }
+                onAdd = { onOpen(ConfigEditor.AddAction) },
+                footer = if (state.actionErrors.isEmpty()) {
+                    null
+                } else {
+                    { ActionErrorsNotice(state.actionErrors) }
+                }
             ) {
                 state.actions.forEach { action ->
                     DeletableRow(
@@ -147,9 +153,10 @@ private fun ConfigListSection(
     header: String,
     addTitle: String,
     onAdd: () -> Unit,
+    footer: (@Composable () -> Unit)? = null,
     rows: @Composable () -> Unit
 ) {
-    ListSection(header = header, headerStyle = ListHeaderStyle.Title) {
+    ListSection(header = header, headerStyle = ListHeaderStyle.Title, footerContent = footer) {
         rows()
         ListRow(
             onClick = onAdd,

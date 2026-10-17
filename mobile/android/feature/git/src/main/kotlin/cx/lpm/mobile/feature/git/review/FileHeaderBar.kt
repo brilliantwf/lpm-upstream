@@ -28,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -69,7 +70,7 @@ internal fun FileHeaderBar(
         ) {
             CircleToggle(
                 on = row.selected,
-                label = stringResource(R.string.git_file_select),
+                label = stringResource(R.string.git_file_include),
                 onColor = colors.tint,
                 size = 24.dp,
                 onToggle = { actions.toggleSelected(path) }
@@ -132,14 +133,19 @@ private fun PathButton(
     modifier: Modifier = Modifier
 ) {
     val colors = LpmTheme.colors
+    val state = stringResource(
+        if (row.collapsed) R.string.git_file_collapsed else R.string.git_file_expanded
+    )
     Row(
-        modifier = modifier.combinedClickable(
-            interactionSource = null,
-            indication = null,
-            role = Role.Button,
-            onLongClick = onLongClick,
-            onClick = onClick
-        ),
+        modifier = modifier
+            .combinedClickable(
+                interactionSource = null,
+                indication = null,
+                role = Role.Button,
+                onLongClick = onLongClick,
+                onClick = onClick
+            )
+            .semantics { stateDescription = state },
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -149,6 +155,19 @@ private fun PathButton(
             tint = colors.label.copy(alpha = SECONDARY_ALPHA),
             modifier = Modifier.size(22.dp)
         )
+        if (row.file.isConflicted) {
+            val conflict = stringResource(R.string.git_file_conflict)
+            Text(
+                text = "!",
+                style = TextStyle(
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = colors.red,
+                modifier = Modifier.semantics { contentDescription = conflict }
+            )
+        }
         Text(
             text = row.path,
             style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
@@ -203,6 +222,7 @@ private fun CircleToggle(
     size: Dp,
     onToggle: () -> Unit
 ) {
+    val value = stringResource(if (on) R.string.git_file_on else R.string.git_file_off)
     Box(
         modifier = Modifier
             .size(size)
@@ -213,7 +233,10 @@ private fun CircleToggle(
                 role = Role.Checkbox,
                 onValueChange = { onToggle() }
             )
-            .semantics { contentDescription = label },
+            .semantics {
+                contentDescription = label
+                stateDescription = value
+            },
         contentAlignment = Alignment.Center
     ) {
         Icon(

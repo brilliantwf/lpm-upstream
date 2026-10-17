@@ -114,14 +114,16 @@ object DataModule {
         @ApplicationScope scope: CoroutineScope,
         clock: Clock,
         transport: SocketTransport,
-        tailnet: ResolvedTailnet
+        tailnet: ResolvedTailnet,
+        credentials: CredentialStore
     ): LpmClientFactory = LpmClientFactory(
         // Posts rather than running inline, like `DispatchQueue.main.async`.
         ClientEnvironment(
             CoroutineScope(scope.coroutineContext + Dispatchers.Main),
             clock,
             transport,
-            tailnet.router
+            tailnet.router,
+            phoneId = { credentials.phoneId }
         )
     )
 
@@ -158,8 +160,9 @@ object DataModule {
     fun macUnpair(
         @ApplicationScope scope: CoroutineScope,
         transport: SocketTransport,
-        tailnet: ResolvedTailnet
-    ): MacUnpair = MacUnpair(scope, transport, tailnet.router)
+        tailnet: ResolvedTailnet,
+        credentials: CredentialStore
+    ): MacUnpair = MacUnpair(scope, transport, tailnet.router) { credentials.phoneId }
 
     @Provides
     @Singleton

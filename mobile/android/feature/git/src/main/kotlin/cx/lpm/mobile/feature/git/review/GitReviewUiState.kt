@@ -20,6 +20,8 @@ data class GitReviewUiState(
     val loadError: String? = null,
     val rows: List<ReviewRow> = emptyList(),
     val files: List<GitFile> = emptyList(),
+    /** Files that still have merge conflicts, for the desktop's ConflictNotice. */
+    val conflicted: List<String> = emptyList(),
     val added: Int = 0,
     val removed: Int = 0,
     val message: String = "",

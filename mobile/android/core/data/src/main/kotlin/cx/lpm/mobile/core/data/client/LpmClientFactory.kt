@@ -8,13 +8,15 @@ import kotlinx.coroutines.CoroutineScope
 /**
  * What every client runs on. `scope` must post to the main thread rather than run
  * inline (`Dispatchers.Main`, not `.immediate`): like `DispatchQueue.main.async`,
- * a frame is handled after the code that triggered it has returned.
+ * a frame is handled after the code that triggered it has returned. `phoneId` is
+ * this install's id, read for each connection's first frame.
  */
 class ClientEnvironment(
     val scope: CoroutineScope,
     val clock: Clock,
     val transport: SocketTransport,
     val tailnet: TailnetRouter,
+    val phoneId: () -> String,
     val random: Random = Random.Default
 )
 

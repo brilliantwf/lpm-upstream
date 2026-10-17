@@ -16,7 +16,7 @@ tags: [demo, activity]
 - extendedWaitUntil:
     visible: "Nothing matches"
     timeout: 3000
-- assertVisible: "Try a different search, or switch back to All."
+- assertVisible: "No agents are running. Switch back to All to see the rest."
 - waitForAnimationToEnd:
     timeout: 3000
 - takeScreenshot: 1-activity-agents

@@ -150,11 +150,16 @@ private fun ChipRow(
 @Composable
 private fun ChipButton(chip: ActivityChip, pending: Boolean, onClick: () -> Unit) {
     val colors = LpmTheme.colors
-    val label = stringResource(
-        if (chip.running) R.string.activity_stop_chip else R.string.activity_start_chip,
-        chip.name,
-        chip.noun
-    )
+    val label = when {
+        chip.crashed && !chip.running -> stringResource(R.string.activity_crashed_chip, chip.name)
+        chip.running -> stringResource(R.string.activity_stop_chip, chip.name, chip.noun)
+        else -> stringResource(R.string.activity_start_chip, chip.name, chip.noun)
+    }
+    val tint = when {
+        chip.running -> colors.green
+        chip.crashed -> colors.red
+        else -> null
+    }
     Row(
         modifier = Modifier
             .background(colors.tertiarySystemFill, CircleShape)
@@ -166,7 +171,7 @@ private fun ChipButton(chip: ActivityChip, pending: Boolean, onClick: () -> Unit
         if (pending) {
             ActivityIndicator(size = ActivityIndicatorSize.Mini)
         } else {
-            StatusDot(color = if (chip.running) colors.green else colors.gray3, size = 5.dp)
+            StatusDot(color = tint ?: colors.gray3, size = 5.dp)
         }
         Spacer(Modifier.width(5.dp))
         Text(
@@ -175,7 +180,7 @@ private fun ChipButton(chip: ActivityChip, pending: Boolean, onClick: () -> Unit
                 fontWeight = FontWeight.Medium,
                 lineHeight = 14.sp
             ),
-            color = if (chip.running) colors.green else colors.secondaryLabel,
+            color = tint ?: colors.secondaryLabel,
             maxLines = 1
         )
     }

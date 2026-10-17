@@ -10,9 +10,29 @@ import cx.lpm.mobile.core.model.TerminalInfo
  * How a terminal ended: its process exited with `code`, or the Mac no longer has it
  * at all (lpm restarted, or the exit itself never reached the phone).
  */
-data class TerminalEnding(val code: Int, val gone: Boolean) {
+data class TerminalEnding(
+    val code: Int,
+    val gone: Boolean,
+    /**
+     * The tab's name and place in its project's list when it ended, to find the tab
+     * lpm reopens in its place.
+     */
+    val label: String? = null,
+    val index: Int? = null,
+    /** Millis. */
+    val at: Long = 0,
+    /**
+     * The link dropped right after it ended: lpm quit under it, rather than its
+     * process exiting on its own.
+     */
+    val restarted: Boolean = false
+) {
+    /** lpm no longer has the tab, so one it reopened can stand in for it. */
+    val replaceable: Boolean get() = gone || restarted
+
     val message: String
         get() = when {
+            restarted -> "Closed when lpm restarted"
             gone -> "This terminal is no longer running"
             code == 0 -> "Process exited"
             else -> "Process exited with code $code"

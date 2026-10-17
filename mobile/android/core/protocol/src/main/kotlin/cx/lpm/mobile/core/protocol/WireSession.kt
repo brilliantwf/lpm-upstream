@@ -9,41 +9,52 @@ sealed interface WireSession {
      * `replaces` names a device record on the Mac this pairing should retire — a
      * re-pair after the Mac lost this phone's credential. Omitted when absent, so
      * older Macs (which ignore unknown keys) behave exactly as before.
+     *
+     * Every first frame carries `phoneId`, this install's own id, so a Mac can refuse
+     * a phone it removed whichever credential or Mac it comes through.
      */
-    fun pair(code: String, name: String, replaces: String? = null): String = frame("pair") {
-        put("code", code)
-        put("name", name)
-        putNonEmpty("replaces", replaces)
-    }
+    fun pair(code: String, name: String, phoneId: String, replaces: String? = null): String =
+        frame("pair") {
+            put("code", code)
+            put("name", name)
+            put("phoneId", phoneId)
+            putNonEmpty("replaces", replaces)
+        }
 
     /**
      * Request approve-on-Mac pairing: no code, the Mac shows an Allow dialog with a
      * match code the phone also displays. Sent as the first frame in that mode.
      */
-    fun pairRequest(name: String, replaces: String? = null): String = frame("pairRequest") {
-        put("name", name)
-        putNonEmpty("replaces", replaces)
-    }
+    fun pairRequest(name: String, phoneId: String, replaces: String? = null): String =
+        frame("pairRequest") {
+            put("name", name)
+            put("phoneId", phoneId)
+            putNonEmpty("replaces", replaces)
+        }
 
-    fun auth(deviceId: String, token: String): String = frame("auth") {
+    fun auth(deviceId: String, token: String, phoneId: String): String = frame("auth") {
         put("deviceId", deviceId)
         put("token", token)
+        put("phoneId", phoneId)
     }
 
     /**
      * Sign in to the Mac and ask it to carry this connection to one of the machines
      * it connects to; the machine then answers as itself.
      */
-    fun relay(deviceId: String, token: String, slug: String): String = frame("relay") {
-        put("deviceId", deviceId)
-        put("token", token)
-        put("slug", slug)
-    }
+    fun relay(deviceId: String, token: String, slug: String, phoneId: String): String =
+        frame("relay") {
+            put("deviceId", deviceId)
+            put("token", token)
+            put("slug", slug)
+            put("phoneId", phoneId)
+        }
 
     /** Ask the Mac to forget this phone: the user removed it here. */
-    fun unpair(deviceId: String, token: String): String = frame("unpair") {
+    fun unpair(deviceId: String, token: String, phoneId: String): String = frame("unpair") {
         put("deviceId", deviceId)
         put("token", token)
+        put("phoneId", phoneId)
     }
 
     fun ping(): String = frame("ping")

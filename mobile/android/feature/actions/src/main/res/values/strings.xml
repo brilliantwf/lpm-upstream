@@ -72,6 +72,14 @@
     <string name="actions_editor_input_kind">Kind</string>
     <string name="actions_editor_input_text">Text</string>
     <string name="actions_editor_input_choice">Choice</string>
+    <string name="actions_editor_input_secret">Secret</string>
+    <string name="actions_editor_input_starts_as">Starts as</string>
+    <string name="actions_editor_input_nothing_selected">Nothing selected</string>
+    <string name="actions_editor_input_persist">Remember the last answer</string>
+    <string name="actions_editor_input_bad_name">Input names can only use letters, numbers, dots, dashes and underscores.</string>
+    <string name="actions_editor_input_duplicate">Two inputs are named %1$s.</string>
+    <string name="actions_editor_input_no_choices">Add at least one choice to %1$s.</string>
+    <string name="actions_editor_input_stale_start">The starting choice of %1$s is no longer in its list.</string>
     <string name="actions_editor_input_required">Required</string>
     <string name="actions_editor_option_value">Value</string>
     <string name="actions_editor_option_add">Add choice</string>

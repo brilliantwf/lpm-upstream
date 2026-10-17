@@ -166,6 +166,17 @@ internal class Pairing(private val s: MacSession) {
         (s.visits.host ?: s).repairMac(target, why)
     }
 
+    /**
+     * Pair the active machine itself after it removed this phone: the Mac it was
+     * opened through can't bring it back, only pairing on the machine can.
+     */
+    fun repairRemovedMac() {
+        val state = s.state.value
+        val target = state.activeRecord?.localId
+        if (state.demoMode || target == null) return
+        (s.visits.host ?: s).repairMac(target, RepairReason.Removed)
+    }
+
     fun repairMac(target: String, reason: RepairReason) {
         pendingRepairMacId = target
         s.link.update {

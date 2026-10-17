@@ -192,6 +192,8 @@ private fun subtitle(state: PairingUiState): String = stringResource(
     when (state.repairReason) {
         RepairReason.NotRecognized -> R.string.pairing_subtitle_not_recognized
 
+        RepairReason.Removed -> R.string.pairing_subtitle_removed
+
         RepairReason.Identity -> R.string.pairing_subtitle_identity
 
         RepairReason.Chosen -> R.string.pairing_subtitle_chosen

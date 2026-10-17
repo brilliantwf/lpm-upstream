@@ -16,11 +16,17 @@ internal fun NotesState.withChats(
     }
 }
 
-/** The chat list didn't answer: a failure only when there's nothing to show. */
-internal fun NotesState.chatsTimedOut(project: String): NotesState = copy(
-    chatsLoading = chatsLoading - project,
-    chatsError = if (project in chats) chatsError else chatsError + (project to UNREACHABLE)
-)
+/**
+ * The chat list didn't answer: a failure only when there's nothing to show.
+ * `unanswered` names a Mac that is there but hasn't answered.
+ */
+internal fun NotesState.chatsTimedOut(project: String, unanswered: String?): NotesState {
+    val error = unanswered?.let { "$it Pull to refresh." } ?: UNREACHABLE
+    return copy(
+        chatsLoading = chatsLoading - project,
+        chatsError = if (project in chats) chatsError else chatsError + (project to error)
+    )
+}
 
 internal fun NotesState.chatMutationStarted(key: String, project: String): NotesState =
     copy(chatMutating = chatMutating + key, chatError = chatError - project)
@@ -78,11 +84,14 @@ internal fun NotesState.withPage(
 }
 
 /** A page didn't answer: a failure only when the chat has nothing to show. */
-internal fun NotesState.pageTimedOut(key: String): NotesState = copy(
-    messagesLoading = messagesLoading - key,
-    paging = paging - key,
-    messagesError = if (key in messages) messagesError else messagesError + (key to PAGE_FAILED)
-)
+internal fun NotesState.pageTimedOut(key: String, unanswered: String?): NotesState {
+    val error = unanswered ?: PAGE_FAILED
+    return copy(
+        messagesLoading = messagesLoading - key,
+        paging = paging - key,
+        messagesError = if (key in messages) messagesError else messagesError + (key to error)
+    )
+}
 
 internal fun NotesState.sendStarted(key: String): NotesState =
     copy(sending = sending + key, sendError = sendError - key)

@@ -282,6 +282,9 @@ private fun DemoServer.registerActionConfigHandlers() {
         val entry = (o.dict("payload") ?: emptyMap()).toMutableMap()
         entry["name"] = key
         entry.remove("children")
+        entry.dict("inputs")?.let { inputs ->
+            if (inputs.isEmpty()) entry.remove("inputs") else entry["inputs"] = wireInputs(inputs)
+        }
         entry.dict("actions")?.let { entry["children"] = actionInfoChildren(key, it) }
         // An unchanged template keeps the label the Mac would render from it.
         if (existing != null) {

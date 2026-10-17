@@ -203,6 +203,28 @@ class ActivityBuildTest {
     }
 
     @Test
+    fun `a crashed service shows on its own chip even under a lit profile`() {
+        val p = project(
+            "storefront",
+            running = true,
+            services = listOf(web, api, worker),
+            profiles = listOf(Profile("dev", listOf("web", "api"))),
+            activeProfile = "dev"
+        ).copy(services = listOf(web.copy(exited = true, exitCode = 1), api.copy(exited = true)))
+        val group = build(listOf(p)).services.single()
+        assertEquals(emptyList<String>(), group.running)
+        assertEquals(listOf("web", "api", "worker"), group.declared)
+        assertEquals(
+            listOf(
+                ActivityChip(ActivityChip.Kind.Service, "web", running = false, crashed = true),
+                ActivityChip(ActivityChip.Kind.Service, "api", running = false),
+                ActivityChip(ActivityChip.Kind.Service, "worker", running = false)
+            ),
+            group.chips
+        )
+    }
+
+    @Test
     fun `projects with nothing going are one footer count`() {
         val activity = build(
             listOf(

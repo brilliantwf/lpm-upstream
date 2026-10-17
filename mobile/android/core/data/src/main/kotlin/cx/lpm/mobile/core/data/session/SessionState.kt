@@ -74,4 +74,4 @@ sealed interface ApprovalPairingState {
 }
 
 /** Why the pairing screen was opened for a Mac that's already saved. */
-enum class RepairReason { NotRecognized, Identity, Chosen }
+enum class RepairReason { NotRecognized, Removed, Identity, Chosen }

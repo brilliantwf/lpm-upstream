@@ -12,6 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -30,24 +32,27 @@ import java.time.Instant
  * A branch to check out: a checkmark on the current one, its name over how long ago
  * it was committed to, and the remote's name on a remote-only branch (a spinner
  * while it's being checked out). The current branch, or any while one is being
- * checked out, can't be picked, and is dimmed like a disabled button.
+ * checked out or the list is refreshing, can't be picked, and is dimmed like a
+ * disabled button: until the refresh lands the checkmark can be on the branch it
+ * was the last time the sheet opened.
  */
 @Composable
 internal fun BranchRow(
     branch: GitBranch,
     current: Boolean,
     checkingOut: String?,
+    loading: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = LpmTheme.colors
-    val enabled = !current && checkingOut == null
+    val enabled = !current && checkingOut == null && !loading
     val dim = Modifier.alpha(if (enabled) 1f else DISABLED_ALPHA)
     val subtitle = remember(branch.committerDate) {
         branchSubtitle(branch.committerDate, Instant.now())
     }
     ListRow(
-        modifier = modifier,
+        modifier = modifier.semantics { selected = current },
         onClick = onClick,
         enabled = enabled,
         leadingSlot = ListLeadingSlot(width = 22.dp, spacing = 12.dp),

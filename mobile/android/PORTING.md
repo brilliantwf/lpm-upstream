@@ -32,7 +32,9 @@ side by side (see `mobile/parity/README.md`).
   no Find bar; read aloud's voices are the phone's text-to-speech voices, named by
   language and voice code, and the basic-voices note points to Android's "Text-to-speech
   output" settings (Android's engine can't pause, so resuming starts again at the word
-  it stopped on).
+  it stopped on); a terminal opened from a notification or an Activity row stays on
+  screen after its tab leaves the list, where iOS shows "Terminal unavailable" (tab
+  restore needs the screen to stay, as iOS's tab-list path does).
 - **Same persisted keys and semantics** as iOS (table below), so behavior and
   defaults match.
 - Desktop changes that touch the phone now update both apps (AGENTS.md).
@@ -247,8 +249,9 @@ recognition, biometrics.
 |---|---|---|
 | Keychain `cx.lpm.mobile` | `device-credential.<localId>` | `{"deviceId","token"}` per Mac |
 | Keychain `cx.lpm.mobile` | `cert-pin.<localId>` | lowercase hex SHA-256 of the Mac's leaf cert |
+| Keychain `cx.lpm.mobile` | `phone-id` | this install's lowercase UUID, minted once, sent as `phoneId` in every first frame and `unpair` |
 | Keychain `cx.lpm.mobile.push` | `push-key` | 32 random bytes, one per phone, registered with every Mac |
-| UserDefaults | `lpm.macs`, `lpm.activeMacId`, `lpm.machineImports` | saved Macs (`MacRecord` JSON), active Mac, machine-import ledger |
+| UserDefaults | `lpm.macs`, `lpm.activeMacId`, `lpm.machineImports`, `lpm.machineImportsRevoked` | saved Macs (`MacRecord` JSON), active Mac, machine-import ledger, machines that removed this phone |
 | UserDefaults | `lpm.push.registered.<localId>` | last acknowledged push registration |
 | UserDefaults | `lpm.notify.enabled` / `.waiting` / `.done` / `.error` / `.automation.started` / `.automation.done` / `.automation.error` | missing = on, except `automation.started` (off) |
 | UserDefaults | `appearanceMode`, `terminalFontSize` (12, 8–24), `terminalTheme` (`claude-dark`) | appearance |
@@ -329,8 +332,8 @@ Flows can't reach these by text until both apps label them the same way (adding
 the label on iOS also helps VoiceOver). Done: the composer's send ("Send"), key bar
 ("Up", "Down", "Left", "Right", "Paste", "Hide keyboard"), attachment "Remove",
 prompt tab "Close", mention "Preview", history "New folder", the Git review jump
-menu ("Jump to file"), per-file "Select" / "Viewed" / "More" and the branch sheet's
-"New branch", Notes "New Chat", error-banner "Close", "Attach", "Send", "Remove",
-"Download" and the memory picker's "Preview" eye. Still unlabeled: composer rewrite
-run and variant steppers; QR scanner close. The project "…" menu already reads
-"More" through SwiftUI's default symbol label.
+menu ("Jump to file"), per-file "Include in commit" / "Viewed" (each valued On/Off) /
+"More" and the branch sheet's "New branch", Notes "New Chat", error-banner "Close",
+"Attach", "Send", "Remove", "Download" and the memory picker's "Preview" eye. Still
+unlabeled: composer rewrite run and variant steppers; QR scanner close. The project
+"…" menu already reads "More" through SwiftUI's default symbol label.

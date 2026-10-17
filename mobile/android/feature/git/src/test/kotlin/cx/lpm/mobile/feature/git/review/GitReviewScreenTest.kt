@@ -1,11 +1,13 @@
 package cx.lpm.mobile.feature.git.review
 
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasStateDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -94,9 +96,13 @@ class GitReviewScreenTest {
     @Test
     fun eachFileBarSelectsCollapsesMarksViewedAndAsks() {
         show(loaded())
-        val select = compose.onAllNodesWithContentDescription("Select")
+        val select = compose.onAllNodesWithContentDescription("Include in commit")
         select[0].assertIsOn()
+        select[0].assert(hasStateDescription("On"))
         select[1].assertIsOff()
+        select[1].assert(hasStateDescription("Off"))
+        compose.onNode(hasText("src/app.ts") and hasClickAction())
+            .assert(hasStateDescription("Expanded"))
         compose.onAllNodesWithContentDescription("Viewed")[1].assertIsOn()
         select[1].performClick()
         compose.onAllNodesWithContentDescription("Viewed")[0].performClick()
@@ -113,6 +119,27 @@ class GitReviewScreenTest {
             ),
             events
         )
+    }
+
+    @Test
+    fun aConflictedFileIsFlaggedAndNamedAboveTheCommitForm() {
+        val conflicted = GitFile("src/merge.ts", "conflicted", staged = false, stamp = "1")
+        show(
+            loaded().copy(
+                files = listOf(conflicted),
+                conflicted = listOf("src/merge.ts"),
+                rows = reviewRows(
+                    listOf(ReviewFile(conflicted, null, null, null, true, false, true, false)),
+                    ghCli = false
+                )
+            )
+        )
+        compose.onNodeWithContentDescription("Merge conflict").assertExists()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Commit message"))
+        compose.onNodeWithText(
+            "src/merge.ts has merge conflicts. Resolve the conflict markers " +
+                "(<<<<<<< … >>>>>>>) before committing."
+        ).assertExists()
     }
 
     @Test

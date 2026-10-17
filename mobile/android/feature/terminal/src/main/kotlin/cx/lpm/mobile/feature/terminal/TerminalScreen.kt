@@ -165,7 +165,8 @@ private fun LoadingOverlay(visible: Boolean, background: Color) {
 
 /**
  * While the link is down the connection banner says why nothing responds
- * (keystrokes and scrolling are dropped meanwhile); otherwise how the terminal ended.
+ * (keystrokes and scrolling are dropped meanwhile); otherwise how the terminal ended,
+ * or for a moment that it's the tab lpm reopened after restarting.
  */
 @Composable
 private fun TerminalBanners(
@@ -187,7 +188,17 @@ private fun TerminalBanners(
             enter = enter,
             exit = exit
         ) {
-            if (ended != null) TerminalEndedBanner(ended)
+            if (ended != null) TerminalEndedBanner(ended.message)
+        }
+        AnimatedVisibility(
+            visible = state.connectionReady && ended == null && state.reopened,
+            enter = enter,
+            exit = exit
+        ) {
+            TerminalEndedBanner(
+                text = stringResource(R.string.terminal_reopened),
+                icon = DesignR.drawable.ic_refresh
+            )
         }
     }
 }

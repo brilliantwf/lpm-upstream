@@ -27,6 +27,8 @@ data class Project(
     val profiles: List<Profile>,
     val activeProfile: String,
     val actions: List<Action>,
+    /** Actions the Mac left out for a config problem, each naming its problem. */
+    val actionErrors: List<String> = emptyList(),
     val zones: List<Zone>,
     /** Why the Mac couldn't read the project's YAML; the rest of the entry is then empty. */
     val configError: String?
@@ -70,19 +72,28 @@ data class Project(
             profiles = o.list("profiles", Profile::parse),
             activeProfile = o.string("activeProfile").orEmpty(),
             actions = o.list("actions", Action::parse),
+            actionErrors = o.strings("actionErrors").orEmpty(),
             zones = o.list("zones", Zone::parse),
             configError = o.string("configError")?.ifEmpty { null }
         )
     }
 }
 
-data class Service(val name: String, val port: Int) {
+/** A started service whose command ended is [exited]; [exitCode] is null when the shell couldn't say. */
+data class Service(
+    val name: String,
+    val port: Int,
+    val exited: Boolean = false,
+    val exitCode: Int? = null
+) {
     val id: String get() = name
 
     companion object {
         fun parse(o: JsonObject): Service = Service(
             name = o.string("name").orEmpty(),
-            port = o.int("port") ?: 0
+            port = o.int("port") ?: 0,
+            exited = o.bool("exited") ?: false,
+            exitCode = o.int("exitCode")
         )
     }
 }
@@ -121,14 +132,17 @@ data class ProjectFolder(
 
 /**
  * One service in the logs viewer. `paneIndex` is the index to pass to
- * `serviceLogs` when the project is running (null when stopped).
+ * `serviceLogs` when the project is running (null when stopped). One that [exited]
+ * while the project runs keeps its pane, and so its logs.
  */
 data class ServiceInfo(
     val name: String,
     val paneIndex: Int?,
     val running: Boolean,
     val cmd: String,
-    val port: Int
+    val port: Int,
+    val exited: Boolean = false,
+    val exitCode: Int? = null
 ) {
     val id: String get() = name
 
@@ -138,7 +152,9 @@ data class ServiceInfo(
             paneIndex = o.int("paneIndex"),
             running = o.bool("running") ?: false,
             cmd = o.string("cmd").orEmpty(),
-            port = o.int("port") ?: 0
+            port = o.int("port") ?: 0,
+            exited = o.bool("exited") ?: false,
+            exitCode = o.int("exitCode")
         )
     }
 }

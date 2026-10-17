@@ -91,6 +91,11 @@ internal fun LpmClientCallbacks.route(frame: Inbound) {
             if (error != null) onActionError?.invoke(error) else onProjectsChanged?.invoke()
         }
 
+        is Inbound.ServiceOp -> {
+            val error = frame.error
+            if (error != null) onActionError?.invoke(error) else onProjectsChanged?.invoke()
+        }
+
         is Inbound.RenameProject -> onRenameProject?.invoke(frame.project, frame.error)
 
         is Inbound.SetWorkStatus -> onSetWorkStatus?.invoke(frame.project, frame.error)

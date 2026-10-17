@@ -3,6 +3,8 @@ package cx.lpm.mobile.core.data.session
 import cx.lpm.mobile.core.data.client.CertPinning
 import cx.lpm.mobile.core.data.client.LpmClient
 import cx.lpm.mobile.core.data.client.startProject
+import cx.lpm.mobile.core.data.link.ConnectionIssue
+import cx.lpm.mobile.core.data.link.IssueAction
 import cx.lpm.mobile.core.data.prefs.PreferenceKeys
 import cx.lpm.mobile.core.data.testing.SessionHarness
 import cx.lpm.mobile.core.demo.DemoServer
@@ -179,6 +181,25 @@ class MacSessionTest {
         val link = h.session.link.state.value
         assertTrue(h.session.state.value.addingMac)
         assertEquals(RepairReason.NotRecognized, link.repairReason)
+        assertEquals(h.session.state.value.activeMacId, link.repairMacId)
+    }
+
+    @Test
+    fun `a machine that removed this phone offers pairing on the machine itself`() = runTest {
+        val h = SessionHarness(this)
+        val socket = h.connectReady()
+        socket.receive("""{"t":"error","error":"revoked"}""")
+        settle()
+        assertTrue(h.session.state.value.needsRepair)
+        assertEquals(
+            LpmClient.State.Failed(LpmClient.REVOKED_ERROR),
+            h.session.state.value.connection
+        )
+
+        h.session.perform(IssueAction.PairAgain, ConnectionIssue.RemovedOnMac)
+        val link = h.session.link.state.value
+        assertTrue(h.session.state.value.addingMac)
+        assertEquals(RepairReason.Removed, link.repairReason)
         assertEquals(h.session.state.value.activeMacId, link.repairMacId)
     }
 

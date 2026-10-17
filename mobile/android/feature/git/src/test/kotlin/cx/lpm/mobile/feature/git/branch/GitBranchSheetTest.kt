@@ -2,6 +2,8 @@ package cx.lpm.mobile.feature.git.branch
 
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -62,6 +64,14 @@ class GitBranchSheetTest {
         val withDev = branches + GitBranch("dev", "", "upstream")
         show(GitBranchUiState(branches = withDev, current = "feat/x", checkingOut = "main"))
         compose.onNode(hasText("upstream") and hasClickAction()).assertIsNotEnabled()
+    }
+
+    @Test
+    fun nothingCanBePickedWhileTheListRefreshes() {
+        show(GitBranchUiState(branches = branches, current = "feat/x", loading = true))
+        compose.onNode(hasText("origin") and hasClickAction()).assertIsNotEnabled()
+        compose.onNode(hasText("feat/x") and hasClickAction()).assertIsSelected()
+        compose.onNode(hasText("origin") and hasClickAction()).assertIsNotSelected()
     }
 
     @Test

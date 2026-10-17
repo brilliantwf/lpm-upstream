@@ -89,6 +89,31 @@ class NotesStoreTest {
     }
 
     @Test
+    fun `a read the connected Mac never answers says it may be waiting on a prompt`() = runTest {
+        val t = liveSession()
+        t.connectReady()
+        t.notes.loadChats("p")
+        t.notes.chatDidOpen("p", "c1")
+        t.settle(25_000)
+        val wait = "No answer from Studio Mac yet. It may be waiting on a prompt on its " +
+            "screen, such as Keychain access."
+        val s = t.notes.state.value
+        assertEquals("$wait Pull to refresh.", s.chatsError["p"])
+        assertEquals(wait, s.messagesError[notesKey("p", "c1")])
+    }
+
+    @Test
+    fun `a read with no link says the Mac couldn't be reached`() = runTest {
+        val t = liveSession()
+        t.notes.loadChats("p")
+        t.notes.chatDidOpen("p", "c1")
+        t.settle(25_000)
+        val s = t.notes.state.value
+        assertEquals("Couldn't reach your Mac. Pull to refresh.", s.chatsError["p"])
+        assertEquals("Couldn't load these notes. Try again.", s.messagesError[notesKey("p", "c1")])
+    }
+
+    @Test
     fun `an attachment over the cap is refused without asking the Mac`() = runTest {
         val t = liveSession()
         val socket = t.connectReady()

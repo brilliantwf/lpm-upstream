@@ -31,6 +31,29 @@ class ConnectionIssueTest {
     }
 
     @Test
+    fun `a machine that removed this phone says so, named even in the bar`() {
+        val revoked = LpmClient.State.Failed(LpmClient.REVOKED_ERROR)
+        val issue = ConnectionIssue.derive(LinkFacts(revoked, needsRepair = true))
+        assertEquals(ConnectionIssue.RemovedOnMac, issue)
+        val copy = issue!!.issueCopy("Build Box", "phone")
+        assertEquals("This phone was removed on Build Box", copy.title)
+        assertEquals("Pair it on that Mac itself to use it here again.", copy.message)
+        assertEquals(listOf(IssueAction.PairAgain), copy.actions)
+        assertTrue(issue.needsYou)
+        assertEquals(
+            "Removed on that Mac",
+            LinkStatusLine.make(
+                ready = false,
+                demo = false,
+                kind = null,
+                issue = issue,
+                device = "phone",
+                now = Instant.EPOCH
+            ).text
+        )
+    }
+
+    @Test
     fun `failures are named by cause`() {
         fun derive(message: String, pairing: Boolean = false) = ConnectionIssue.derive(
             LinkFacts(LpmClient.State.Failed(message), pairing = pairing, atHome = true)

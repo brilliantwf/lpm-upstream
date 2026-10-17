@@ -36,6 +36,7 @@ fun ProjectsRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val alerts by viewModel.alerts.collectAsStateWithLifecycle()
+    val removal by viewModel.removal.collectAsStateWithLifecycle()
     var dialog by remember { mutableStateOf<ProjectsDialog?>(null) }
     var refreshing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -96,7 +97,10 @@ fun ProjectsRoute(
             move = viewModel::moveToFolder,
             newFolderFor = { dialog = ProjectsDialog.NewFolderFor(it) },
             duplicate = { dialog = ProjectsDialog.Duplicate(it) },
-            remove = { dialog = ProjectsDialog.RemoveDuplicate(it) },
+            remove = {
+                viewModel.checkRemoval(it)
+                dialog = ProjectsDialog.RemoveDuplicate(it)
+            },
             openTerminal = { project, id -> onNavigate(TerminalKey(project.name, id)) },
             cancelQueued = viewModel::cancelQueued,
             retryQueued = viewModel::retryQueued
@@ -122,6 +126,7 @@ fun ProjectsRoute(
     ProjectsDialogHost(
         dialog = dialog,
         duplicateDefaults = state.duplicateDefaults,
+        removal = removal,
         actions = ProjectsDialogActions(
             createFolder = viewModel::createFolder,
             moveToFolder = viewModel::moveToFolder,
@@ -131,7 +136,10 @@ fun ProjectsRoute(
             duplicate = viewModel::duplicate,
             setWorkStatus = viewModel::setWorkStatus
         ),
-        onDismiss = { dialog = null }
+        onDismiss = {
+            if (dialog is ProjectsDialog.RemoveDuplicate) viewModel.endRemovalCheck()
+            dialog = null
+        }
     )
     SessionAlertsHost(
         alerts = alerts,

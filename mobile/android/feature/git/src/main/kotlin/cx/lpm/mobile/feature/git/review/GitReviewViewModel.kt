@@ -141,6 +141,7 @@ class GitReviewViewModel @AssistedInject constructor(
                 emptyList()
             },
             files = if (snapshot?.isRepo == true) files else emptyList(),
+            conflicted = files.filter { it.isConflicted }.map { it.path },
             added = review.sumOf { it.parsed?.addedCount ?: 0 },
             removed = review.sumOf { it.parsed?.removedCount ?: 0 },
             message = l.message,
@@ -162,11 +163,15 @@ class GitReviewViewModel @AssistedInject constructor(
             return files.map { it.path }.filterNot { it in deselected }
         }
 
-    /** The screen came up: load if nothing has, and follow the working tree while it's open. */
+    /**
+     * The screen came up: follow the working tree while it's open. The watch only
+     * reports changes from here on, so whatever changed since the last snapshot is
+     * fetched now.
+     */
     fun appear() {
         val store = git ?: return
-        if (store.state.value.snapshots[project] == null) store.load(project)
         store.watch(project)
+        store.refreshWatched(project)
     }
 
     fun disappear() {

@@ -23,8 +23,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 /**
  * Adds the live Mac's own machines — its Linux servers and other Macs — to this
@@ -34,8 +36,9 @@ import kotlinx.serialization.json.JsonPrimitive
  * asks that machine to arm a pairing code (`machinePair`), and the phone pairs with
  * it directly over a throwaway connection. The result is an ordinary saved machine
  * the phone reaches on its own, with the Mac asleep. A machine the user removed is
- * never re-added on its own, and a failure isn't retried automatically for ten
- * minutes, so an unreachable server doesn't get a fresh code on every reconnect.
+ * never re-added on its own, nor is one that removed this phone: only pairing on it
+ * lets the phone back in. A failure isn't retried automatically for ten minutes, so
+ * an unreachable server doesn't get a fresh code on every reconnect.
  */
 class MachineImporter(private val session: MacSession) : SessionStore {
     private val mutable = MutableStateFlow(MachineImportState())
@@ -82,8 +85,20 @@ class MachineImporter(private val session: MacSession) : SessionStore {
     /** The live Mac (`source` is its serverId) listed its machines: add every new one. */
     fun update(list: List<RemoteMachine>, source: String) {
         if (source != state.value.sourceId) detach()
-        mutable.update { it.copy(sourceId = source, machines = list, ledger = readLedger()) }
+        mutable.update {
+            it.copy(
+                sourceId = source,
+                machines = list,
+                ledger = readLedger(),
+                revoked = readRevoked()
+            )
+        }
         val macs = session.state.value.macs
+        // Paired on the machine itself since: whatever it refused before is over.
+        forgetRevoked(
+            list.filter { state.value.isOnPhone(it, source, macs) }
+                .map { MachineImportState.key(source, it.slug) }
+        )
         for (m in list) {
             if (m.state == RemoteMachine.State.Ready && shouldAdd(m, source)) enqueue(m.slug)
         }
@@ -142,7 +157,7 @@ class MachineImporter(private val session: MacSession) : SessionStore {
         val s = state.value
         val macs = session.state.value.macs
         if (s.isOnPhone(m, source, macs) || s.wasRemoved(m, source, macs)) return false
-        if (m.slug in s.adding) return false
+        if (m.slug in s.adding || MachineImportState.key(source, m.slug) in s.revoked) return false
         val failure = s.failures[MachineImportState.key(source, m.slug)]
         return failure == null ||
             clock.millis() - failure.at.toEpochMilli() >= RETRY_AFTER_MS
@@ -165,6 +180,10 @@ class MachineImporter(private val session: MacSession) : SessionStore {
         val gen = generation
         when (val outcome = pair(slug)) {
             is Outcome.Success -> save(outcome.machine, source, slug)
+
+            Outcome.Revoked -> writeRevoked(
+                state.value.revoked + MachineImportState.key(source, slug)
+            )
 
             // Leaving the Mac mid-way is not the machine's failure; retry it on return.
             is Outcome.Failure -> if (generation == gen) {
@@ -189,6 +208,8 @@ class MachineImporter(private val session: MacSession) : SessionStore {
     private sealed interface Outcome {
         data class Success(val machine: AdoptedMachine) : Outcome
 
+        data object Revoked : Outcome
+
         data class Failure(val message: String) : Outcome
     }
 
@@ -203,8 +224,11 @@ class MachineImporter(private val session: MacSession) : SessionStore {
         val attempt = MachinePairAttempt(session.env.clients, session.env.device.name)
         val result = attempt.pair(host, offer.port, offer.code, offer.fingerprint, PAIR_TIMEOUT_MS)
         return when (result) {
-            is MachinePairAttempt.Outcome.Failed ->
+            is MachinePairAttempt.Outcome.Failed -> if (result.reason == LpmClient.REVOKED_ERROR) {
+                Outcome.Revoked
+            } else {
                 Outcome.Failure(pairFailure(result.reason, offer.port))
+            }
 
             is MachinePairAttempt.Outcome.Paired -> {
                 val p = result.pairing
@@ -239,6 +263,26 @@ class MachineImporter(private val session: MacSession) : SessionStore {
     private fun readLedger(): Map<String, String> {
         val raw = prefs.string(PreferenceKeys.MACHINE_IMPORTS) ?: return emptyMap()
         return runCatching { Json.parseToJsonElement(raw) }.getOrNull().asStringMap().orEmpty()
+    }
+
+    private fun readRevoked(): Set<String> {
+        val raw = prefs.string(PreferenceKeys.MACHINE_IMPORTS_REVOKED) ?: return emptySet()
+        val list = runCatching { Json.parseToJsonElement(raw) as? JsonArray }.getOrNull()
+        return list.orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.toSet()
+    }
+
+    private fun forgetRevoked(keys: List<String>) {
+        val revoked = state.value.revoked
+        val kept = revoked - keys.toSet()
+        if (kept.size != revoked.size) writeRevoked(kept)
+    }
+
+    private fun writeRevoked(keys: Set<String>) {
+        prefs.setString(
+            PreferenceKeys.MACHINE_IMPORTS_REVOKED,
+            JsonArray(keys.sorted().map(::JsonPrimitive)).toString()
+        )
+        mutable.update { it.copy(revoked = keys) }
     }
 
     internal companion object {

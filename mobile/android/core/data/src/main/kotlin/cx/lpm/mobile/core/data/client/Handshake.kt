@@ -6,7 +6,11 @@ import cx.lpm.mobile.core.protocol.Wire
  * How a connection opens: with a one-time pairing code, an approve-on-Mac request,
  * or the stored credential — carried on to one of the Mac's machines with `relay`.
  */
-internal class Handshake(private val deviceName: String, private val relaySlug: String?) {
+internal class Handshake(
+    private val deviceName: String,
+    private val relaySlug: String?,
+    private val phoneId: () -> String
+) {
     private var pairingCode: String? = null
 
     // Set while an approve-on-Mac pairing is in flight: the name sent in its first
@@ -34,14 +38,14 @@ internal class Handshake(private val deviceName: String, private val relaySlug: 
     fun frame(credential: LpmClient.Credential?): String? {
         val code = pairingCode
         return when {
-            pairRequestName != null -> Wire.pairRequest(deviceName, replacesDeviceId)
+            pairRequestName != null -> Wire.pairRequest(deviceName, phoneId(), replacesDeviceId)
 
-            code != null -> Wire.pair(code, deviceName, replacesDeviceId)
+            code != null -> Wire.pair(code, deviceName, phoneId(), replacesDeviceId)
 
             credential != null && relaySlug != null ->
-                Wire.relay(credential.deviceId, credential.token, relaySlug)
+                Wire.relay(credential.deviceId, credential.token, relaySlug, phoneId())
 
-            credential != null -> Wire.auth(credential.deviceId, credential.token)
+            credential != null -> Wire.auth(credential.deviceId, credential.token, phoneId())
 
             else -> null
         }

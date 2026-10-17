@@ -51,7 +51,7 @@ fun AdvancedSections(draft: JobEditorDraft, onEdit: DraftEdit) {
     }
 }
 
-/** "Delete job", and whether the copies its runs made go with it. */
+/** "Delete automation", and whether the copies its runs made go with it. */
 @Composable
 fun DeleteSection(
     state: AutomationEditorUiState,

@@ -28,6 +28,8 @@ data class ProjectConfigUiState(
     val services: List<Service> = emptyList(),
     val profiles: List<Profile> = emptyList(),
     val actions: List<Action> = emptyList(),
+    /** Actions the Mac left out for a config problem, each naming its problem. */
+    val actionErrors: List<String> = emptyList(),
     val mutationError: String? = null
 )
 
@@ -57,6 +59,7 @@ class ProjectConfigViewModel @AssistedInject constructor(
             services = p?.allServices.orEmpty(),
             profiles = p?.profiles.orEmpty(),
             actions = p?.actions.orEmpty(),
+            actionErrors = p?.actionErrors.orEmpty(),
             mutationError = c.mutationError
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProjectConfigUiState())

@@ -22,7 +22,8 @@ class LpmClientTransportTest {
 
     private fun TestScope.client(credential: LpmClient.Credential? = CREDENTIAL): LpmClient {
         val clock = SchedulerClock(testScheduler)
-        val env = ClientEnvironment(backgroundScope, clock, transport, NoTailnet, Random(1))
+        val env =
+            ClientEnvironment(backgroundScope, clock, transport, NoTailnet, { PHONE_ID }, Random(1))
         val endpoint = LpmClient.Endpoint("192.168.1.20", 8765)
         return LpmClientFactory(env).create(endpoint, credential, "Test Phone")
     }
@@ -52,6 +53,7 @@ class LpmClientTransportTest {
 
         assertEquals(listOf("auth"), socket.sentTypes)
         assertEquals("tok-1", socket.sentOf("auth").single().string("token"))
+        assertEquals(PHONE_ID, socket.sentOf("auth").single().string("phoneId"))
     }
 
     @Test
@@ -206,6 +208,7 @@ class LpmClientTransportTest {
         socket.open()
         testScheduler.runCurrent()
         assertEquals(listOf("pairRequest"), socket.sentTypes)
+        assertEquals(PHONE_ID, socket.sentOf("pairRequest").single().string("phoneId"))
 
         socket.fail()
         testScheduler.runCurrent()
@@ -226,6 +229,18 @@ class LpmClientTransportTest {
         testScheduler.advanceTimeBy(60_000)
 
         assertEquals(LpmClient.State.Failed(LpmClient.UNAUTHORIZED_ERROR), c.state)
+        assertEquals(1, transport.sockets.size)
+    }
+
+    @Test
+    fun `a Mac that removed this phone is fatal`() = runTest {
+        val c = client()
+        val socket = ready(c)
+        socket.receive("""{"t":"error","error":"revoked"}""")
+        testScheduler.runCurrent()
+        testScheduler.advanceTimeBy(60_000)
+
+        assertEquals(LpmClient.State.Failed(LpmClient.REVOKED_ERROR), c.state)
         assertEquals(1, transport.sockets.size)
     }
 
@@ -259,5 +274,6 @@ class LpmClientTransportTest {
 
     private companion object {
         val CREDENTIAL = LpmClient.Credential("dev-1", "tok-1")
+        const val PHONE_ID = "5f0c1d2e-3b4a-4c5d-8e9f-0a1b2c3d4e5f"
     }
 }

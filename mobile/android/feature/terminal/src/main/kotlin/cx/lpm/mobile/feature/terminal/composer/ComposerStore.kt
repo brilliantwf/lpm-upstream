@@ -113,6 +113,27 @@ class ComposerStore internal constructor(
     }
 
     /**
+     * Take over the prompts typed for another terminal, the tab lpm reopened in this
+     * one's place, unless something is typed here already. Attachments still
+     * uploading went with the old tab's link.
+     */
+    fun adoptDraft(other: ComposerStore) {
+        if (current.tabs.any { it.text.isNotEmpty() || it.attachments.isNotEmpty() }) return
+        val tabs = other.current.tabs.map { old ->
+            ComposerTab(
+                text = old.text,
+                attachments = old.attachments.filter {
+                    it.macPath != null
+                }
+            )
+        }
+        update {
+            it.copy(tabs = tabs, activeIndex = minOf(other.current.activeIndex, tabs.lastIndex))
+        }
+        if (current.text.isNotEmpty()) link.sendDraft(termId, current.text)
+    }
+
+    /**
      * After a successful send: close the sent tab if others remain, else clear it in
      * place (the desktop's "a sent prompt closes its tab, else resets").
      */

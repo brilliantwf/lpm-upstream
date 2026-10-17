@@ -30,12 +30,13 @@ class InboundCoverageTest {
         "memorySave", "memoryDelete", "memory-changed", "notesChats", "notesCreateChat",
         "notesRenameChat", "notesDeleteChat", "notesMessages", "notesAddMessage",
         "notesEditMessage", "notesDeleteMessage", "notesSearch", "notesAttachment", "updateCheck",
-        "updateProgress", "updateInstall", "updateCancel", "pong"
+        "updateProgress", "updateInstall", "updateCancel", "pong", "restartService",
+        "stopService"
     )
 
     @Test
     fun decodesExactlyTheTypesIosDoes() {
-        assertEquals(127, iosTypes.size)
+        assertEquals(129, iosTypes.size)
         assertEquals(iosTypes, inboundParsers.keys)
     }
 
@@ -49,7 +50,8 @@ class InboundCoverageTest {
             composerParsers,
             automationParsers,
             gitParsers,
-            memoryNotesParsers
+            memoryNotesParsers,
+            serviceParsers
         )
         assertEquals(inboundParsers.size, tables.sumOf { it.size })
     }

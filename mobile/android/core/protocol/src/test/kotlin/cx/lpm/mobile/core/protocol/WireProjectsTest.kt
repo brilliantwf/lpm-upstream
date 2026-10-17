@@ -24,6 +24,14 @@ class WireProjectsTest {
             """{ "t": "toggleService", "name": "api", "service": "web" }""",
             Wire.toggleService("api", "web")
         )
+        assertFrame(
+            """{ "t": "restartService", "name": "api", "service": "web" }""",
+            Wire.restartService("api", "web")
+        )
+        assertFrame(
+            """{ "t": "stopService", "name": "api", "service": "web" }""",
+            Wire.stopService("api", "web")
+        )
         assertFrame("""{ "t": "status", "project": "api" }""", Wire.status("api"))
         assertFrame(
             """{ "t": "clearStatus", "project": "api", "paneId": "api-1", "value": "Done" }""",

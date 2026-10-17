@@ -45,7 +45,8 @@ class MachinesMenuTest {
             ),
             MachineImportRow(machine("c", "Old Box"), MachineImportStatus.Removed),
             MachineImportRow(machine("d", "Mini", platform = "macos"), MachineImportStatus.Offline),
-            MachineImportRow(machine("e", "Legacy"), MachineImportStatus.NeedsUpdate)
+            MachineImportRow(machine("e", "Legacy"), MachineImportStatus.NeedsUpdate),
+            MachineImportRow(machine("f", "Lab Box"), MachineImportStatus.Revoked)
         )
         compose.setContent {
             LpmTheme {
@@ -64,6 +65,8 @@ class MachinesMenuTest {
         compose.onNode(hasText("Mini")).assertIsNotEnabled()
         compose.onNode(hasText("Legacy")).assertIsNotEnabled()
         compose.onNode(hasText("Old Box")).assertIsEnabled()
+        compose.onNodeWithText("Removed this phone. Pair on it to add it.").assertExists()
+        compose.onNode(hasText("Lab Box")).assertIsEnabled()
         compose.onNode(hasText("GPU Box")).performClick()
         assertEquals(listOf("b"), added)
     }
@@ -96,6 +99,13 @@ class MachinesMenuTest {
                 null,
                 MachineImportStatus.Failed("Its identity didn't match. Try again."),
                 true
+            ),
+            MachineSection(
+                machine("c", "Lab Box"),
+                emptyList(),
+                null,
+                MachineImportStatus.Revoked,
+                true
             )
         )
         compose.setContent {
@@ -109,6 +119,7 @@ class MachinesMenuTest {
             "Get its notifications and open it while this Mac sleeps"
         ).assertExists()
         compose.onNodeWithText("Its identity didn't match. Try again.").assertExists()
+        compose.onNodeWithText("It removed this phone. Pair on it to add it again.").assertExists()
         compose.onNodeWithText("Pair Directly with Build Box").performClick()
         assertEquals(listOf("a"), added)
     }

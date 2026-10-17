@@ -181,3 +181,6 @@ the iPhone screenshots). An icon-only control keeps the accessible name iOS give
 | `xmark` (reader) | `close` | 22 dp | reader bar stop | "Stop reading" |
 | `play.circle` (sample) | `play_circle` | 24 dp | Settings → Read aloud "Hear a sample" | |
 | `waveform.badge.exclamationmark` | `graphic_eq` | 24 dp | "Your installed voices are all basic ones…" | |
+| `arrow.clockwise` (service) | `refresh` | 17 dp | an ended service's Restart button and long-press Restart, "Reopened after lpm restarted" banner | "Restart <service>" |
+| `stop.fill` (service menu) | `stop` (fill) | 24 dp | a service's long-press Stop | |
+| `exclamationmark.triangle.fill` (footnote) | `warning` (fill) | 15 dp | "An action couldn't be loaded" notice | |

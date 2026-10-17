@@ -17,7 +17,7 @@ tags: [demo, git]
           timeout: 10000
 - waitForAnimationToEnd:
     timeout: 3000
-# Each file's header: "Select" (commit it), the path (collapses the diff),
+# Each file's header: "Include in commit", the path (collapses the diff),
 # "Viewed" and "More". Marking the first file viewed collapses it.
 - tapOn:
     text: "Viewed"
@@ -28,7 +28,7 @@ tags: [demo, git]
 - takeScreenshot: 1-viewed
 # Unselecting a file leaves it out of the commit.
 - tapOn:
-    text: "Select"
+    text: "Include in commit"
     index: 1
 - scrollUntilVisible:
     element: "Commit 3 files"

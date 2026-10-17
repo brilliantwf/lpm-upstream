@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cx.lpm.mobile.core.data.automations.AutomationsState
 import cx.lpm.mobile.core.data.automations.AutomationsStore
+import cx.lpm.mobile.core.data.git.GitStore
 import cx.lpm.mobile.core.data.link.LinkState
 import cx.lpm.mobile.core.data.link.LinkStatusLine
 import cx.lpm.mobile.core.data.link.LinkView
 import cx.lpm.mobile.core.data.mac.MacRecord
+import cx.lpm.mobile.core.data.mac.ThisDevice
 import cx.lpm.mobile.core.data.machines.MachineImporter
 import cx.lpm.mobile.core.data.machines.MachineSection
 import cx.lpm.mobile.core.data.projects.ProjectsState
@@ -41,13 +43,16 @@ import kotlinx.coroutines.flow.update
 @HiltViewModel
 class ProjectsViewModel @Inject constructor(
     private val session: MacSession,
-    private val clock: Clock
+    private val clock: Clock,
+    private val device: ThisDevice
 ) : ViewModel() {
     private val projects: ProjectsStore = session.store()
     private val terminals: TerminalsStore = session.store()
     private val automations: AutomationsStore = session.store()
     private val machines: MachineImporter = session.store()
+    private val git: GitStore = session.store()
     private val expanded = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    private val removing = MutableStateFlow<String?>(null)
 
     val alerts: StateFlow<SessionAlerts.Alerts> = session.alerts.alerts
 
@@ -63,6 +68,11 @@ class ProjectsViewModel @Inject constructor(
     ) { s, (linkState, view), p, sections, (t, jobs, open) ->
         buildState(s, linkState, view, p, sections, t.terminalTitles, jobs, open)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProjectsUiState())
+
+    /** The copy whose Remove is being confirmed: its git status, for the work only it has. */
+    val removal: StateFlow<CopyRemovalCheck?> = combine(removing, git.state) { name, g ->
+        name?.let { CopyRemovalCheck(g.snapshots[it], checking = it in g.loading) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     init {
         // Terminal rows are named after their tabs, and only the Mac knows those
@@ -122,6 +132,9 @@ class ProjectsViewModel @Inject constructor(
             loaded = p.projectsLoaded,
             issue = view.visibleIssue?.takeUnless { it.isConnecting },
             listAge = link.listAsOf?.takeIf { stale && !view.quietReconnect },
+            // A Mac that revoked this device is up; it just won't take anything from it.
+            repairFooter = RepairFooter(device.noun, view.macLabel)
+                .takeIf { s.needsRepair || link.identityRejected },
             folders = p.groups,
             duplicateDefaults = p.duplicateDefaults,
             duplicateProgress = p.duplicateProgress,
@@ -188,6 +201,16 @@ class ProjectsViewModel @Inject constructor(
         projects.duplicateProject(project, options)
 
     fun remove(project: Project) = projects.removeProject(project)
+
+    /** Remove was asked for: read the copy's git status for what only it holds. */
+    fun checkRemoval(project: Project) {
+        removing.value = project.name
+        git.load(project.name)
+    }
+
+    fun endRemovalCheck() {
+        removing.value = null
+    }
 
     fun moveToFolder(project: Project, folder: String?) = projects.moveProject(project, folder)
 

@@ -150,7 +150,11 @@ class ActivityViewModel @Inject constructor(
      */
     fun runChip(project: String, chip: ActivityChip) {
         if (chip.kind == ActivityChip.Kind.Service) {
-            projects.toggleService(project, chip.name)
+            if (chip.crashed && !chip.running) {
+                projects.restartService(project, chip.name)
+            } else {
+                projects.toggleService(project, chip.name)
+            }
             return
         }
         val p = projects.state.value.project(project) ?: return

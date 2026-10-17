@@ -8,6 +8,7 @@ import cx.lpm.mobile.core.model.ProjectFolder
 import cx.lpm.mobile.core.model.ServiceInfo
 import cx.lpm.mobile.core.model.WorkStatusChoice
 import cx.lpm.mobile.core.model.defaultWorkStatusPalette
+import cx.lpm.mobile.core.model.liveServiceNames
 import cx.lpm.mobile.core.model.workStatusMenu
 
 /** Live progress of a running duplicate batch, shown as a HUD on the projects list. */
@@ -45,8 +46,6 @@ data class ProjectsState(
 
     fun project(name: String): Project? = projects.firstOrNull { it.name == name }
 
-    fun serviceRunning(project: String, service: String): Boolean {
-        val p = project(project) ?: return false
-        return p.running && p.services.any { it.name == service }
-    }
+    fun serviceRunning(project: String, service: String): Boolean =
+        project(project)?.liveServiceNames?.contains(service) ?: false
 }

@@ -65,11 +65,12 @@ internal fun projectsSlots(navigator: Navigator) = ProjectsSlots(
 )
 
 internal fun terminalSlots(navigator: Navigator, projects: ProjectsSlots) = TerminalSlots(
-    projectMenu = { project, session, onSpawned ->
+    projectMenu = { project, terminal, session, onSpawned ->
         ProjectMenuToolbar(
             project = project.name,
             session = session,
             onNavigate = navigator::navigate,
+            terminal = terminal,
             onSpawnedTerminal = onSpawned,
             slots = projects
         )

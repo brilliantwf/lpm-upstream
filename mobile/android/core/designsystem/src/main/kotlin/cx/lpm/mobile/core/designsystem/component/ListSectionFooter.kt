@@ -1,5 +1,6 @@
 package cx.lpm.mobile.core.designsystem.component
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
@@ -23,11 +24,13 @@ fun ListSectionFooter(
         color = color,
         modifier = modifier
             .fillMaxWidth()
-            .padding(
-                start = ListDefaults.RowPadding,
-                end = ListDefaults.RowPadding,
-                top = 8.8.dp,
-                bottom = 12.5.dp
-            )
+            .padding(ListSectionFooterPadding)
     )
 }
+
+internal val ListSectionFooterPadding = PaddingValues(
+    start = ListDefaults.RowPadding,
+    end = ListDefaults.RowPadding,
+    top = 8.8.dp,
+    bottom = 12.5.dp
+)

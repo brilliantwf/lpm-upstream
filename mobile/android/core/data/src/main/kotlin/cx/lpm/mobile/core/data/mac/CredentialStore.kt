@@ -10,6 +10,7 @@ import cx.lpm.mobile.core.data.di.CredentialsDataStore
 import cx.lpm.mobile.core.model.string
 import java.security.SecureRandom
 import java.util.Base64
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,7 +26,8 @@ import kotlinx.serialization.json.put
 
 /**
  * The iOS Keychain items: each Mac's device credential (`device-credential.<localId>`)
- * and certificate pin (`cert-pin.<localId>`), and the phone's push key (`push-key`).
+ * and certificate pin (`cert-pin.<localId>`), the phone's push key (`push-key`) and
+ * this install's id (`phone-id`).
  * Values are sealed by [SecretCipher] and kept in their own DataStore. [load] once at
  * startup; reads are then synchronous and safe from any thread (the TLS pin check
  * reads a pin off the main thread), writes reach disk asynchronously.
@@ -89,6 +91,16 @@ class CredentialStore @Inject constructor(
         return key
     }
 
+    /**
+     * This install's own id, sent in every connection's first frame so a Mac knows the
+     * phone behind any credential, its own or another Mac's. A lowercase UUID minted
+     * once and never rotated.
+     */
+    val phoneId: String
+        get() = secrets[PHONE_ID] ?: synchronized(this) {
+            secrets[PHONE_ID] ?: UUID.randomUUID().toString().also { write(PHONE_ID, it) }
+        }
+
     private fun write(account: String, value: String?) {
         if (value == null) secrets.remove(account) else secrets[account] = value
         val sealed = value?.let {
@@ -108,6 +120,7 @@ class CredentialStore @Inject constructor(
 
     companion object {
         const val PUSH_KEY = "push-key"
+        const val PHONE_ID = "phone-id"
         private const val PUSH_KEY_BYTES = 32
 
         fun credentialAccount(localId: String): String = "device-credential.$localId"

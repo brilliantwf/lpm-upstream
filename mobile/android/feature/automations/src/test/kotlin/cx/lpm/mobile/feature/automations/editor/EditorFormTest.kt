@@ -95,7 +95,7 @@ class EditorFormTest {
         show()
         compose.onNodeWithText("Cron 0 9 * * 1").performScrollTo().assertExists()
         compose.onNodeWithText("Repeat").assertDoesNotExist()
-        compose.onNodeWithText("Delete job").performScrollTo().performClick()
+        compose.onNodeWithText("Delete automation").performScrollTo().performClick()
         assertTrue(deleted)
     }
 

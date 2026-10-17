@@ -69,7 +69,8 @@ internal class ConnectionWiring(private val s: MacSession) {
             }
         }
         // Same shape: the Mac no longer holds a record for this device.
-        val needsRepair = state == LpmClient.State.Failed(LpmClient.UNAUTHORIZED_ERROR)
+        val needsRepair = state == LpmClient.State.Failed(LpmClient.UNAUTHORIZED_ERROR) ||
+            state == LpmClient.State.Failed(LpmClient.REVOKED_ERROR)
         s.mutableState.update { it.copy(identityMismatch = mismatch, needsRepair = needsRepair) }
         s.setConnection(state)
         s.upkeep.repickHostIfStale(state, c)

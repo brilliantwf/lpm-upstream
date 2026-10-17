@@ -19,6 +19,23 @@ class ComposerStoreTest {
     }
 
     @Test
+    fun `a reopened tab takes over what was typed, unless something is typed there`() = runTest {
+        val old = composer(link, media)
+        old.setText("first")
+        old.newTab()
+        old.setText("second")
+        val reopened = composer(FakeLink(), media)
+        reopened.adoptDraft(old)
+        assertEquals(listOf("first", "second"), reopened.current.tabs.map { it.text })
+        assertEquals("second", reopened.current.text)
+
+        val busy = composer(FakeLink(), media)
+        busy.setText("mine")
+        busy.adoptDraft(old)
+        assertEquals(listOf("mine"), busy.current.tabs.map { it.text })
+    }
+
+    @Test
     fun `typing mirrors the draft once the typist pauses`() = runTest {
         val store = composer(link, media)
         store.setText("h")
@@ -51,6 +68,39 @@ class ComposerStoreTest {
         store.afterSend()
         assertEquals(1, store.current.tabs.size)
         assertEquals("first", store.current.text)
+    }
+
+    @Test
+    fun `a reopened tab takes over the prompts typed for the one it replaced`() = runTest {
+        val old = composer(link, media)
+        old.setText("first")
+        old.newTab()
+        old.setText("second")
+        val uploaded = Attachment(
+            Attachment.Kind.File,
+            "notes.md",
+            "text/markdown",
+            status = Attachment.Status.Uploaded("/tmp/notes.md")
+        )
+        val uploading = Attachment(Attachment.Kind.File, "big.mov", "video/quicktime")
+        old.update { s ->
+            s.copy(tabs = s.tabs.replaced(1) { it.copy(attachments = listOf(uploaded, uploading)) })
+        }
+        old.switchTab(0)
+        settle(1_000)
+        link.drafts.clear()
+
+        val reopened = composer(link, media)
+        reopened.adoptDraft(old)
+        assertEquals(listOf("first", "second"), reopened.current.tabs.map { it.text })
+        assertEquals("first", reopened.current.text)
+        assertEquals(listOf("notes.md"), reopened.current.tabs[1].attachments.map { it.filename })
+        assertEquals(listOf("first"), link.drafts)
+
+        val typed = composer(link, media)
+        typed.setText("mine")
+        typed.adoptDraft(old)
+        assertEquals(listOf("mine"), typed.current.tabs.map { it.text })
     }
 
     @Test

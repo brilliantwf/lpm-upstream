@@ -103,10 +103,10 @@ class JobEditorDraftTest {
     fun `save waits for a name, a valid time and something to run`() {
         val ready = JobEditorDraft(label = "Docs", prompt = "Write docs")
         assertNull(ready.validationError(standalone = true))
-        assertEquals("Give this job a name.", ready.copy(label = " ").validationError(false))
+        assertEquals("Give this automation a name.", ready.copy(label = " ").validationError(false))
         assertEquals("Enter a prompt to run.", ready.copy(prompt = "\n").validationError(false))
         assertEquals(
-            "Standalone jobs can't run an action.",
+            "Standalone automations can't run an action.",
             ready.copy(runMode = RunMode.Action, action = "deploy").validationError(true)
         )
         assertEquals("Pick a valid time.", ready.copy(time = "25:00").validationError(false))

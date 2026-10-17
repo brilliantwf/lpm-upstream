@@ -148,8 +148,12 @@ data class JobEditorDraft(
 
     /** Why Save is off, or null when the job can be saved. */
     fun validationError(standalone: Boolean): String? {
-        if (label.trimmingWhitespace().isEmpty()) return "Give this job a name."
-        if (standalone && runMode == RunMode.Action) return "Standalone jobs can't run an action."
+        if (label.trimmingWhitespace().isEmpty()) return "Give this automation a name."
+        if (standalone &&
+            runMode == RunMode.Action
+        ) {
+            return "Standalone automations can't run an action."
+        }
         if (keptSchedule == null) scheduleError()?.let { return it }
         return when (runMode) {
             RunMode.Action -> "Choose an action to run.".takeIf { action.isBlankTrimmed() }

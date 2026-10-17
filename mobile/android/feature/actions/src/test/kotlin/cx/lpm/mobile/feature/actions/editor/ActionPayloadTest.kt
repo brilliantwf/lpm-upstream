@@ -1,5 +1,8 @@
 package cx.lpm.mobile.feature.actions.editor
 
+import cx.lpm.mobile.core.model.ActionInputDraft
+import cx.lpm.mobile.core.model.ActionInputKind
+import cx.lpm.mobile.core.model.ActionOptionDraft
 import cx.lpm.mobile.feature.actions.json
 import cx.lpm.mobile.feature.actions.zone
 import org.junit.Assert.assertEquals
@@ -17,10 +20,10 @@ class ActionPayloadTest {
             """{"label":"Deploy","emoji":"🚀","cmd":"npm run deploy","cwd":"./web",""" +
                 """"type":"terminal","reuse":true,"confirm":true,"display":"footer",""" +
                 """"color":"cyan-deep","shortcut":"cmd+d","position":3,"env":{"A":"1"},""" +
-                """"inputs":[{"key":"env","label":"Environment","type":"select",""" +
+                """"inputs":{"env":{"label":"Environment","type":"radio",""" +
                 """"required":true,"default":"staging","options":[""" +
-                """{"value":"staging","label":"Staging"},""" +
-                """{"value":"prod"}]},{"key":"note","placeholder":"Why?"}]}"""
+                """{"label":"Staging","value":"staging"},"prod"]},""" +
+                """"note":{"placeholder":"Why?"}}}"""
         )
         val draft = ActionDraft.from(body, "deploy", zones)
         assertEquals(ActionKind.Command, draft.kind)
@@ -30,6 +33,39 @@ class ActionPayloadTest {
         // Keys keep their place in the mapping.
         val saved = draft.payload(editing = true, seedBody = body)
         assertEquals(body.keys.toList(), saved.keys.toList())
+    }
+
+    @Test
+    fun `inputs go out whole as the mapping, and empty once all are removed`() {
+        val listed = json(
+            """{"cmd":"deploy {{tag}}","inputs":[{"key":"tag","type":"select",""" +
+                """"options":[{"value":"v1","label":"One"}]},{"key":"env"}]}"""
+        )
+        val draft = ActionDraft.from(listed, "deploy", zones)
+        assertEquals(
+            json(
+                """{"tag":{"type":"radio","options":[{"label":"One","value":"v1"}],""" +
+                    """"position":1},"env":{"position":2}}"""
+            ),
+            draft.payload(editing = true, seedBody = listed)["inputs"]
+        )
+        val cleared = draft.copy(inputs = emptyList())
+        assertEquals(json("{}"), cleared.payload(editing = true, seedBody = listed)["inputs"])
+        assertNull(cleared.payload(editing = false, seedBody = null)["inputs"])
+    }
+
+    @Test
+    fun `inputs that can't be saved keep Save off`() {
+        val draft = ActionDraft(
+            name = "deploy",
+            cmd = "x",
+            inputs = listOf(ActionInputDraft(key = "tag", kind = ActionInputKind.Radio))
+        )
+        assertEquals(ActionDraftError.Inputs, draft.validationError(emptyList()))
+        val fixed = draft.copy(
+            inputs = listOf(draft.inputs[0].copy(options = listOf(ActionOptionDraft("v1"))))
+        )
+        assertNull(fixed.validationError(emptyList()))
     }
 
     @Test
