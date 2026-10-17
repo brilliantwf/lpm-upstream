@@ -55,7 +55,7 @@ side by side (see `mobile/parity/README.md`).
 | NDK | r30 (`ndk/30.0.16248370`), pinned in build-logic so native libraries are stripped |
 | gomobile / gobind | `~/go/bin` — `gomobile bind` of `tailnet/node` → AAR verified (arm64, 83 s, 16 KB-aligned) |
 | Maestro | 2.11.0 — drives both the iOS simulator and the emulator |
-| Agent skills | `.claude/skills/{android-cli,navigation-3,edge-to-edge,camerax,testing-setup}` (official, via `android skills add`) |
+| Agent skills | `.claude/skills/{android-cli,navigation-3,edge-to-edge}` (official, via `android skills add`) |
 
 `node mobile/parity/parity.js doctor` re-checks all of it.
 
@@ -162,8 +162,6 @@ Modularized by layer and feature; create a module when its milestone starts.
 
 ## Testing
 
-Per the `testing-setup` skill:
-
 | Layer | Where | Tools |
 |---|---|---|
 | Unit | `src/test`, JVM | JUnit 4, kotlinx-coroutines-test, Turbine; ViewModels asserted through `uiState.value`; protocol tests fed with PROTOCOL.md frames |
@@ -227,7 +225,7 @@ Port order is top to bottom within each milestone below. Lines are iOS sizes.
 | APNs + Notification Service Extension (decrypts AES-GCM payload, rewrites text) | FCM **data** messages decrypted in `FirebaseMessagingService`, notification posted by the app; `POST_NOTIFICATIONS` on 13+ |
 | `NWBrowser` Bonjour `_lpm._tcp` (TXT `id`, `name`, `v`, `rp`, `dev`) | `NsdManager` + `MulticastLock` |
 | `NWPathMonitor` | `ConnectivityManager.NetworkCallback` |
-| AVFoundation QR scanner | CameraX + ML Kit barcode scanning (`camerax` skill) |
+| AVFoundation QR scanner | CameraX + ML Kit barcode scanning |
 | AVSpeechSynthesizer / AVAudioPlayer / Now Playing | `TextToSpeech`, Media3 + `MediaSession`, `mediaPlayback` foreground service |
 | SFSafariViewController | Custom Tabs |
 | PhotosPicker / camera / fileImporter | Photo Picker, `TakePicture`, `OpenMultipleDocuments` |
