@@ -207,7 +207,7 @@ private fun GenerateRow(generating: Boolean, onClick: () -> Unit) {
     ) {
         Text(
             text = stringResource(
-                if (generating) R.string.git_review_generating else R.string.git_pr_generate
+                if (generating) R.string.git_commit_generating else R.string.git_pr_generate
             ),
             style = LpmTheme.typography.body,
             color = if (generating) colors.tertiaryLabel else colors.tint

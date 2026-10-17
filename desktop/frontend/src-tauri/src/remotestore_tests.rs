@@ -549,6 +549,37 @@ fn old_json_loads_with_default_push_fields() {
     assert!(!cfg.devices[0].push_automation_started);
     assert!(!cfg.devices[0].push_automation_done);
     assert!(!cfg.devices[0].push_automation_error);
+    assert!(
+        cfg.devices[0].push_platform.is_empty(),
+        "a legacy token is APNs"
+    );
+}
+
+// An APNs record is written without push_platform, exactly as before Android
+// phones, while an FCM record names its platform and reads back as FCM.
+#[test]
+fn push_platform_is_written_only_for_fcm() {
+    let iphone = Device {
+        apns_token: "abcd".into(),
+        ..device("iphone")
+    };
+    let android = Device {
+        apns_token: "cZ1:APA91b".into(),
+        push_platform: "fcm".into(),
+        ..device("android")
+    };
+    let json = serde_json::to_value(RemoteConfig {
+        devices: vec![iphone, android],
+        ..Default::default()
+    })
+    .unwrap();
+    assert!(json["devices"][0].get("push_platform").is_none());
+    assert_eq!(json["devices"][1]["push_platform"], "fcm");
+
+    let back: RemoteConfig = serde_json::from_value(json).unwrap();
+    assert_eq!(back.devices[0].push_platform, "");
+    assert_eq!(back.devices[1].push_platform, "fcm");
+    assert!(back.devices[1].extra.is_empty());
 }
 
 // A legacy file round-trips through a read-modify-write with every unknown-to-

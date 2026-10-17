@@ -90,6 +90,10 @@ class InboundSessionTest {
         assertFalse(
             decode<Inbound.ApnsToken>("""{ "t": "apnsToken", "ok": false, "error": "…" }""").ok
         )
+        assertTrue(decode<Inbound.PushToken>("""{ "t": "pushToken", "ok": true }""").ok)
+        assertFalse(
+            decode<Inbound.PushToken>("""{ "t": "pushToken", "ok": false, "error": "…" }""").ok
+        )
     }
 
     @Test

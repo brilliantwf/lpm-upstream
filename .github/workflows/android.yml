@@ -10,11 +10,13 @@ on:
     paths:
       - "mobile/android/**"
       - "mobile/shared/**"
+      - "tailnet/**"
       - ".github/workflows/android.yml"
   pull_request:
     paths:
       - "mobile/android/**"
       - "mobile/shared/**"
+      - "tailnet/**"
       - ".github/workflows/android.yml"
   workflow_dispatch:
 
@@ -38,6 +40,14 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+      # Built-in Tailscale (tailnet/android, Go) is bound into :core:tailnet
+      # with gomobile, against the NDK the Android Gradle plugin installs.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tailnet/go.mod
+          cache-dependency-path: |
+            tailnet/go.sum
+            tailnet/android/go.sum
       # Also validates the Gradle wrapper jar's checksum.
       - uses: gradle/actions/setup-gradle@v6
       - name: Check and build release

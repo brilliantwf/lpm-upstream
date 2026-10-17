@@ -73,6 +73,27 @@ class WireSessionTest {
     }
 
     @Test
+    fun pushTokenNamesItsPlatformAndLeavesOutAMissingEnv() {
+        assertFrame(
+            """{ "t": "pushToken", "platform": "fcm", "token": "f:A-b_1", "key": "a2V5",
+                 "notify": { "waiting": true, "done": true, "error": false, "automationStarted": false,
+                             "automationDone": true, "automationError": false } }""",
+            Wire.pushToken(
+                platform = "fcm",
+                token = "f:A-b_1",
+                env = null,
+                key = "a2V5",
+                notifyWaiting = true,
+                notifyDone = true,
+                notifyError = false,
+                notifyAutomationStarted = false,
+                notifyAutomationDone = true,
+                notifyAutomationError = false
+            )
+        )
+    }
+
+    @Test
     fun macRequests() {
         assertFrame("""{ "t": "machines" }""", Wire.machines())
         assertFrame("""{ "t": "machinePair", "slug": "box" }""", Wire.machinePair("box"))

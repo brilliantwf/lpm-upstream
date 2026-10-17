@@ -1,16 +1,21 @@
 package cx.lpm.mobile.feature.git.review
 
+import android.content.ClipData
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -18,11 +23,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -39,78 +47,62 @@ import androidx.compose.ui.unit.sp
 import cx.lpm.mobile.core.designsystem.R as DesignR
 import cx.lpm.mobile.core.designsystem.component.ContextMenu
 import cx.lpm.mobile.core.designsystem.component.ContextMenuItem
-import cx.lpm.mobile.core.designsystem.component.ListDefaults
 import cx.lpm.mobile.core.designsystem.component.clickableNoIndication
 import cx.lpm.mobile.core.designsystem.theme.LpmTheme
 import cx.lpm.mobile.feature.git.R
+import kotlinx.coroutines.launch
 
 /**
- * A file's full-bleed bar (GitHub "Files changed" style): the commit checkmark, the
- * collapse chevron with the path (truncated at the head) and +N −M, the "viewed"
- * circle, and "…" with "Ask agent…" — also on a long press.
+ * A file's bar, pinned over its diff while the diff scrolls (GitHub "Files changed"
+ * style): the collapse chevron, status letter, name over folder with +N −M, the
+ * "Viewed" toggle, and "…" with "Ask agent…", include or exclude, and "Copy Path" —
+ * also on a long press.
  */
 @Composable
 internal fun FileHeaderBar(
     row: ReviewRow.FileHeader,
     actions: ReviewActions,
+    onViewedToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = LpmTheme.colors
     var menu by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     val path = row.path
     Box(modifier) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = ListDefaults.RowMinHeight)
-                .background(colors.secondarySystemGroupedBackground)
-                .pointerInput(Unit) { detectTapGestures(onLongPress = { menu = true }) }
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .heightIn(min = HeaderMinHeight)
+                .background(colors.secondarySystemBackground)
+                .padding(start = 12.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            CircleToggle(
-                on = row.selected,
-                label = stringResource(R.string.git_file_include),
-                onColor = colors.tint,
-                size = 24.dp,
-                onToggle = { actions.toggleSelected(path) }
-            )
-            PathButton(
+            NameButton(
                 row = row,
                 onClick = { actions.toggleCollapsed(path) },
                 onLongClick = { menu = true },
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 5.dp, end = 10.dp)
+                modifier = Modifier.weight(1f)
             )
-            CircleToggle(
-                on = row.viewed,
-                label = stringResource(R.string.git_file_viewed),
-                onColor = colors.green,
-                size = 22.dp,
-                onToggle = { actions.toggleViewed(path) }
-            )
+            ViewedPill(viewed = row.viewed, onToggle = onViewedToggle)
             Box(
                 modifier = Modifier
-                    .padding(start = 10.dp)
-                    .size(28.dp)
+                    .size(32.dp)
                     .clickableNoIndication(onClick = { menu = true }),
                 contentAlignment = Alignment.Center
             ) {
-                // A menu's label in the secondary style of the accent.
                 Icon(
                     painter = painterResource(DesignR.drawable.ic_more_horiz),
                     contentDescription = stringResource(R.string.git_more),
-                    tint = colors.tint.copy(alpha = SECONDARY_ALPHA),
+                    tint = colors.secondaryLabel,
                     modifier = Modifier.size(20.dp)
                 )
             }
         }
-        // Under the bar's content, which a row's minimum height leaves 2 dp short.
         HorizontalDivider(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(bottom = 2.dp),
+            modifier = Modifier.align(Alignment.BottomStart),
             thickness = Dp.Hairline,
             color = colors.separator
         )
@@ -120,13 +112,32 @@ internal fun FileHeaderBar(
                 onClick = { actions.ask(path) },
                 icon = painterResource(DesignR.drawable.ic_auto_awesome)
             )
+            ContextMenuItem(
+                title = stringResource(
+                    if (row.selected) {
+                        R.string.git_file_exclude_from_commit
+                    } else {
+                        R.string.git_file_include_in_commit
+                    }
+                ),
+                onClick = { actions.toggleSelected(path) },
+                icon = painterResource(if (row.selected) EXCLUDE_ICON else INCLUDE_ICON)
+            )
+            ContextMenuItem(
+                title = stringResource(R.string.git_file_copy_path),
+                onClick = {
+                    val clip = ClipEntry(ClipData.newPlainText(null, path))
+                    scope.launch { clipboard.setClipEntry(clip) }
+                },
+                icon = painterResource(DesignR.drawable.ic_content_copy)
+            )
         }
     }
 }
 
-/** The chevron and path that collapse the diff, with the change counts once parsed. */
+/** The chevron, status and name that collapse the diff, read out as the file's path. */
 @Composable
-private fun PathButton(
+private fun NameButton(
     row: ReviewRow.FileHeader,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
@@ -136,6 +147,7 @@ private fun PathButton(
     val state = stringResource(
         if (row.collapsed) R.string.git_file_collapsed else R.string.git_file_expanded
     )
+    val turn by animateFloatAsState(if (row.collapsed) -90f else 0f, tween(150), label = "chevron")
     Row(
         modifier = modifier
             .combinedClickable(
@@ -145,40 +157,115 @@ private fun PathButton(
                 onLongClick = onLongClick,
                 onClick = onClick
             )
-            .semantics { stateDescription = state },
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
+            .semantics(mergeDescendants = true) {
+                contentDescription = row.path
+                stateDescription = state
+            },
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.width(14.dp), contentAlignment = Alignment.Center) {
+            Icon(
+                painter = painterResource(DesignR.drawable.ic_keyboard_arrow_down),
+                contentDescription = null,
+                tint = colors.secondaryLabel,
+                modifier = Modifier
+                    .size(20.dp)
+                    .rotate(turn)
+            )
+        }
+        FileStatusBadge(row.file.status)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = row.file.name,
+                style = LpmTheme.typography.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                color = colors.label,
+                maxLines = 1,
+                overflow = TextOverflow.MiddleEllipsis
+            )
+            DetailLine(row)
+        }
+    }
+}
+
+/** The folder, the change counts once parsed, and "Excluded" when left out of the commit. */
+@Composable
+private fun DetailLine(row: ReviewRow.FileHeader) {
+    val colors = LpmTheme.colors
+    val style = LpmTheme.typography.caption1
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val directory = row.file.directory
+        if (directory.isNotEmpty()) {
+            Text(
+                text = directory,
+                style = style,
+                color = colors.secondaryLabel,
+                maxLines = 1,
+                overflow = TextOverflow.StartEllipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+        }
+        if (row.added != null && row.removed != null) {
+            DiffStat(row.added, row.removed)
+        }
+        if (!row.selected) {
+            Text(
+                text = stringResource(R.string.git_file_excluded),
+                style = style,
+                color = colors.orange,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/**
+ * GitHub's "Viewed" checkbox as a capsule: a ring while unviewed, a green check once
+ * viewed. Marking a file viewed collapses it.
+ */
+@Composable
+private fun ViewedPill(viewed: Boolean, onToggle: () -> Unit) {
+    val colors = LpmTheme.colors
+    val label = stringResource(R.string.git_file_viewed)
+    val value = stringResource(if (viewed) R.string.git_file_on else R.string.git_file_off)
+    val tint = if (viewed) colors.green else colors.secondaryLabel
+    Row(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(
+                if (viewed) colors.green.copy(alpha = PILL_ALPHA) else colors.tertiarySystemFill
+            )
+            .toggleable(
+                value = viewed,
+                interactionSource = null,
+                indication = null,
+                role = Role.Checkbox,
+                onValueChange = { onToggle() }
+            )
+            .semantics(mergeDescendants = true) {
+                contentDescription = label
+                stateDescription = value
+            }
+            .padding(horizontal = 9.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            painter = painterResource(if (row.collapsed) CHEVRON_CLOSED else CHEVRON_OPEN),
+            painter = painterResource(
+                if (viewed) DesignR.drawable.ic_check_circle_fill else DesignR.drawable.ic_circle
+            ),
             contentDescription = null,
-            tint = colors.label.copy(alpha = SECONDARY_ALPHA),
-            modifier = Modifier.size(22.dp)
+            tint = tint,
+            modifier = Modifier.size(14.dp)
         )
-        if (row.file.isConflicted) {
-            val conflict = stringResource(R.string.git_file_conflict)
-            Text(
-                text = "!",
-                style = TextStyle(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = colors.red,
-                modifier = Modifier.semantics { contentDescription = conflict }
-            )
-        }
         Text(
-            text = row.path,
-            style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
-            color = colors.label,
-            maxLines = 1,
-            overflow = TextOverflow.StartEllipsis,
-            modifier = Modifier.weight(1f)
+            text = label,
+            style = LpmTheme.typography.caption1.copy(fontWeight = FontWeight.SemiBold),
+            color = tint
         )
-        if (row.added != null && row.removed != null) {
-            DiffStat(row.added, row.removed, Modifier.padding(start = 6.dp))
-        }
     }
 }
 
@@ -192,64 +279,26 @@ internal fun DiffStat(added: Int, removed: Int, modifier: Modifier = Modifier) {
         fontWeight = FontWeight.SemiBold
     )
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (added >
-            0
-        ) {
+        if (added > 0) {
             Text(
                 stringResource(R.string.git_review_added, added),
                 style = style,
-                color = colors.green
+                color = colors.green,
+                maxLines = 1
             )
         }
-        if (removed >
-            0
-        ) {
+        if (removed > 0) {
             Text(
                 stringResource(R.string.git_review_removed, removed),
                 style = style,
-                color = colors.red
+                color = colors.red,
+                maxLines = 1
             )
         }
     }
 }
 
-/** A checkmark circle that's filled in [onColor] while on, an empty gray ring while off. */
-@Composable
-private fun CircleToggle(
-    on: Boolean,
-    label: String,
-    onColor: Color,
-    size: Dp,
-    onToggle: () -> Unit
-) {
-    val value = stringResource(if (on) R.string.git_file_on else R.string.git_file_off)
-    Box(
-        modifier = Modifier
-            .size(size)
-            .toggleable(
-                value = on,
-                interactionSource = null,
-                indication = null,
-                role = Role.Checkbox,
-                onValueChange = { onToggle() }
-            )
-            .semantics {
-                contentDescription = label
-                stateDescription = value
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            painter = painterResource(
-                if (on) DesignR.drawable.ic_check_circle_fill else DesignR.drawable.ic_circle
-            ),
-            contentDescription = null,
-            tint = if (on) onColor else LpmTheme.colors.secondaryLabel,
-            modifier = Modifier.size(size)
-        )
-    }
-}
-
-private const val SECONDARY_ALPHA = 0.5f
-private val CHEVRON_CLOSED = DesignR.drawable.ic_chevron_right
-private val CHEVRON_OPEN = DesignR.drawable.ic_keyboard_arrow_down
+private const val PILL_ALPHA = 0.15f
+private val EXCLUDE_ICON = DesignR.drawable.ic_do_not_disturb_on
+private val INCLUDE_ICON = DesignR.drawable.ic_add_circle
+private val HeaderMinHeight = 56.dp

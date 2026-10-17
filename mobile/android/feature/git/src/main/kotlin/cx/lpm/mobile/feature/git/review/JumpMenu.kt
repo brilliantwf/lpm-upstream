@@ -14,13 +14,15 @@ import cx.lpm.mobile.core.designsystem.R as DesignR
 import cx.lpm.mobile.core.designsystem.component.ContextMenu
 import cx.lpm.mobile.core.designsystem.component.ContextMenuItem
 import cx.lpm.mobile.core.designsystem.component.GlassIconButton
-import cx.lpm.mobile.core.model.GitFile
 import cx.lpm.mobile.feature.git.R
 
-/** The bar's list button: every changed file by name, each scrolling to its diff. */
+/**
+ * The bar's list button: every changed file by name over its folder, checked once
+ * viewed, each scrolling to its diff.
+ */
 @Composable
 internal fun JumpMenu(
-    files: List<GitFile>,
+    files: List<ReviewRow.FileHeader>,
     onJump: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -33,22 +35,20 @@ internal fun JumpMenu(
             iconSize = 26.dp
         )
         ContextMenu(expanded = open, onDismissRequest = { open = false }) {
-            files.forEach { file ->
+            files.forEach { header ->
                 ContextMenuItem(
-                    title = lastPathComponent(file.path),
-                    onClick = { onJump(file.path) },
-                    icon = painterResource(statusIcon(file.status))
+                    title = header.file.name,
+                    subtitle = header.file.directory.ifEmpty { null },
+                    onClick = { onJump(header.path) },
+                    icon = painterResource(
+                        if (header.viewed) {
+                            DesignR.drawable.ic_check_circle_fill
+                        } else {
+                            GitFileStatus.of(header.file.status).icon
+                        }
+                    )
                 )
             }
         }
     }
-}
-
-private fun statusIcon(status: String): Int = when (status) {
-    "added" -> DesignR.drawable.ic_add_circle
-    "deleted" -> DesignR.drawable.ic_do_not_disturb_on
-    "renamed" -> DesignR.drawable.ic_arrow_circle_right
-    "untracked" -> DesignR.drawable.ic_help
-    "conflicted" -> DesignR.drawable.ic_warning
-    else -> DesignR.drawable.ic_edit_circle
 }

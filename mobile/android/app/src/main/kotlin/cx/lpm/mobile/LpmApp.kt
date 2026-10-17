@@ -19,6 +19,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import cx.lpm.mobile.core.data.push.NotificationOpens
 import cx.lpm.mobile.core.data.session.MacSession
 import cx.lpm.mobile.core.navigation.Navigator
 import cx.lpm.mobile.core.navigation.PairingKey
@@ -56,7 +57,12 @@ import kotlinx.coroutines.flow.StateFlow
  * connection sheets over both and "Add a machine" over the projects list.
  */
 @Composable
-fun LpmApp(session: MacSession, tailnetState: StateFlow<String>, modifier: Modifier = Modifier) {
+fun LpmApp(
+    session: MacSession,
+    tailnetState: StateFlow<String>,
+    opens: NotificationOpens,
+    modifier: Modifier = Modifier
+) {
     val state by session.state.collectAsStateWithLifecycle()
     LaunchedEffect(session, tailnetState) { tailnetState.collect(session::tailnetChanged) }
     var backgrounded by rememberSaveable { mutableStateOf(false) }
@@ -81,7 +87,10 @@ fun LpmApp(session: MacSession, tailnetState: StateFlow<String>, modifier: Modif
         RootStack(
             root = ProjectsKey,
             modifier = modifier,
-            overlay = { navigator -> VisitHost(session, navigator) }
+            overlay = { navigator ->
+                VisitHost(session, navigator)
+                NotificationOpenHost(session, opens, navigator)
+            }
         ) { navigator ->
             val projects = projectsSlots(navigator)
             projectsEntries(navigator, projects)

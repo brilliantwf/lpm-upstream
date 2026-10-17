@@ -10,6 +10,7 @@ import cx.lpm.mobile.core.data.link.HostProber
 import cx.lpm.mobile.core.data.link.MacBrowser
 import cx.lpm.mobile.core.data.link.NetworkMonitor
 import cx.lpm.mobile.core.data.mac.SecretCipher
+import cx.lpm.mobile.core.data.push.PushTokenSource
 import cx.lpm.mobile.core.model.string
 import java.io.IOException
 import java.time.Clock
@@ -173,4 +174,13 @@ class FakeHostProber(val reachable: MutableSet<String> = mutableSetOf()) : HostP
         val ok = host in reachable
         return HostProber.Outcome(host, ok, if (ok) "open" else "refused")
     }
+}
+
+/** A push token the test hands out, and the phone's notification switch. */
+class FakePushTokens : PushTokenSource {
+    override val platform = "fcm"
+    override val token = MutableStateFlow<String?>(null)
+    var allowed = true
+
+    override fun notificationsAllowed() = allowed
 }

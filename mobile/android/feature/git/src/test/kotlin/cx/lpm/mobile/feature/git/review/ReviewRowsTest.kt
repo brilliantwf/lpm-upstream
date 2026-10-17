@@ -21,12 +21,17 @@ class ReviewRowsTest {
     ) = ReviewFile(file(path), result, error, parsed, true, false, collapsed, expanded)
 
     @Test
-    fun `no changes, with a pull request still possible`() {
-        assertEquals(listOf(ReviewRow.NoChanges), reviewRows(emptyList(), ghCli = false))
-        assertEquals(
-            listOf(ReviewRow.NoChanges, ReviewRow.CreatePullRequest),
-            reviewRows(emptyList(), ghCli = true)
-        )
+    fun `no changes leaves the list to the overlay`() {
+        assertEquals(emptyList<ReviewRow>(), reviewRows(emptyList(), ghCli = false))
+        assertEquals(emptyList<ReviewRow>(), reviewRows(emptyList(), ghCli = true))
+    }
+
+    @Test
+    fun `the summary counts viewed files and a pull request closes the list`() {
+        val viewed = ReviewFile(file("a.ts"), null, null, null, true, true, true, false)
+        val rows = reviewRows(listOf(viewed, review("b.ts")), ghCli = true)
+        assertEquals(ReviewRow.Summary(total = 2, viewed = 1), rows.first())
+        assertEquals(ReviewRow.CreatePullRequest, rows.last())
     }
 
     @Test
@@ -50,7 +55,7 @@ class ReviewRowsTest {
         assertEquals(FileNote.Empty, notes["empty.ts"])
         assertEquals(FileNote.Loading, notes["parsing.ts"])
         assertTrue("closed.ts" !in notes)
-        assertEquals(ReviewRow.Commit, rows.last())
+        assertTrue(rows.last() is ReviewRow.FileHeader)
     }
 
     @Test
@@ -64,7 +69,7 @@ class ReviewRowsTest {
         val blocks = cut.filterIsInstance<ReviewRow.Block>().map { it.block }
         assertEquals(576, blocks.sumOf { it.lineCount })
         assertEquals(DiffBlockKind.Code, blocks.last().kind)
-        assertEquals(ReviewRow.ShowAll("big.ts", parsed.lines.size), cut[cut.size - 2])
+        assertEquals(ReviewRow.ShowAll("big.ts", parsed.lines.size), cut.last())
 
         val all =
             reviewRows(

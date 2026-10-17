@@ -19,6 +19,9 @@ import cx.lpm.mobile.core.data.mac.ThisDevice
 import cx.lpm.mobile.core.data.machines.MachineImporter
 import cx.lpm.mobile.core.data.prefs.AppPreferences
 import cx.lpm.mobile.core.data.projects.ProjectsStore
+import cx.lpm.mobile.core.data.push.PushRegistrar
+import cx.lpm.mobile.core.data.push.PushStore
+import cx.lpm.mobile.core.data.push.ResolvedPush
 import cx.lpm.mobile.core.data.services.ServiceLogsStore
 import cx.lpm.mobile.core.data.session.MacSession
 import cx.lpm.mobile.core.data.session.SessionEnvironment
@@ -54,6 +57,16 @@ class SessionHarness(test: TestScope) {
     val clients = LpmClientFactory(
         ClientEnvironment(scope, clock, transport, NoTailnet, { credentials.phoneId }, Random(SEED))
     )
+    val pushTokens = FakePushTokens()
+    val registrar = PushRegistrar(
+        ResolvedPush(pushTokens),
+        credentials,
+        prefs,
+        clients,
+        prober,
+        ThisDevice("Test Phone"),
+        scope
+    )
     val env = SessionEnvironment(
         scope = scope,
         clock = clock,
@@ -80,7 +93,8 @@ class SessionHarness(test: TestScope) {
             SessionStore.Factory(::StatsStore),
             SessionStore.Factory(::ClaudeAccountsStore),
             SessionStore.Factory(::ActionsStore),
-            SessionStore.Factory(::MachineImporter)
+            SessionStore.Factory(::MachineImporter),
+            SessionStore.Factory { PushStore(it, registrar) }
         )
     )
     val session = MacSession(env, visitHost = null)

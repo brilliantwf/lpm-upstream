@@ -124,23 +124,31 @@ class GitReviewViewModel @AssistedInject constructor(
         val selected = review.count { it.selected }
         val committing = project in g.committing
         val loading = project in g.loading
+        val repo = snapshot?.isRepo == true
         val overlay = when {
-            snapshot != null -> if (snapshot.isRepo) null else ReviewOverlay.NotRepo
+            snapshot != null -> when {
+                !snapshot.isRepo -> ReviewOverlay.NotRepo
+                files.isEmpty() -> ReviewOverlay.NoChanges
+                else -> null
+            }
+
             g.loadError[project] != null && !loading -> ReviewOverlay.Unreachable
+
             else -> ReviewOverlay.Skeleton
         }
         return GitReviewUiState(
             project = project,
             overlay = overlay,
             loadError = g.loadError[project],
-            rows = if (snapshot?.isRepo ==
-                true
-            ) {
-                reviewRows(review, snapshot.ghCli)
+            ghCli = snapshot?.ghCli == true,
+            rows = if (repo) reviewRows(review, snapshot.ghCli) else emptyList(),
+            commitFiles = if (repo) {
+                review.map {
+                    CommitFile(it.file, it.selected, it.parsed?.addedCount, it.parsed?.removedCount)
+                }
             } else {
                 emptyList()
             },
-            files = if (snapshot?.isRepo == true) files else emptyList(),
             conflicted = files.filter { it.isConflicted }.map { it.path },
             added = review.sumOf { it.parsed?.addedCount ?: 0 },
             removed = review.sumOf { it.parsed?.removedCount ?: 0 },
@@ -150,6 +158,7 @@ class GitReviewViewModel @AssistedInject constructor(
             committing = committing,
             canCommit = selected > 0 && l.message.isNotBlank() && !committing &&
                 project !in g.pushing,
+            commitTick = g.commitTick[project] ?: 0,
             opError = g.opError[project],
             notice = g.notice[project],
             terminals = t.terminals[project].orEmpty()
@@ -215,6 +224,12 @@ class GitReviewViewModel @AssistedInject constructor(
                 it.deselected + path
             }
         )
+    }
+
+    /** "Select All" / "Deselect All" in the commit sheet. */
+    fun selectAll(selected: Boolean) {
+        val paths = git?.state?.value?.snapshots?.get(project)?.files.orEmpty().map { it.path }
+        local.update { it.copy(deselected = if (selected) emptySet() else paths.toSet()) }
     }
 
     fun toggleCollapsed(path: String) {

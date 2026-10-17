@@ -28,8 +28,8 @@ import kotlinx.coroutines.launch
 
 /**
  * The review screen wired to its ViewModel: it follows the working tree while open,
- * catches up when the app comes back, and sends "Ask agent…" to a terminal, opening
- * it once the sheet has slid away.
+ * catches up when the app comes back, opens the commit sheet, and sends "Ask agent…"
+ * to a terminal, opening it once the sheet has slid away.
  */
 @Composable
 fun GitReviewRoute(
@@ -43,6 +43,7 @@ fun GitReviewRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var asking by remember { mutableStateOf<AskContext?>(null) }
+    var committing by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
     var backgrounded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -80,15 +81,30 @@ fun GitReviewRoute(
             retryDiff = viewModel::retryDiff,
             toggleSelected = viewModel::toggleSelected,
             toggleCollapsed = viewModel::toggleCollapsed,
-            toggleViewed = viewModel::toggleViewed,
+            toggleViewed = {
+                haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                viewModel.toggleViewed(it)
+            },
             showAll = viewModel::showAll,
             ask = { asking = viewModel.askContext(it) },
-            setMessage = viewModel::setMessage,
-            generateMessage = viewModel::generateMessage,
-            commit = viewModel::commit,
+            openCommit = { committing = true },
             createPullRequest = { onNavigate(GitPullRequestKey(key.project, key.session)) }
         )
     )
+
+    if (committing) {
+        GitCommitSheet(
+            state = state,
+            actions = CommitActions(
+                setMessage = viewModel::setMessage,
+                generateMessage = viewModel::generateMessage,
+                toggleSelected = viewModel::toggleSelected,
+                selectAll = viewModel::selectAll,
+                commit = viewModel::commit
+            ),
+            onDismiss = { committing = false }
+        )
+    }
 
     asking?.let { context ->
         AgentAskSheet(

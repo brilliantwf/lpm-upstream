@@ -34,10 +34,13 @@ class InboundCoverageTest {
         "stopService"
     )
 
+    // Replies only Android asks for: iOS registers for push with `apnsToken`.
+    private val androidOnlyTypes = setOf("pushToken")
+
     @Test
-    fun decodesExactlyTheTypesIosDoes() {
+    fun decodesExactlyTheTypesIosDoesPlusAndroidsOwn() {
         assertEquals(129, iosTypes.size)
-        assertEquals(iosTypes, inboundParsers.keys)
+        assertEquals(iosTypes + androidOnlyTypes, inboundParsers.keys)
     }
 
     @Test
@@ -58,7 +61,7 @@ class InboundCoverageTest {
 
     @Test
     fun everyTypeDecodesFromAFailedOrBareFrame() {
-        for (t in iosTypes) {
+        for (t in iosTypes + androidOnlyTypes) {
             assertNotNull(t, Inbound.parse("""{ "t": "$t", "ok": false }"""))
         }
     }

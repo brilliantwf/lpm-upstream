@@ -4,6 +4,7 @@ import cx.lpm.mobile.core.data.di.ApplicationScope
 import cx.lpm.mobile.core.data.mac.CredentialStore
 import cx.lpm.mobile.core.data.prefs.AppPreferences
 import cx.lpm.mobile.core.data.session.MacSession
+import cx.lpm.mobile.core.push.PushStartup
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +22,7 @@ class AppStartup @Inject constructor(
     private val preferences: AppPreferences,
     private val credentials: CredentialStore,
     private val session: MacSession,
+    private val push: PushStartup,
     @param:ApplicationScope private val scope: CoroutineScope
 ) {
     private val mutableReady = MutableStateFlow(false)
@@ -34,6 +36,7 @@ class AppStartup @Inject constructor(
             preferences.load()
             credentials.load()
             session.bootstrap()
+            push.start()
             mutableReady.value = true
         }
     }

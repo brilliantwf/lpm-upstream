@@ -19,26 +19,31 @@ tags: [demo, git]
 - waitForAnimationToEnd:
     timeout: 3000
 - assertVisible: "Changes"
+# The summary on top: how many files changed and how many are viewed.
+- assertVisible: "4 files changed.*"
+- assertVisible: ".*0 of 4 viewed"
 - takeScreenshot: 1-review
 # The jump menu: icon-only, labelled "Jump to file" on both platforms; its rows
-# are the files' names.
+# are the files' names over their folders.
 - tapOn: "Jump to file"
 - extendedWaitUntil:
-    visible: "payments.ts"
+    visible: "payments.ts.*"
     timeout: 5000
-- assertVisible: "CheckoutForm.tsx"
-- assertVisible: "page.tsx"
+- assertVisible: "CheckoutForm.tsx.*"
+- assertVisible: "page.tsx.*"
 - takeScreenshot: 2-jump-menu
-- tapOn: "payments.ts"
+- tapOn: "payments.ts.*"
 - waitForAnimationToEnd:
     timeout: 3000
 - assertVisible: "lib/payments.ts"
 - takeScreenshot: 3-jumped
-- scrollUntilVisible:
-    element: "Only the selected files are committed."
-    direction: DOWN
-- assertVisible: "Generate message"
-- assertVisible: "Commit 4 files"
+# The pinned commit button opens the commit sheet.
+- tapOn: "Commit 4 files"
+- extendedWaitUntil:
+    visible: "Generate message"
+    timeout: 5000
+- assertVisible: "Commit message"
+- assertVisible: "Deselect All"
 - assertVisible: "Only the selected files are committed."
 - takeScreenshot: 4-commit
 - tapOn: "Generate message"

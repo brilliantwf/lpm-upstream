@@ -206,6 +206,17 @@ class MacSession internal constructor(
         if (state.value.isReady && c != null) work(c) else link.enqueue(verb, project, work)
     }
 
+    /**
+     * Whether the open app shows this Mac's statuses live right now, so its push
+     * needn't be shown too. A push from an older Mac carries no id and is taken to be
+     * the live one's.
+     */
+    fun showsLive(serverId: String?): Boolean {
+        val s = state.value
+        if (!s.isReady) return false
+        return serverId.isNullOrEmpty() || serverId == s.activeRecord?.serverId
+    }
+
     /** The app came on screen or went away; the Mac notifies only while it's away. */
     fun setInForeground(active: Boolean) {
         inForeground = active

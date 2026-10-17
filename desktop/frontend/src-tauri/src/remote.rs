@@ -169,6 +169,27 @@ struct PushPreferences {
     automation_error: bool,
 }
 
+impl PushPreferences {
+    /// A registration's `notify` object: a missing object or any missing field
+    /// keeps agent alerts on and automation alerts off.
+    fn from_notify(notify: Option<&Value>) -> Self {
+        let pref = |name: &str, fallback: bool| {
+            notify
+                .and_then(|n| n.get(name))
+                .and_then(Value::as_bool)
+                .unwrap_or(fallback)
+        };
+        Self {
+            waiting: pref("waiting", true),
+            done: pref("done", true),
+            error: pref("error", true),
+            automation_started: pref("automationStarted", false),
+            automation_done: pref("automationDone", false),
+            automation_error: pref("automationError", false),
+        }
+    }
+}
+
 /// This host's user-visible name, resolved once per process. Prefers the macOS
 /// Sharing pane's ComputerName, falling back to the hostname (see sys.rs).
 fn server_name() -> String {
@@ -306,7 +327,7 @@ struct HubInner {
     // wake-up, so a request survives arriving before the main window's
     // listener is mounted (app just launched, window re-created).
     pending_run_actions: Mutex<Vec<Value>>,
-    // (project, status key) -> last (value, ts) pushed as an APNs notification, so a
+    // (project, status key) -> last (value, ts) pushed as a notification, so a
     // re-reported identical status never re-notifies. Connection-independent (a push
     // is a transition fact, not per-device); recomputed on every status-changed.
     push_dedup: Mutex<HashMap<(String, String), (String, i64)>>,
@@ -2763,43 +2784,22 @@ fn handle_msg(
                 let _ = app.emit("status-changed", &project);
             }
         }
-        // Register (or refresh) this device's push identity: the APNs device token,
-        // its environment, and the phone's AES key the sealed payload is encrypted
+        // Register (or refresh) this device's push identity: its push token (APNs
+        // from iOS's `apnsToken`, APNs or FCM from `pushToken`), the APNs
+        // environment, and the phone's AES key the sealed payload is encrypted
         // under. Sent after every successful auth (the token can rotate). Persisted
         // on the device record so a later status transition can push while the phone
         // is backgrounded and its socket is gone.
-        "apnsToken" => {
-            let token = str_field("token").unwrap_or_default();
-            let env = str_field("env").unwrap_or_default();
-            let key = str_field("key").unwrap_or_default();
-            // Per-device notification prefs: a missing `notify` object or any missing
-            // field means that class stays enabled.
-            let notify = v.get("notify");
-            let pref = |name: &str, fallback: bool| {
-                notify
-                    .and_then(|n| n.get(name))
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(fallback)
-            };
-            let prefs = PushPreferences {
-                waiting: pref("waiting", true),
-                done: pref("done", true),
-                error: pref("error", true),
-                automation_started: pref("automationStarted", false),
-                automation_done: pref("automationDone", false),
-                automation_error: pref("automationError", false),
-            };
-            match validate_apns(&token, &env, &key) {
-                // This ack is the phone's only sign that a registration didn't
-                // take (it re-sends on reconnect, never within a session), so it
-                // has to carry the real result rather than a fixed true.
-                Ok(()) => {
-                    let stored = set_apns_token(hub, device_id, &token, &env, &key, prefs);
-                    send(ws, json!({ "t": "apnsToken", "ok": stored }))?;
-                }
-                Err(e) => send(ws, json!({ "t": "apnsToken", "ok": false, "error": e }))?,
+        "apnsToken" | "pushToken" => match push_registration(t, &v) {
+            // This ack is the phone's only sign that a registration didn't take
+            // (it re-sends on reconnect, never within a session), so it has to
+            // carry the real result rather than a fixed true.
+            Ok(reg) => {
+                let stored = set_push_token(hub, device_id, &reg);
+                send(ws, json!({ "t": t, "ok": stored }))?;
             }
-        }
+            Err(e) => send(ws, json!({ "t": t, "ok": false, "error": e }))?,
+        },
         "sub" => {
             let Some(id) = str_field("id") else {
                 return Ok(());
@@ -4897,10 +4897,14 @@ fn read_project_file(cwd: &str, project: &str, path: &str) -> Value {
         "content": content, "truncated": truncated })
 }
 
-// --- APNs push notifications -------------------------------------------------
+// --- Push notifications (APNs and FCM) ---------------------------------------
 
-/// Validate an `apnsToken` registration: token is non-empty hex ≤200 chars, env
-/// is one of the two APNs environments, and key base64-decodes to 32 bytes.
+/// `Device::push_platform` for an FCM registration token. APNs is the empty
+/// string, which every record written before Android phones already holds.
+const PUSH_PLATFORM_FCM: &str = "fcm";
+
+/// Validate an APNs registration: token is non-empty hex ≤200 chars, env is one
+/// of the two APNs environments, and key base64-decodes to 32 bytes.
 fn validate_apns(token: &str, env: &str, key: &str) -> Result<(), String> {
     if token.is_empty() || token.len() > 200 || !token.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err("invalid token".into());
@@ -4908,45 +4912,105 @@ fn validate_apns(token: &str, env: &str, key: &str) -> Result<(), String> {
     if env != "production" && env != "sandbox" {
         return Err("invalid env".into());
     }
+    validate_push_key(key)
+}
+
+/// Validate an FCM registration: the token is 1–4096 characters of FCM's
+/// alphabet (letters, digits, `_`, `:`, `-`) and key base64-decodes to 32 bytes.
+/// FCM has no environments, so there is no env to check.
+fn validate_fcm(token: &str, key: &str) -> Result<(), String> {
+    let alphabet = |c: char| c.is_ascii_alphanumeric() || matches!(c, '_' | ':' | '-');
+    if token.is_empty() || token.len() > 4096 || !token.chars().all(alphabet) {
+        return Err("invalid token".into());
+    }
+    validate_push_key(key)
+}
+
+fn validate_push_key(key: &str) -> Result<(), String> {
     match base64::engine::general_purpose::STANDARD.decode(key) {
         Ok(k) if k.len() == 32 => Ok(()),
         _ => Err("invalid key".into()),
     }
 }
 
-/// Register `token`/`env`/`key`/`prefs` on the device with `device_id`, and strip
-/// the push identity from every OTHER record still holding the same `apns_token`.
-/// An APNs token uniquely identifies a physical device+app install, so any other
+/// Validate a registration for `platform` ("apns" or "fcm") and return the
+/// `Device::push_platform` it is stored under.
+fn validate_push(
+    platform: &str,
+    token: &str,
+    env: &str,
+    key: &str,
+) -> Result<&'static str, String> {
+    match platform {
+        "apns" => validate_apns(token, env, key).map(|()| ""),
+        PUSH_PLATFORM_FCM => validate_fcm(token, key).map(|()| PUSH_PLATFORM_FCM),
+        _ => Err("invalid platform".into()),
+    }
+}
+
+/// One validated push registration from a phone: where its pushes go
+/// (`platform` as stored on `Device::push_platform`, `token`, the APNs `env`),
+/// the key they are sealed under, and which alerts it wants.
+struct PushRegistration {
+    platform: &'static str,
+    token: String,
+    env: String,
+    key: String,
+    prefs: PushPreferences,
+}
+
+/// The registration an `apnsToken` or `pushToken` frame asks for, or why it is
+/// refused. `apnsToken` is always APNs; `pushToken` names its platform.
+fn push_registration(t: &str, v: &Value) -> Result<PushRegistration, String> {
+    let field = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or_default();
+    let platform = if t == "apnsToken" {
+        "apns"
+    } else {
+        field("platform")
+    };
+    let (token, env, key) = (field("token"), field("env"), field("key"));
+    let stored = validate_push(platform, token, env, key)?;
+    Ok(PushRegistration {
+        platform: stored,
+        token: token.to_string(),
+        env: if stored == PUSH_PLATFORM_FCM {
+            String::new()
+        } else {
+            env.to_string()
+        },
+        key: key.to_string(),
+        prefs: PushPreferences::from_notify(v.get("notify")),
+    })
+}
+
+/// Register `reg` on the device with `device_id`, and strip the push identity
+/// from every OTHER record still holding the same token on the same platform.
+/// A push token uniquely identifies a physical device+app install, so any other
 /// record carrying it is a stale pairing (phone reinstalled / re-scanned the QR)
 /// that would otherwise keep receiving pushes under its old, fail-open prefs.
 /// Stale records stay paired — only their push identity is cleared. Returns false
 /// when `device_id` isn't paired.
-fn apply_apns_token(
-    devices: &mut [Device],
-    device_id: &str,
-    token: &str,
-    env: &str,
-    key: &str,
-    prefs: PushPreferences,
-) -> bool {
+fn apply_push_token(devices: &mut [Device], device_id: &str, reg: &PushRegistration) -> bool {
     if !devices.iter().any(|d| d.id == device_id) {
         return false;
     }
     for d in devices.iter_mut() {
         if d.id == device_id {
-            d.apns_token = token.to_string();
-            d.apns_env = env.to_string();
-            d.push_key = key.to_string();
-            d.push_waiting = prefs.waiting;
-            d.push_done = prefs.done;
-            d.push_error = prefs.error;
-            d.push_automation_started = prefs.automation_started;
-            d.push_automation_done = prefs.automation_done;
-            d.push_automation_error = prefs.automation_error;
-        } else if d.apns_token == token {
+            d.apns_token = reg.token.clone();
+            d.apns_env = reg.env.clone();
+            d.push_key = reg.key.clone();
+            d.push_platform = reg.platform.to_string();
+            d.push_waiting = reg.prefs.waiting;
+            d.push_done = reg.prefs.done;
+            d.push_error = reg.prefs.error;
+            d.push_automation_started = reg.prefs.automation_started;
+            d.push_automation_done = reg.prefs.automation_done;
+            d.push_automation_error = reg.prefs.automation_error;
+        } else if d.apns_token == reg.token && d.push_platform == reg.platform {
             d.apns_token.clear();
             d.apns_env.clear();
             d.push_key.clear();
+            d.push_platform.clear();
         }
     }
     true
@@ -4954,21 +5018,14 @@ fn apply_apns_token(
 
 /// Persist a device's push identity on its config record. Returns false when the
 /// device id isn't paired (a stale/forged connection).
-fn set_apns_token(
-    hub: &RemoteHub,
-    device_id: &str,
-    token: &str,
-    env: &str,
-    key: &str,
-    prefs: PushPreferences,
-) -> bool {
-    hub.update_config(|cfg| apply_apns_token(&mut cfg.devices, device_id, token, env, key, prefs))
+fn set_push_token(hub: &RemoteHub, device_id: &str, reg: &PushRegistration) -> bool {
+    hub.update_config(|cfg| apply_push_token(&mut cfg.devices, device_id, reg))
         .unwrap_or(false)
 }
 
-/// Clear a device's stored APNs token (kept paired) after the relay reports it
+/// Clear a device's stored push token (kept paired) after the relay reports it
 /// dead (HTTP 410 / Unregistered), so a stale install stops generating traffic.
-fn clear_apns_token(hub: &RemoteHub, device_id: &str) {
+fn clear_push_token(hub: &RemoteHub, device_id: &str) {
     hub.update_config(|cfg| {
         if let Some(d) = cfg.devices.iter_mut().find(|d| d.id == device_id) {
             d.apns_token.clear();
@@ -5039,6 +5096,8 @@ struct PushDevice {
     id: String,
     token: String,
     env: String,
+    /// `Device::push_platform`: empty for APNs, `PUSH_PLATFORM_FCM` for FCM.
+    platform: String,
     key: [u8; 32],
     push_waiting: bool,
     push_done: bool,
@@ -5160,6 +5219,7 @@ fn make_push_device(d: &Device) -> Option<PushDevice> {
         id: d.id.clone(),
         token: d.apns_token.clone(),
         env: d.apns_env.clone(),
+        platform: d.push_platform.clone(),
         key,
         push_waiting: d.push_waiting,
         push_done: d.push_done,
@@ -5281,6 +5341,31 @@ fn still_waiting(entries: &[StatusEntry], key: &str, ts: i64) -> bool {
         .any(|e| e.key == key && e.value == STATUS_WAITING && e.timestamp == ts)
 }
 
+/// The relay POST body for one sealed push to `dev`: an alert (with the
+/// notification's `collapse_id`) or, when `background`, a silent withdrawal. An
+/// APNs device names its environment, as every body always has; an FCM device
+/// names its platform instead and has no environment.
+fn relay_body(
+    dev: &PushDevice,
+    blob: String,
+    collapse_id: Option<&str>,
+    background: bool,
+) -> String {
+    let mut body = json!({ "token": dev.token, "blob": blob });
+    if dev.platform == PUSH_PLATFORM_FCM {
+        body["platform"] = json!(PUSH_PLATFORM_FCM);
+    } else {
+        body["env"] = json!(dev.env);
+    }
+    if let Some(id) = collapse_id {
+        body["collapseId"] = json!(id);
+    }
+    if background {
+        body["type"] = json!("background");
+    }
+    body.to_string()
+}
+
 /// Seal and POST one alert per (device, wanted job). A 410 from the relay retires
 /// the device token, so the rest of that device's jobs are skipped.
 fn send_alert_pushes(
@@ -5299,13 +5384,7 @@ fn send_alert_pushes(
             let Some(blob) = seal_push(&dev.key, plaintext.as_bytes()) else {
                 continue;
             };
-            let body = json!({
-                "token": dev.token,
-                "env": dev.env,
-                "blob": blob,
-                "collapseId": job.collapse_id,
-            })
-            .to_string();
+            let body = relay_body(dev, blob, Some(&job.collapse_id), false);
             if post_push(client, relay, hub, &dev.id, body) {
                 break;
             }
@@ -5384,7 +5463,7 @@ fn spawn_deferred_codex_pushes(
     });
 }
 
-/// On an agent status transition, push an APNs notification to every registered
+/// On an agent status transition, push a notification to every registered
 /// device that isn't currently holding a live socket (a live socket means the app
 /// is foregrounded and already got the `status-changed` frame). Never blocks the
 /// event listener: all the network work runs on a spawned thread.
@@ -5566,13 +5645,7 @@ fn push_notifications(hub: &RemoteHub, app: &AppHandle, project: &str) {
                 let Some(blob) = seal_push(&dev.key, clear_plaintext.as_bytes()) else {
                     continue;
                 };
-                let body = json!({
-                    "token": dev.token,
-                    "env": dev.env,
-                    "blob": blob,
-                    "type": "background",
-                })
-                .to_string();
+                let body = relay_body(dev, blob, None, true);
                 post_push(&client, &relay, &hub, &dev.id, body);
             }
         }
@@ -5653,13 +5726,7 @@ fn push_automation_notification(
             let Some(blob) = seal_push(&dev.key, plaintext.as_bytes()) else {
                 continue;
             };
-            let body = json!({
-                "token": dev.token,
-                "env": dev.env,
-                "blob": blob,
-                "collapseId": collapse_id,
-            })
-            .to_string();
+            let body = relay_body(dev, blob, Some(&collapse_id), false);
             post_push(&client, &relay, &hub, &dev.id, body);
         }
     });
@@ -5684,7 +5751,7 @@ fn post_push(
         Ok(resp) => {
             let status = resp.status().as_u16();
             if status == 410 {
-                clear_apns_token(hub, device_id);
+                clear_push_token(hub, device_id);
                 return true;
             }
             if !(200..300).contains(&status) {
@@ -7387,7 +7454,7 @@ mod tests {
     }
 
     #[test]
-    fn apply_apns_token_clears_stale_duplicate_records() {
+    fn apply_push_token_clears_stale_duplicate_records() {
         let b64 = |b: [u8; 32]| base64::engine::general_purpose::STANDARD.encode(b);
         let mut devices = vec![
             // A stale pairing for the same physical phone, still holding "deadbeef"
@@ -7423,14 +7490,14 @@ mod tests {
             automation_done: false,
             automation_error: true,
         };
-        assert!(apply_apns_token(
-            &mut devices,
-            "new",
-            "deadbeef",
-            "sandbox",
-            &key,
-            prefs
-        ));
+        let reg = |token: &str| PushRegistration {
+            platform: "",
+            token: token.into(),
+            env: "sandbox".into(),
+            key: key.clone(),
+            prefs,
+        };
+        assert!(apply_push_token(&mut devices, "new", &reg("deadbeef")));
 
         let new = devices.iter().find(|d| d.id == "new").unwrap();
         assert_eq!(new.apns_token, "deadbeef");
@@ -7465,14 +7532,7 @@ mod tests {
 
         // An unknown device id reports not-paired and mutates nothing — not even
         // other records holding the same token.
-        assert!(!apply_apns_token(
-            &mut devices,
-            "ghost",
-            "deadbeef",
-            "sandbox",
-            &key,
-            prefs
-        ));
+        assert!(!apply_push_token(&mut devices, "ghost", &reg("deadbeef")));
         let new = devices.iter().find(|d| d.id == "new").unwrap();
         assert_eq!(new.apns_token, "deadbeef");
         assert_eq!(
@@ -7564,6 +7624,7 @@ mod tests {
                 apns_token: "deadbeef".into(),
                 apns_env: "sandbox".into(),
                 push_key: base64::engine::general_purpose::STANDARD.encode([7u8; 32]),
+                push_platform: PUSH_PLATFORM_FCM.into(),
                 push_waiting: true,
                 push_done: false,
                 push_error: true,
@@ -7593,6 +7654,7 @@ mod tests {
         assert_eq!(back.devices[0].id, "d1");
         assert_eq!(back.devices[0].apns_token, "deadbeef");
         assert_eq!(back.devices[0].apns_env, "sandbox");
+        assert_eq!(back.devices[0].push_platform, PUSH_PLATFORM_FCM);
         assert!(back.keep_awake);
         assert_eq!(back.devices[0].alias, "Work iPhone");
         assert_eq!(back.devices[0].last_seen, 43);
@@ -7638,6 +7700,208 @@ mod tests {
         assert!(
             validate_apns("ab", "production", "not base64!!").is_err(),
             "bad base64"
+        );
+    }
+
+    #[test]
+    fn validate_push_checks_each_platform() {
+        let key = base64::engine::general_purpose::STANDARD.encode([1u8; 32]);
+        let fcm = "cZ1-x_Y:APA91bH-abc_DEF123";
+        assert_eq!(validate_push("apns", "abc123", "production", &key), Ok(""));
+        assert_eq!(validate_push("fcm", fcm, "", &key), Ok(PUSH_PLATFORM_FCM));
+        assert_eq!(
+            validate_push("fcm", fcm, "production", &key),
+            Ok(PUSH_PLATFORM_FCM),
+            "an env sent with an FCM token is ignored"
+        );
+        assert!(
+            validate_push("apns", fcm, "production", &key).is_err(),
+            "FCM token as APNs"
+        );
+        assert!(
+            validate_push("apns", "abc123", "", &key).is_err(),
+            "APNs needs an env"
+        );
+        assert!(validate_push("fcm", "", "", &key).is_err(), "empty token");
+        assert!(
+            validate_push("fcm", "bad token!", "", &key).is_err(),
+            "outside the alphabet"
+        );
+        assert!(validate_push("fcm", &"a".repeat(4096), "", &key).is_ok());
+        assert!(
+            validate_push("fcm", &"a".repeat(4097), "", &key).is_err(),
+            "over-long token"
+        );
+        let short = base64::engine::general_purpose::STANDARD.encode([1u8; 16]);
+        assert!(
+            validate_push("fcm", fcm, "", &short).is_err(),
+            "16-byte key"
+        );
+        assert_eq!(
+            validate_push("webpush", fcm, "", &key),
+            Err("invalid platform".into())
+        );
+        assert_eq!(
+            validate_push("", fcm, "", &key),
+            Err("invalid platform".into())
+        );
+    }
+
+    #[test]
+    fn push_frames_parse_into_registrations() {
+        let key = base64::engine::general_purpose::STANDARD.encode([1u8; 32]);
+
+        // iOS's frame names no platform: it's APNs, stored as the empty platform.
+        let apns = push_registration(
+            "apnsToken",
+            &json!({ "t": "apnsToken", "token": "abc123", "env": "sandbox", "key": key }),
+        )
+        .unwrap();
+        assert_eq!((apns.platform, apns.env.as_str()), ("", "sandbox"));
+        assert!(apns.prefs.waiting && apns.prefs.done && apns.prefs.error);
+        assert!(!apns.prefs.automation_started);
+
+        // `apnsToken` stays APNs even if it names another platform.
+        assert!(push_registration(
+            "apnsToken",
+            &json!({ "token": "cZ1:APA91b", "platform": "fcm", "key": key }),
+        )
+        .is_err());
+
+        let fcm = push_registration(
+            "pushToken",
+            &json!({
+                "t": "pushToken", "platform": "fcm", "token": "cZ1:APA91b-x_y",
+                "env": "production", "key": key,
+                "notify": { "waiting": false, "automationDone": true },
+            }),
+        )
+        .unwrap();
+        assert_eq!(fcm.platform, PUSH_PLATFORM_FCM);
+        assert_eq!(fcm.token, "cZ1:APA91b-x_y");
+        assert_eq!(fcm.env, "", "FCM has no environment");
+        assert_eq!(fcm.key, key);
+        assert!(!fcm.prefs.waiting && fcm.prefs.done && fcm.prefs.automation_done);
+
+        let apns = push_registration(
+            "pushToken",
+            &json!({ "platform": "apns", "token": "ABCDEF", "env": "production", "key": key }),
+        )
+        .unwrap();
+        assert_eq!((apns.platform, apns.env.as_str()), ("", "production"));
+
+        assert_eq!(
+            push_registration("pushToken", &json!({ "token": "abc", "key": key }))
+                .err()
+                .as_deref(),
+            Some("invalid platform")
+        );
+    }
+
+    #[test]
+    fn push_tokens_are_unique_per_platform() {
+        let b64 = |b: [u8; 32]| base64::engine::general_purpose::STANDARD.encode(b);
+        let prefs = PushPreferences::from_notify(None);
+        let mut devices = vec![
+            // An Android phone's stale pairing holding the same FCM token.
+            Device {
+                id: "old-android".into(),
+                apns_token: "tok".into(),
+                push_platform: PUSH_PLATFORM_FCM.into(),
+                push_key: b64([1u8; 32]),
+                ..Default::default()
+            },
+            // An APNs record whose token happens to read the same: not the same phone.
+            Device {
+                id: "iphone".into(),
+                apns_token: "tok".into(),
+                apns_env: "production".into(),
+                push_key: b64([2u8; 32]),
+                ..Default::default()
+            },
+            Device {
+                id: "android".into(),
+                ..Default::default()
+            },
+        ];
+        let fcm = PushRegistration {
+            platform: PUSH_PLATFORM_FCM,
+            token: "tok".into(),
+            env: String::new(),
+            key: b64([3u8; 32]),
+            prefs,
+        };
+        assert!(apply_push_token(&mut devices, "android", &fcm));
+
+        let by_id =
+            |devices: &[Device], id: &str| devices.iter().find(|d| d.id == id).cloned().unwrap();
+        let android = by_id(&devices, "android");
+        assert_eq!(android.apns_token, "tok");
+        assert_eq!(android.push_platform, PUSH_PLATFORM_FCM);
+        assert_eq!(android.apns_env, "");
+        let old = by_id(&devices, "old-android");
+        assert!(
+            old.apns_token.is_empty() && old.push_key.is_empty() && old.push_platform.is_empty()
+        );
+        let iphone = by_id(&devices, "iphone");
+        assert_eq!(iphone.apns_token, "tok");
+        assert_eq!(iphone.push_key, b64([2u8; 32]));
+
+        // The same record registering over APNs is an APNs record again.
+        let apns = PushRegistration {
+            platform: "",
+            token: "abcd".into(),
+            env: "sandbox".into(),
+            key: b64([4u8; 32]),
+            prefs,
+        };
+        assert!(apply_push_token(&mut devices, "android", &apns));
+        let android = by_id(&devices, "android");
+        assert_eq!(android.push_platform, "");
+        assert_eq!(android.apns_env, "sandbox");
+    }
+
+    #[test]
+    fn relay_bodies_name_the_platform_or_the_apns_env() {
+        let b64 = |b: [u8; 32]| base64::engine::general_purpose::STANDARD.encode(b);
+        let apns = make_push_device(&Device {
+            id: "iphone".into(),
+            apns_token: "abcd".into(),
+            apns_env: "sandbox".into(),
+            push_key: b64([1u8; 32]),
+            ..Default::default()
+        })
+        .unwrap();
+        let fcm = make_push_device(&Device {
+            id: "android".into(),
+            apns_token: "cZ1:APA91b".into(),
+            push_platform: PUSH_PLATFORM_FCM.into(),
+            push_key: b64([2u8; 32]),
+            ..Default::default()
+        })
+        .unwrap();
+        let parse = |s: String| serde_json::from_str::<Value>(&s).unwrap();
+
+        let alert = parse(relay_body(&apns, "blob".into(), Some("cid"), false));
+        assert_eq!(
+            alert,
+            json!({ "token": "abcd", "env": "sandbox", "blob": "blob", "collapseId": "cid" })
+        );
+        let clear = parse(relay_body(&apns, "blob".into(), None, true));
+        assert_eq!(
+            clear,
+            json!({ "token": "abcd", "env": "sandbox", "blob": "blob", "type": "background" })
+        );
+
+        let alert = parse(relay_body(&fcm, "blob".into(), Some("cid"), false));
+        assert_eq!(
+            alert,
+            json!({ "token": "cZ1:APA91b", "platform": "fcm", "blob": "blob", "collapseId": "cid" })
+        );
+        let clear = parse(relay_body(&fcm, "blob".into(), None, true));
+        assert_eq!(
+            clear,
+            json!({ "token": "cZ1:APA91b", "platform": "fcm", "blob": "blob", "type": "background" })
         );
     }
 
@@ -7888,6 +8152,7 @@ mod tests {
             id: "d".into(),
             token: "t".into(),
             env: "sandbox".into(),
+            platform: String::new(),
             key: [0u8; 32],
             push_waiting: w,
             push_done: d,
@@ -7919,6 +8184,7 @@ mod tests {
             id: "d".into(),
             token: "t".into(),
             env: "sandbox".into(),
+            platform: String::new(),
             key: [0u8; 32],
             push_waiting: false,
             push_done: false,

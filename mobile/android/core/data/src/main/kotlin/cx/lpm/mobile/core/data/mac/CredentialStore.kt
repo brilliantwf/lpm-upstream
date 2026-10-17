@@ -40,12 +40,16 @@ class CredentialStore @Inject constructor(
 ) {
     private val secrets = ConcurrentHashMap<String, String>()
 
+    @Volatile var isLoaded = false
+        private set
+
     suspend fun load() {
         val stored = dataStore.data.first().asMap()
         for ((key, value) in stored) {
             val sealed = (value as? String)?.let(::decodeBase64) ?: continue
             cipher.open(sealed)?.let { secrets[key.name] = it.decodeToString() }
         }
+        isLoaded = true
     }
 
     fun save(deviceId: String, token: String, localId: String) {
@@ -81,11 +85,13 @@ class CredentialStore @Inject constructor(
 
     fun deletePin(localId: String) = write(pinAccount(localId), null)
 
+    /** The push key, or null before one was made (a push can't be for this phone then). */
+    fun loadPushKey(): ByteArray? =
+        secrets[PUSH_KEY]?.let(::decodeBase64)?.takeIf { it.size == PUSH_KEY_BYTES }
+
     /** 32 random bytes, one per phone, registered with every Mac for push decryption. */
     fun loadOrCreatePushKey(): ByteArray {
-        secrets[PUSH_KEY]?.let(::decodeBase64)?.takeIf {
-            it.size == PUSH_KEY_BYTES
-        }?.let { return it }
+        loadPushKey()?.let { return it }
         val key = ByteArray(PUSH_KEY_BYTES).also(SecureRandom()::nextBytes)
         write(PUSH_KEY, Base64.getEncoder().encodeToString(key))
         return key

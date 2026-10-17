@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
@@ -34,6 +33,7 @@ import cx.lpm.mobile.core.designsystem.theme.LpmTheme
 import cx.lpm.mobile.feature.git.R
 import cx.lpm.mobile.feature.git.diff.DiffBlockKind
 import cx.lpm.mobile.feature.git.diff.DiffCodeBlock
+import cx.lpm.mobile.feature.git.diff.DiffColors
 import cx.lpm.mobile.feature.git.diff.HunkSeparator
 import cx.lpm.mobile.feature.git.diff.rememberDiffColors
 import cx.lpm.mobile.feature.git.ui.GitNoticeBanner
@@ -52,16 +52,15 @@ class ReviewActions(
     val toggleViewed: (String) -> Unit = {},
     val showAll: (String) -> Unit = {},
     val ask: (String) -> Unit = {},
-    val setMessage: (String) -> Unit = {},
-    val generateMessage: () -> Unit = {},
-    val commit: () -> Unit = {},
+    val openCommit: () -> Unit = {},
     val createPullRequest: () -> Unit = {}
 )
 
 /**
- * The Git review screen (iOS `GitReviewView`): "Changes" over the +A −D, a jump menu,
- * then every changed file with its whole diff, the commit form and "Create Pull
- * Request". Pull to refresh.
+ * The Git review screen (iOS `GitReviewView`): "Changes" over the +A −D and a jump
+ * menu, how many files changed and how many are viewed, then every changed file with
+ * its whole diff under a bar that pins while it scrolls, and a pinned "Commit N
+ * files" that opens the commit sheet. Pull to refresh.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,6 +72,7 @@ fun GitReviewScreen(
     listState: LazyListState = rememberLazyListState()
 ) {
     val scope = rememberCoroutineScope()
+    val headers = state.rows.filterIsInstance<ReviewRow.FileHeader>()
     Column(
         modifier
             .fillMaxSize()
@@ -87,9 +87,9 @@ fun GitReviewScreen(
                 )
             },
             trailing = {
-                if (state.files.isNotEmpty()) {
+                if (headers.isNotEmpty()) {
                     JumpMenu(
-                        files = state.files,
+                        files = headers,
                         onJump = { path ->
                             val index = state.rows.indexOfFirst { it.key == "h:$path" }
                             if (index >= 0) scope.launch { listState.animateScrollToItem(index) }
@@ -104,50 +104,80 @@ fun GitReviewScreen(
                 onRefresh = actions.refresh,
                 modifier = Modifier.fillMaxSize()
             ) {
-                ReviewList(state, actions, listState)
-                state.overlay?.let { ReviewOverlayContent(it, state.loadError, actions.retry) }
+                ReviewList(
+                    state = state,
+                    actions = actions,
+                    listState = listState,
+                    onViewedToggle = { header ->
+                        val index = state.rows.indexOf(header)
+                        val pinned = index >= 0 && listState.firstVisibleItemIndex > index
+                        actions.toggleViewed(header.path)
+                        // A bar pinned over its scrolled diff would collapse out from
+                        // under the screen: it goes back to the top instead, the next
+                        // file right below it.
+                        if (!header.viewed && !header.collapsed && pinned) {
+                            scope.launch { listState.scrollToItem(index) }
+                        }
+                    }
+                )
+                ReviewOverlayContent(state, actions.retry, actions.createPullRequest)
             }
             GitNoticeBanner(state.notice, Modifier.align(Alignment.TopCenter))
+        }
+        if (headers.isNotEmpty()) {
+            CommitBar(
+                selected = state.selectedCount,
+                committing = state.committing,
+                onClick = actions.openCommit
+            )
         }
     }
 }
 
 @Composable
-private fun ReviewList(state: GitReviewUiState, actions: ReviewActions, listState: LazyListState) {
+private fun ReviewList(
+    state: GitReviewUiState,
+    actions: ReviewActions,
+    listState: LazyListState,
+    onViewedToggle: (ReviewRow.FileHeader) -> Unit
+) {
     val colors = rememberDiffColors()
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        items(state.rows, key = { it.key }, contentType = { it::class }) { row ->
-            when (row) {
-                is ReviewRow.ChangedHeader -> ChangedFilesHeader(row)
-
-                ReviewRow.NoChanges -> NoChangesRow()
-
-                is ReviewRow.FileHeader -> {
+        state.rows.forEach { row ->
+            if (row is ReviewRow.FileHeader) {
+                stickyHeader(key = row.key, contentType = ReviewRow.FileHeader::class) {
                     LaunchedEffect(row.path) { actions.fileAppeared(row.path) }
-                    FileHeaderBar(row, actions)
+                    FileHeaderBar(row, actions, onViewedToggle = { onViewedToggle(row) })
                 }
-
-                is ReviewRow.Block -> if (row.block.kind == DiffBlockKind.Hunk) {
-                    HunkSeparator(row.block)
-                } else {
-                    DiffCodeBlock(row.block, colors, Modifier.fillMaxWidth())
-                }
-
-                is ReviewRow.Note -> FileNoteRow(row.note, onRetry = {
-                    actions.retryDiff(row.path)
-                })
-
-                is ReviewRow.ShowAll -> ShowAllRow(row, onClick = { actions.showAll(row.path) })
-
-                ReviewRow.Commit -> CommitSection(state, actions)
-
-                ReviewRow.CreatePullRequest -> CreatePullRequestRow(actions.createPullRequest)
+            } else {
+                item(key = row.key, contentType = row::class) { ReviewItem(row, actions, colors) }
             }
         }
+    }
+}
+
+@Composable
+private fun ReviewItem(row: ReviewRow, actions: ReviewActions, colors: DiffColors) {
+    when (row) {
+        is ReviewRow.Summary -> ReviewSummary(row)
+
+        is ReviewRow.FileHeader -> Unit
+
+        is ReviewRow.Block -> if (row.block.kind == DiffBlockKind.Hunk) {
+            HunkSeparator(row.block)
+        } else {
+            DiffCodeBlock(row.block, colors, Modifier.fillMaxWidth())
+        }
+
+        is ReviewRow.Note -> FileNoteRow(row.note, onRetry = { actions.retryDiff(row.path) })
+
+        is ReviewRow.ShowAll -> ShowAllRow(row, onClick = { actions.showAll(row.path) })
+
+        ReviewRow.CreatePullRequest -> CreatePullRequestRow(actions.createPullRequest)
     }
 }
 

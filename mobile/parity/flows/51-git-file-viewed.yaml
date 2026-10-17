@@ -17,20 +17,25 @@ tags: [demo, git]
           timeout: 10000
 - waitForAnimationToEnd:
     timeout: 3000
-# Each file's header: "Include in commit", the path (collapses the diff),
-# "Viewed" and "More". Marking the first file viewed collapses it.
+# Each file's header: the name (collapses the diff), "Viewed" and "More".
+# Marking the first file viewed collapses it.
 - tapOn:
     text: "Viewed"
     index: 0
 - extendedWaitUntil:
-    visible: "1 of 4 reviewed"
+    visible: ".*1 of 4 viewed"
     timeout: 5000
 - takeScreenshot: 1-viewed
-# Unselecting a file leaves it out of the commit.
-- tapOn:
-    text: "Include in commit"
-    index: 1
-- scrollUntilVisible:
-    element: "Commit 3 files"
-    direction: DOWN
+# Unselecting a file in the commit sheet leaves it out of the commit.
+- tapOn: "Commit 4 files"
+- extendedWaitUntil:
+    visible: "Deselect All"
+    timeout: 5000
+- tapOn: "app/checkout/page.tsx"
 - takeScreenshot: 2-unselected
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    visible: "Commit 3 files"
+    timeout: 5000
+- assertVisible: "Excluded"
+- takeScreenshot: 3-excluded

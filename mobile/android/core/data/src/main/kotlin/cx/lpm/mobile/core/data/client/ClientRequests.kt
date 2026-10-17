@@ -1,5 +1,6 @@
 package cx.lpm.mobile.core.data.client
 
+import cx.lpm.mobile.core.data.push.PushRegistration
 import cx.lpm.mobile.core.model.ClaudeAccountChoice
 import cx.lpm.mobile.core.model.DuplicateOptions
 import cx.lpm.mobile.core.model.HistoryCursor
@@ -122,27 +123,19 @@ fun LpmClient.sidebarMoveProject(project: String, folder: String?) =
 fun LpmClient.fileChunk(reqId: String, project: String, path: String, offset: Long, length: Long) =
     send(Wire.fileChunk(reqId, project, path, offset, length))
 
-fun LpmClient.sendApnsToken(
-    token: String,
-    env: String,
-    key: String,
-    notifyWaiting: Boolean,
-    notifyDone: Boolean,
-    notifyError: Boolean,
-    notifyAutomationStarted: Boolean,
-    notifyAutomationDone: Boolean,
-    notifyAutomationError: Boolean
-) = send(
-    Wire.apnsToken(
-        token,
-        env,
-        key,
-        notifyWaiting,
-        notifyDone,
-        notifyError,
-        notifyAutomationStarted,
-        notifyAutomationDone,
-        notifyAutomationError
+/** Register (or refresh) this phone's push identity with the Mac. */
+fun LpmClient.sendPushToken(p: PushRegistration) = send(
+    Wire.pushToken(
+        platform = p.platform,
+        token = p.token,
+        env = null,
+        key = p.key,
+        notifyWaiting = p.waiting,
+        notifyDone = p.done,
+        notifyError = p.error,
+        notifyAutomationStarted = p.automationStarted,
+        notifyAutomationDone = p.automationDone,
+        notifyAutomationError = p.automationError
     )
 )
 

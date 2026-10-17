@@ -183,6 +183,7 @@ abstract class LpmClientCallbacks {
     var onUpdateInstall: ((cancelled: Boolean, error: String?) -> Unit)? = null
     var onUpdateCancel: ((stopping: Boolean) -> Unit)? = null
     var onApnsToken: ((ok: Boolean) -> Unit)? = null
+    var onPushToken: ((ok: Boolean) -> Unit)? = null
     var onComposerActions: ((actions: List<ComposerAction>) -> Unit)? = null
     var onTransformVariant: (
         (

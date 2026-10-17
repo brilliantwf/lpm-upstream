@@ -30,57 +30,6 @@ import cx.lpm.mobile.feature.git.R
 /** Where a plain list's rows start and end. */
 internal val PlainRowInset = ListDefaults.RowPadding
 
-/** "CHANGED FILES (4)" as a plain row (a header would pin while scrolling). */
-@Composable
-internal fun ChangedFilesHeader(row: ReviewRow.ChangedHeader, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.padding(
-            start = PlainRowInset,
-            end = PlainRowInset,
-            top = 34.dp,
-            bottom = 16.dp
-        ),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
-    ) {
-        Text(
-            text = stringResource(R.string.git_review_changed_files, row.count).uppercase(),
-            style = LpmTheme.typography.footnote.copy(fontWeight = FontWeight.SemiBold),
-            color = LpmTheme.colors.secondaryLabel
-        )
-        if (row.reviewed > 0) {
-            Text(
-                text = stringResource(R.string.git_review_reviewed, row.reviewed, row.count),
-                style = LpmTheme.typography.caption2,
-                color = LpmTheme.colors.tertiaryLabel
-            )
-        }
-    }
-}
-
-@Composable
-internal fun NoChangesRow(modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = ListDefaults.RowMinHeight)
-            .padding(horizontal = PlainRowInset, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            painter = painterResource(DesignR.drawable.ic_check_circle_fill),
-            contentDescription = null,
-            tint = LpmTheme.colors.green,
-            modifier = Modifier.size(24.dp)
-        )
-        Text(
-            text = stringResource(R.string.git_review_no_changes),
-            style = LpmTheme.typography.body,
-            color = LpmTheme.colors.secondaryLabel
-        )
-    }
-}
-
 /** What a file shows instead of its diff: binary, nothing to show, loading, or a failure. */
 @Composable
 internal fun FileNoteRow(note: FileNote, onRetry: () -> Unit, modifier: Modifier = Modifier) {

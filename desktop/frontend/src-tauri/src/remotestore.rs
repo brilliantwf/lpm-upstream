@@ -16,7 +16,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 
-pub(crate) const DEFAULT_PUSH_RELAY: &str = "https://lpm.cx/api/push"; // APNs relay (holds the signing key)
+pub(crate) const DEFAULT_PUSH_RELAY: &str = "https://lpm.cx/api/push"; // APNs/FCM relay (holds the signing keys)
 
 fn default_true() -> bool {
     true
@@ -29,12 +29,19 @@ pub(crate) struct Device {
     pub(crate) name: String,
     pub(crate) token_hash: String, // sha256(token) hex — the raw token lives only on the phone
     pub(crate) created_at: i64,
-    // Push identity (registered via `apnsToken` after each auth). apns_token is the
-    // hex APNs device token; apns_env is "production"|"sandbox"; push_key is the
-    // phone's base64 AES-256 key the notification payload is sealed under.
+    // Push identity (registered via `apnsToken` or `pushToken` after each auth).
+    // apns_token is the device's token on its push_platform — the hex APNs device
+    // token, or an FCM registration token; it keeps its APNs-era name so existing
+    // files need no migration. apns_env is "production"|"sandbox" (APNs only);
+    // push_key is the phone's base64 AES-256 key the notification payload is
+    // sealed under.
     pub(crate) apns_token: String,
     pub(crate) apns_env: String,
     pub(crate) push_key: String,
+    // Which service delivers to apns_token: empty for APNs (every record from
+    // before Android phones), "fcm" for Firebase Cloud Messaging.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub(crate) push_platform: String,
     // Per-device notification prefs (from the phone's `notify` object). Agent
     // prefs default on for older records; automation prefs default off.
     #[serde(default = "default_true")]
@@ -81,6 +88,7 @@ impl Default for Device {
             apns_token: String::new(),
             apns_env: String::new(),
             push_key: String::new(),
+            push_platform: String::new(),
             push_waiting: true,
             push_done: true,
             push_error: true,
@@ -114,7 +122,7 @@ pub(crate) struct RemoteConfig {
     #[serde(default)]
     pub(crate) pairing_code_by_peer: bool,
     pub(crate) tailscale: bool, // advertise this Mac's Tailscale address in the pairing QR
-    pub(crate) push_relay: String, // override for the APNs relay URL (empty => DEFAULT_PUSH_RELAY)
+    pub(crate) push_relay: String, // override for the push relay URL (empty => DEFAULT_PUSH_RELAY)
     pub(crate) keep_awake: bool, // keep this machine from idle-sleeping while remote control is on
     // Stable identity of this Mac, minted on first run and persisted. Sent to the
     // phone so it can distinguish and label multiple paired Macs, and mixed into

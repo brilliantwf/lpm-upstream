@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Notification channels: Android lists them under the app's notification settings. -->
+    <string name="push_group_agents">Agents</string>
+    <string name="push_group_automations">Automations</string>
+    <string name="push_channel_waiting">Waiting for you</string>
+    <string name="push_channel_done">Finished</string>
+    <string name="push_channel_error">Error</string>
+    <string name="push_channel_automation_started">Started</string>
+    <string name="push_channel_automation_done">Finished</string>
+    <string name="push_channel_automation_error">Error or timeout</string>
+</resources>

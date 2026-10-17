@@ -268,8 +268,8 @@ link to that machine, and from there on the machine answers as itself: its
 and no `hosts`), then every request and push exactly as on a direct connection,
 in the same order. The machine knows the phone by the `deviceId` it has on this
 Mac, so a terminal's `owner` still names this phone. Its push notifications
-don't reach a phone that way — `apnsToken` belongs to Macs the phone is paired
-with — and the machine's own phone server can be off.
+don't reach a phone that way — `apnsToken` and `pushToken` belong to Macs the
+phone is paired with — and the machine's own phone server can be off.
 
 Failures, each followed by the Mac closing the connection:
 `{ "t": "error", "error": "unauthorized" }` as for `auth`;
@@ -660,16 +660,18 @@ hold as `beforeId` (`""` for the first page). Chat and message timestamps are un
 | `{ "t": "notesSearch", "project": "<name>", "query": "…", "limit": N }` | `{ "t": "notesSearch", "project": "<name>", "query": "…", "ok": true, "hits": [NoteSearchHit…] }` / `{ "ok": false, "error": "…" }` — substring match across the project's messages, newest first, `limit` default 50. `query` is echoed so a stale reply from a superseded keystroke can be dropped. Async (worker) |
 | `{ "t": "notesAttachment", "project": "<name>", "hash": "<sha256 hex>", "reqId": <any>? }` | `{ "t": "notesAttachment", "project": "<name>", "hash": "<sha256 hex>", "ok": true, "data": "<base64>" }` / `{ "ok": false, "error": "…" }` — one attachment's bytes. Over 8MiB the reply is `"This attachment is too large to open on your phone. Open it on your Mac instead."`; the phone knows each attachment's `size` from its message, so it should not ask in the first place. Async (worker) |
 
-### Push notifications (APNs)
+### Push notifications (APNs and FCM)
 
 While the app is backgrounded its socket dies, so agent status changes reach the
-phone as APNs pushes instead. The desktop sends them via a relay (the lpm
-website) that holds the APNs signing key; notification content is end-to-end
-encrypted, so the relay sees only opaque blobs and device tokens.
+phone as pushes instead: APNs for iPhones, Firebase Cloud Messaging (FCM) for
+Android phones. The desktop sends them via a relay (the lpm website) that holds
+the APNs signing key and the FCM service account; notification content is
+end-to-end encrypted, so the relay sees only opaque blobs and device tokens.
 
 | Request | Reply |
 |---|---|
 | `{ "t": "apnsToken", "token": "<hex APNs device token>", "env": "production"\|"sandbox", "key": "<base64 32-byte push key>", "notify": { "waiting": bool, "done": bool, "error": bool, "automationStarted": bool, "automationDone": bool, "automationError": bool } }` | `{ "t": "apnsToken", "ok": true }` / `{ "t": "apnsToken", "ok": false, "error": "…" }` — registers (or refreshes) this device's push identity; sent after every successful `auth`, since the token can rotate, and re-sent immediately when the user changes notification preferences. A phone also sends `{ "t": "presence", "active": bool }` (no reply) when its app leaves or returns to the screen, and `active: false` right after `ready` if a connection comes up while it's away; every new connection starts out counted as on screen, and older phones that never send it keep today's behavior. `env` is the APNs environment the build's token belongs to (debug builds → `sandbox`, TestFlight/App Store → `production`). `key` is the phone-generated AES-256 push key; the phone keeps **one** push key (Keychain, shared with the notification extension) and registers the same key with every paired Mac, so the extension never has to guess which key decrypts. `notify` selects which agent and automation outcomes this device wants pushed; the desktop filters **before** sealing/sending, so a disabled kind never leaves the Mac. Missing agent fields default to enabled for older phones; missing automation fields default to disabled. All-false keeps the device registered with notifications off. Everything persists on the device record in `remote.json`. `ok` is **false** for three reasons: the payload failed validation (`error` says which field), the Mac holds no device record for this `deviceId`, or — since every write became a read-modify-write, below — the device is paired but the registration **could not be saved**, e.g. `remote.json` is unreadable or another writer holds the lock too long. In that last case the device stays paired and the socket stays up; only push registration is missing, and the phone's next `auth` re-sends it |
+| `{ "t": "pushToken", "platform": "fcm"\|"apns", "token": "<push token>", "env": "production"\|"sandbox", "key": "<base64 32-byte push key>", "notify": { …as apnsToken… } }` | `{ "t": "pushToken", "ok": true }` / `{ "t": "pushToken", "ok": false, "error": "…" }` — the same registration for any push platform, with the same timing, `key`, `notify` defaults, persistence and `ok` semantics as `apnsToken`. Android phones send it with `platform: "fcm"`, their FCM registration token as `token`, and no `env` (FCM has none; one sent anyway is ignored). `platform: "apns"` takes an APNs token and `env` exactly as `apnsToken` does; iOS keeps sending `apnsToken`, which stays supported. Validation: an `fcm` token is 1–4096 characters of `A–Z a–z 0–9 _ : -`; an `apns` token is ≤200 hex characters with `env` `production` or `sandbox`; `key` must decode to 32 bytes; any other `platform` (or none) fails with `error: "invalid platform"`. A desktop that predates `pushToken` ignores it and never replies, so the phone treats a missing ack as not registered and sends it again on its next `auth` |
 
 **When the desktop pushes.** On an agent status transition to `Waiting`, `Done`,
 or `Error` (the same `status-changed` signal that drives the socket push), for
@@ -748,6 +750,41 @@ nothing leaks. Relay replies `{ "ok": true }` or
 `{ "ok": false, "status": <apns http status>, "reason": "<apns reason>" }`; on
 `410`/`Unregistered` the desktop clears that device's stored token so dead
 installs stop generating traffic.
+
+**Platforms.** Each device record stores its token's platform as
+`push_platform` in `remote.json`: absent for APNs (every record written before
+Android phones, and every `apnsToken` registration), `"fcm"` for an FCM token.
+The token itself stays in `apns_token`, whichever platform it belongs to, so
+existing files need no migration. A registration clears the push identity of
+every **other** record holding the same token on the same platform (a stale
+pairing of the same install). An older desktop sharing the file keeps the field
+but doesn't read it, so it may offer an FCM token to the relay as APNs; the relay
+rejects that body and nothing is sent.
+
+For an FCM device the desktop adds `"platform": "fcm"` to the relay body and
+leaves out `env`; every other field, and every kind of push (status alerts,
+automation alerts, withdrawals), is the same:
+```
+{ "platform": "fcm", "token": "<FCM registration token>", "blob": "<base64 sealed payload>", "type": "alert"|"background", "collapseId": "<≤64 chars>" }
+```
+`platform` defaults to `apns`. The relay sends an FCM device a **data-only**
+message through the FCM HTTP v1 API (`messages:send`, authorized with an OAuth2
+token from a service account: env vars `FCM_PROJECT_ID` / `FCM_CLIENT_EMAIL` /
+`FCM_PRIVATE_KEY`), so FCM never shows a notification of its own:
+```
+{ "message": { "token": "<token>", "data": { "blob": "<base64>", "type": "alert"|"background", "collapseId": "<id>" }, "android": { "priority": "HIGH"|"NORMAL", "ttl": "21600s", "collapse_key": "<id>" } } }
+```
+Alerts go at `HIGH` priority with `collapse_key` set to `collapseId`; withdrawals
+(`type: "background"`) at `NORMAL`, without one; both expire after ~6h like an
+APNs alert. The phone opens `blob` itself (the same `nonce || ciphertext || tag`
+AES-256-GCM box: the first 12 bytes are the GCM IV) and posts the notification —
+title and body as the iOS extension writes them, replacing an earlier one with
+the same `collapseId` — or, for a `clear`, removes the matching ones, scoped by
+`serverId` as on iOS. An FCM `UNREGISTERED` (404) or an `INVALID_ARGUMENT` about
+the registration token answers `410` like APNs' `Unregistered`; FCM out of reach
+answers `502` with `reason: "fcm unreachable"`. Each platform answers `503` with
+`reason: "relay not configured"` while its own credentials are missing, so a
+relay can serve one platform without the other.
 
 ### Server-initiated pushes (desktop → phone)
 

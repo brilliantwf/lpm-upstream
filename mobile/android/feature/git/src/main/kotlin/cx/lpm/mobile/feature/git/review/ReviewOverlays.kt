@@ -7,10 +7,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,25 +30,29 @@ import cx.lpm.mobile.core.designsystem.component.ListDefaults
 import cx.lpm.mobile.core.designsystem.component.ListRow
 import cx.lpm.mobile.core.designsystem.component.Shimmer
 import cx.lpm.mobile.core.designsystem.component.SkeletonBar
+import cx.lpm.mobile.core.designsystem.component.plainListSeparator
 import cx.lpm.mobile.core.designsystem.theme.LpmTheme
 import cx.lpm.mobile.feature.git.R
 
-/** The loading ghost, "Can't reach your Mac" with Retry, or "Not a git repository". */
+/**
+ * The loading ghost, "Can't reach your Mac" with Retry, "Not a git repository", or
+ * "No changes" with "Create Pull Request" when the Mac has the GitHub CLI.
+ */
 @Composable
 internal fun ReviewOverlayContent(
-    overlay: ReviewOverlay,
-    loadError: String?,
+    state: GitReviewUiState,
     onRetry: () -> Unit,
+    onCreatePullRequest: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    when (overlay) {
+    when (state.overlay ?: return) {
         ReviewOverlay.Skeleton -> ReviewSkeleton(modifier)
 
         ReviewOverlay.Unreachable -> Centered(modifier) {
             EmptyState(
                 title = stringResource(R.string.git_review_unreachable),
                 icon = painterResource(DesignR.drawable.ic_wifi_off),
-                description = { Description(loadError.orEmpty()) },
+                description = { Description(state.loadError.orEmpty()) },
                 actions = {
                     CapsuleButton(
                         text = stringResource(R.string.git_retry),
@@ -62,6 +69,35 @@ internal fun ReviewOverlayContent(
                 title = stringResource(R.string.git_review_not_repo),
                 icon = painterResource(DesignR.drawable.ic_folder_off),
                 description = { Description(stringResource(R.string.git_review_not_repo_message)) }
+            )
+        }
+
+        ReviewOverlay.NoChanges -> Centered(modifier) {
+            EmptyState(
+                title = stringResource(R.string.git_review_no_changes),
+                icon = painterResource(DesignR.drawable.ic_check_circle),
+                description = {
+                    Description(stringResource(R.string.git_review_no_changes_message))
+                },
+                actions = if (state.ghCli) {
+                    {
+                        CapsuleButton(
+                            text = stringResource(R.string.git_review_create_pr),
+                            onClick = onCreatePullRequest,
+                            textStyle = LpmTheme.typography.body,
+                            leading = {
+                                Icon(
+                                    painter = painterResource(DesignR.drawable.ic_merge),
+                                    contentDescription = null,
+                                    tint = LpmTheme.colors.tint,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        )
+                    }
+                } else {
+                    null
+                }
             )
         }
     }
@@ -82,43 +118,37 @@ private fun Description(text: String) {
     )
 }
 
-/** The branch row and four file rows, shimmering, until the first snapshot. */
+/** The summary and four file bars, shimmering, until the first snapshot. */
 @Composable
 private fun ReviewSkeleton(modifier: Modifier = Modifier) {
     val fill = LpmTheme.colors.tertiarySystemFill
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(LpmTheme.colors.systemGroupedBackground)
-            .padding(horizontal = ListDefaults.Margin)
-            .padding(top = ListDefaults.ContentTopPadding),
-        verticalArrangement = Arrangement.spacedBy(35.dp)
+            .background(LpmTheme.colors.systemBackground)
     ) {
-        ListCard {
-            Shimmer {
-                ListRow {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(Modifier.size(34.dp).background(fill, RoundedCornerShape(10.dp)))
-                        SkeletonBar(width = 120.dp)
-                    }
-                }
+        Shimmer {
+            Column(
+                Modifier.padding(horizontal = 16.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SkeletonBar(width = 120.dp)
+                Box(Modifier.fillMaxWidth().height(4.dp).background(fill, CircleShape))
             }
         }
-        ListCard(Modifier.fillMaxWidth()) {
-            listOf(160, 120, 190, 140).forEach { width ->
-                Shimmer {
-                    ListRow {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(Modifier.size(20.dp).background(fill, CircleShape))
-                            SkeletonBar(width = width.dp)
-                        }
-                    }
+        listOf(160, 120, 190, 140).forEach { width ->
+            Shimmer {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = ListDefaults.RowMinHeight)
+                        .plainListSeparator(LpmTheme.colors.separator)
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(Modifier.size(18.dp).background(fill, RoundedCornerShape(5.dp)))
+                    SkeletonBar(width = width.dp)
                 }
             }
         }

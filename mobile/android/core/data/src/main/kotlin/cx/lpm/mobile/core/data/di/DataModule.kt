@@ -35,6 +35,11 @@ import cx.lpm.mobile.core.data.mac.ThisDevice
 import cx.lpm.mobile.core.data.machines.MachineImporter
 import cx.lpm.mobile.core.data.prefs.AppPreferences
 import cx.lpm.mobile.core.data.projects.ProjectsStore
+import cx.lpm.mobile.core.data.push.NoPushTokens
+import cx.lpm.mobile.core.data.push.PushRegistrar
+import cx.lpm.mobile.core.data.push.PushStore
+import cx.lpm.mobile.core.data.push.PushTokenSource
+import cx.lpm.mobile.core.data.push.ResolvedPush
 import cx.lpm.mobile.core.data.services.ServiceLogsStore
 import cx.lpm.mobile.core.data.session.MacSession
 import cx.lpm.mobile.core.data.session.SessionEnvironment
@@ -103,6 +108,10 @@ object DataModule {
     @Provides
     fun tailnetRouter(router: Optional<TailnetRouter>): ResolvedTailnet =
         ResolvedTailnet(router.orElse(NoTailnet))
+
+    @Provides
+    fun pushTokens(source: Optional<PushTokenSource>): ResolvedPush =
+        ResolvedPush(source.orElse(NoPushTokens))
 
     @Provides
     @Singleton
@@ -253,6 +262,11 @@ object DataModule {
     @IntoSet
     fun machineImporterFactory(): SessionStore.Factory = SessionStore.Factory(::MachineImporter)
 
+    @Provides
+    @IntoSet
+    fun pushStoreFactory(registrar: Provider<PushRegistrar>): SessionStore.Factory =
+        SessionStore.Factory { PushStore(it, registrar.get()) }
+
     /**
      * The live session's stores, for app-level code (root, settings). Screens resolve
      * theirs from [cx.lpm.mobile.core.data.session.MacSessions] by their key's session.
@@ -272,6 +286,10 @@ interface DataBindings {
     /** Bound by `:core:tailnet`; until then every address is dialed directly. */
     @BindsOptionalOf
     fun tailnetRouter(): TailnetRouter
+
+    /** Bound by `:core:push`; until then no Mac is asked to push. */
+    @BindsOptionalOf
+    fun pushTokenSource(): PushTokenSource
 
     @Binds
     fun secretCipher(impl: KeystoreCipher): SecretCipher

@@ -12,40 +12,60 @@
     <string name="git_review_added">+%1$d</string>
     <string name="git_review_removed">−%1$d</string>
     <string name="git_review_jump">Jump to file</string>
-    <string name="git_review_changed_files">Changed files (%1$d)</string>
-    <string name="git_review_reviewed" tools:ignore="PluralsCandidate">%1$d of %2$d reviewed</string>
+    <plurals name="git_review_files_changed">
+        <item quantity="one">%1$d file changed</item>
+        <item quantity="other">%1$d files changed</item>
+    </plurals>
+    <string name="git_review_viewed" tools:ignore="PluralsCandidate">%1$d of %2$d viewed</string>
     <string name="git_review_no_changes">No changes</string>
-    <string name="git_review_commit_header">Commit</string>
-    <string name="git_review_commit_footer">Only the selected files are committed.</string>
-    <string name="git_review_commit_message">Commit message</string>
-    <string name="git_review_generating">Generating…</string>
-    <string name="git_review_generate_message">Generate message</string>
+    <string name="git_review_no_changes_message">The working tree is clean.</string>
+    <string name="git_review_commit">Commit</string>
     <plurals name="git_review_commit_files">
         <item quantity="one">Commit %1$d file</item>
         <item quantity="other">Commit %1$d files</item>
     </plurals>
-    <plurals name="git_review_conflicts">
-        <item quantity="one">%1$s has merge conflicts. Resolve the conflict markers (&lt;&lt;&lt;&lt;&lt;&lt;&lt; … &gt;&gt;&gt;&gt;&gt;&gt;&gt;) before committing.</item>
-        <item quantity="other">%1$s have merge conflicts. Resolve the conflict markers (&lt;&lt;&lt;&lt;&lt;&lt;&lt; … &gt;&gt;&gt;&gt;&gt;&gt;&gt;) before committing.</item>
-    </plurals>
-    <string name="git_review_conflicts_more" tools:ignore="PluralsCandidate">%1$s and %2$d more</string>
     <string name="git_review_create_pr">Create Pull Request</string>
     <string name="git_review_not_repo">Not a git repository</string>
     <string name="git_review_not_repo_message">This project isn\'t tracked by git, so there\'s nothing to review.</string>
     <string name="git_review_unreachable">Can\'t reach your Mac</string>
-    <string name="git_file_include">Include in commit</string>
     <string name="git_file_viewed">Viewed</string>
     <string name="git_file_on">On</string>
     <string name="git_file_off">Off</string>
     <string name="git_file_collapsed">Collapsed</string>
     <string name="git_file_expanded">Expanded</string>
-    <string name="git_file_conflict">Merge conflict</string>
+    <string name="git_file_excluded">Excluded</string>
     <string name="git_file_ask_agent">Ask agent…</string>
+    <string name="git_file_include_in_commit">Include in Commit</string>
+    <string name="git_file_exclude_from_commit">Exclude from Commit</string>
+    <string name="git_file_copy_path">Copy Path</string>
     <string name="git_file_binary">Binary file</string>
     <string name="git_file_no_changes">No changes to show</string>
     <string name="git_file_loading">Loading diff…</string>
     <string name="git_file_show_all" tools:ignore="PluralsCandidate">Show all %1$d lines</string>
     <string name="git_hunk_indent">⇥ %1$d</string>
+    <string name="git_status_added">Added</string>
+    <string name="git_status_untracked">Untracked</string>
+    <string name="git_status_deleted">Deleted</string>
+    <string name="git_status_renamed">Renamed</string>
+    <string name="git_status_modified">Modified</string>
+    <string name="git_status_conflicted">Merge conflict</string>
+
+    <!-- Commit -->
+    <string name="git_commit_title">Commit</string>
+    <string name="git_commit_message">Commit message</string>
+    <string name="git_commit_generating">Generating…</string>
+    <string name="git_commit_generate_message">Generate message</string>
+    <string name="git_commit_files">Files</string>
+    <string name="git_commit_select_all">Select All</string>
+    <string name="git_commit_deselect_all">Deselect All</string>
+    <string name="git_commit_footer">Only the selected files are committed.</string>
+    <string name="git_commit_included">Included</string>
+    <string name="git_commit_excluded">Excluded</string>
+    <plurals name="git_commit_conflicts">
+        <item quantity="one">%1$s has merge conflicts. Resolve the conflict markers (&lt;&lt;&lt;&lt;&lt;&lt;&lt; … &gt;&gt;&gt;&gt;&gt;&gt;&gt;) before committing.</item>
+        <item quantity="other">%1$s have merge conflicts. Resolve the conflict markers (&lt;&lt;&lt;&lt;&lt;&lt;&lt; … &gt;&gt;&gt;&gt;&gt;&gt;&gt;) before committing.</item>
+    </plurals>
+    <string name="git_commit_conflicts_more" tools:ignore="PluralsCandidate">%1$s and %2$d more</string>
 
     <!-- Pull request -->
     <string name="git_pr_title">Pull Request</string>

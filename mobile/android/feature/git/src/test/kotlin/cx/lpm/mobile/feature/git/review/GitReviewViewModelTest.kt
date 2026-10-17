@@ -54,27 +54,29 @@ class GitReviewViewModelTest {
         val t = demoSession()
         val state = review(t).uiState.value
         assertNull(state.overlay)
-        assertEquals(paths, state.files.map { it.path })
-        assertEquals(ReviewRow.ChangedHeader(count = 4, reviewed = 0), state.rows.first())
+        assertEquals(paths, state.commitFiles.map { it.file.path })
+        assertEquals(ReviewRow.Summary(total = 4, viewed = 0), state.rows.first())
         assertEquals(paths, state.headers.map { it.path })
         assertTrue(state.headers.all { it.selected && !it.viewed && !it.collapsed })
         assertEquals(state.headers.sumOf { it.added ?: 0 }, state.added)
         assertEquals(state.headers.sumOf { it.removed ?: 0 }, state.removed)
         assertEquals(22, state.headers.single { it.path == "lib/payments.ts" }.added)
         assertEquals(DiffBlockKind.Hunk, state.blocks("lib/payments.ts").first().block.kind)
-        assertEquals(listOf(ReviewRow.Commit, ReviewRow.CreatePullRequest), state.rows.takeLast(2))
+        assertEquals(ReviewRow.CreatePullRequest, state.rows.last())
         assertEquals(4, state.selectedCount)
+        assertTrue(state.commitFiles.all { it.selected })
+        assertEquals(22, state.commitFiles.single { it.file.path == "lib/payments.ts" }.added)
         assertFalse("no message yet", state.canCommit)
     }
 
     @Test
-    fun `marking a file viewed collapses it and counts it reviewed`() = runTest {
+    fun `marking a file viewed collapses it and counts it viewed`() = runTest {
         val t = demoSession()
         val vm = review(t)
         vm.toggleViewed("README.md")
         t.settle(0)
         var state = vm.uiState.value
-        assertEquals(ReviewRow.ChangedHeader(count = 4, reviewed = 1), state.rows.first())
+        assertEquals(ReviewRow.Summary(total = 4, viewed = 1), state.rows.first())
         val readme = state.headers.single { it.path == "README.md" }
         assertTrue(readme.viewed && readme.collapsed)
         assertTrue(state.blocks("README.md").isEmpty())
@@ -87,10 +89,7 @@ class GitReviewViewModelTest {
 
         vm.toggleViewed("README.md")
         t.settle(0)
-        assertEquals(
-            ReviewRow.ChangedHeader(count = 4, reviewed = 0),
-            vm.uiState.value.rows.first()
-        )
+        assertEquals(ReviewRow.Summary(total = 4, viewed = 0), vm.uiState.value.rows.first())
     }
 
     @Test
@@ -101,6 +100,7 @@ class GitReviewViewModelTest {
         t.settle(0)
         assertEquals(3, vm.uiState.value.selectedCount)
         assertFalse(vm.uiState.value.headers.single { it.path == "README.md" }.selected)
+        assertFalse(vm.uiState.value.commitFiles.single { it.file.path == "README.md" }.selected)
 
         vm.generateMessage()
         t.settle(0)
@@ -119,10 +119,25 @@ class GitReviewViewModelTest {
         assertTrue(vm.uiState.value.committing)
         t.settle(2_000)
         val after = vm.uiState.value
-        assertEquals(listOf("README.md"), after.files.map { it.path })
+        assertEquals(listOf("README.md"), after.commitFiles.map { it.file.path })
         assertEquals("", after.message)
         assertEquals(1, after.selectedCount)
+        assertEquals(1, after.commitTick)
         assertEquals("Committed successfully", after.notice?.text)
+    }
+
+    @Test
+    fun `select all and deselect all in the commit sheet`() = runTest {
+        val t = demoSession()
+        val vm = review(t)
+        vm.selectAll(false)
+        t.settle(0)
+        assertEquals(0, vm.uiState.value.selectedCount)
+        assertTrue(vm.uiState.value.commitFiles.none { it.selected })
+        assertTrue(vm.uiState.value.headers.none { it.selected })
+        vm.selectAll(true)
+        t.settle(0)
+        assertEquals(4, vm.uiState.value.selectedCount)
     }
 
     @Test
@@ -188,6 +203,15 @@ class GitReviewViewModelTest {
         socket.receive("""{"t":"git","ok":true,"project":"storefront","isRepo":false}""")
         t.settle(0)
         assertEquals(ReviewOverlay.NotRepo, vm.uiState.value.overlay)
+        assertTrue(vm.uiState.value.rows.isEmpty())
+
+        vm.load()
+        socket.receive(
+            """{"t":"git","ok":true,"project":"storefront","isRepo":true,"ghCli":true,"files":[]}"""
+        )
+        t.settle(0)
+        assertEquals(ReviewOverlay.NoChanges, vm.uiState.value.overlay)
+        assertTrue(vm.uiState.value.ghCli)
         assertTrue(vm.uiState.value.rows.isEmpty())
 
         vm.disappear()

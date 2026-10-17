@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// The git review screen for a project: the branch and its upstream relation with
-/// a Push button, the changed files (each selectable for commit and tappable for
-/// its diff), a commit message field with an AI "generate" helper, and — when the
-/// GitHub CLI is available — a "Create Pull Request" flow.
+/// The git review screen for a project: how many files changed and how many are
+/// viewed, then every changed file with its whole diff under a header that pins
+/// while it scrolls, and a pinned "Commit N files" that opens the commit sheet.
+/// When the GitHub CLI is available it also offers "Create Pull Request".
 struct GitReviewView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
@@ -13,6 +13,11 @@ struct GitReviewView: View {
     // Files the user explicitly unchecked. Everything else stays selected, so new
     // changes are picked up automatically and deselections survive a refresh.
     @State private var deselected: Set<String> = []
+    // Collapse the user chose per file; a file without a choice is collapsed once
+    // it's viewed.
+    @State private var collapsed: [String: Bool] = [:]
+    @State private var pins = HeaderPins()
+    @State private var showCommit = false
     @State private var showPrSheet = false
     @State private var asking: AskContext?
     @State private var openTerminal: TerminalInfo?
@@ -22,60 +27,65 @@ struct GitReviewView: View {
     private var snapshot: GitSnapshot? { model.git.snapshots[name] }
     private var loadError: String? { model.git.loadError[name] }
     private var loading: Bool { model.git.loading.contains(name) }
-    private var pushing: Bool { model.git.pushing.contains(name) }
-    private var committing: Bool { model.git.committing.contains(name) }
-    private var generating: Bool { model.git.generatingMessage.contains(name) }
+    private var changedFiles: [GitFile]? {
+        guard let s = snapshot, s.isRepo, !s.files.isEmpty else { return nil }
+        return s.files
+    }
 
-    private var selectedPaths: [String] {
-        (snapshot?.files ?? []).map(\.path).filter { !deselected.contains($0) }
-    }
-    private var trimmedMessage: String {
-        message.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-    private var canCommit: Bool {
-        !selectedPaths.isEmpty && !trimmedMessage.isEmpty && !committing && !pushing
+    private var selectedCount: Int {
+        (snapshot?.files ?? []).filter { !deselected.contains($0.path) }.count
     }
 
     var body: some View {
         ScrollViewReader { proxy in
             List {
-                if let s = snapshot, s.isRepo {
-                    if s.files.isEmpty {
-                        noChangesSection
-                    } else {
-                        changedFilesHeader(s)
-                        ForEach(s.files) { file in
-                            GitFileSection(
-                                project: name,
-                                file: file,
-                                selected: !deselected.contains(file.path),
-                                toggle: { toggle(file.path) },
-                                onAsk: { diffText in asking = AskContext(path: file.path, diffText: diffText) }
-                            )
-                            .id("file-" + file.path)
-                        }
-                        commitSection
+                if let files = changedFiles {
+                    Section {
+                        ReviewSummary(total: files.count, viewed: viewedCount(files))
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
                     }
-                    if s.ghCli {
+                    ForEach(files) { file in
+                        GitFileSection(
+                            project: name,
+                            file: file,
+                            selected: !deselected.contains(file.path),
+                            collapsed: isCollapsed(file.path),
+                            toggleSelected: { toggleSelected(file.path) },
+                            toggleCollapsed: { toggleCollapsed(file.path) },
+                            toggleViewed: { toggleViewed(file.path, proxy: proxy) },
+                            onAsk: { diffText in asking = AskContext(path: file.path, diffText: diffText) },
+                            pins: pins
+                        )
+                    }
+                    if snapshot?.ghCli == true {
                         prSection
                     }
                 }
             }
             .listStyle(.plain)
+            .listSectionSpacing(0)
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Changes")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable { await refresh() }
             .overlay { stateOverlay }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if changedFiles != nil {
+                    CommitBar(selected: selectedCount, committing: model.git.committing.contains(name)) {
+                        showCommit = true
+                    }
+                }
+            }
             .gitNotice(project: name, isActive: isVisible)
             .animation(.default, value: snapshot?.files.count ?? -1)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     ChangesTitle(project: name)
                 }
-                if let s = snapshot, s.isRepo, !s.files.isEmpty {
+                if let files = changedFiles {
                     ToolbarItem(placement: .topBarTrailing) {
-                        jumpMenu(s, proxy: proxy)
+                        jumpMenu(files, proxy: proxy)
                     }
                 }
             }
@@ -105,15 +115,20 @@ struct GitReviewView: View {
             }
             // Gated on isVisible: a terminal pushed from this screen hosts the
             // project menu, whose git ops report into the same gitOpError slot —
-            // without the gate both screens would try to present this alert.
+            // without the gate both screens would try to present this alert. The
+            // commit sheet reports its own failures while it's up.
             .alert(
                 model.git.opError[name]?.title ?? "",
-                isPresented: Binding(get: { isVisible && model.git.opError[name] != nil },
+                isPresented: Binding(get: { isVisible && !showCommit && model.git.opError[name] != nil },
                                      set: { if !$0 { model.git.opError[name] = nil } })
             ) {
                 Button("OK", role: .cancel) { model.git.opError[name] = nil }
             } message: {
                 Text(model.git.opError[name]?.message ?? "")
+            }
+            .sheet(isPresented: $showCommit) {
+                GitCommitSheet(project: name, message: $message, deselected: $deselected)
+                    .environment(model)
             }
             .sheet(isPresented: $showPrSheet) {
                 GitPrSheet(project: project)
@@ -138,130 +153,31 @@ struct GitReviewView: View {
         }
     }
 
-    /// The desktop's ConflictNotice: which files still have merge conflicts.
-    private var conflictNotice: String? {
-        let paths = (snapshot?.files ?? []).filter { $0.status == "conflicted" }.map(\.path)
-        if paths.isEmpty { return nil }
-        let shown = 3
-        let named = paths.count > shown
-            ? paths.prefix(shown).joined(separator: ", ") + " and \(paths.count - shown) more"
-            : paths.joined(separator: ", ")
-        return "\(named) \(paths.count == 1 ? "has" : "have") merge conflicts. Resolve the conflict markers (<<<<<<< … >>>>>>>) before committing."
+    private func viewedCount(_ files: [GitFile]) -> Int {
+        files.filter { model.git.isViewed(name, path: $0.path) }.count
     }
 
-    private func reviewedCount(_ s: GitSnapshot) -> Int {
-        s.files.filter { model.git.isViewed(name, path: $0.path) }.count
+    private func isCollapsed(_ path: String) -> Bool {
+        collapsed[path] ?? model.git.isViewed(name, path: path)
     }
 
-    private func jumpMenu(_ s: GitSnapshot, proxy: ScrollViewProxy) -> some View {
+    /// Every changed file by name with its folder, checked once viewed, each
+    /// scrolling to its diff.
+    private func jumpMenu(_ files: [GitFile], proxy: ScrollViewProxy) -> some View {
         Menu {
-            ForEach(s.files) { f in
+            ForEach(files) { f in
                 Button {
                     withAnimation { proxy.scrollTo("file-" + f.path, anchor: .top) }
                 } label: {
-                    Label((f.path as NSString).lastPathComponent, systemImage: jumpSymbol(f.status))
+                    Label(f.name, systemImage: model.git.isViewed(name, path: f.path)
+                          ? "checkmark.circle.fill" : GitFileStatus(f.status).symbol)
+                    if !f.directory.isEmpty { Text(f.directory) }
                 }
             }
         } label: {
             Image(systemName: "list.bullet")
         }
         .accessibilityLabel("Jump to file")
-    }
-
-    private func jumpSymbol(_ status: String) -> String {
-        switch status {
-        case "added": return "plus.circle"
-        case "deleted": return "minus.circle"
-        case "renamed": return "arrow.right.circle"
-        case "untracked": return "questionmark.circle"
-        case "conflicted": return "exclamationmark.triangle"
-        default: return "pencil.circle"
-        }
-    }
-
-    // MARK: sections
-
-    /// The "Changed files (N)" label as a plain row (not a Section header, which
-    /// would pin to the top while scrolling in a .plain list).
-    private func changedFilesHeader(_ s: GitSnapshot) -> some View {
-        Section {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Changed files (\(s.files.count))")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-                if reviewedCount(s) > 0 {
-                    Text("\(reviewedCount(s)) of \(s.files.count) reviewed")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .padding(.top, 10)
-            .padding(.bottom, 2)
-            .listRowSeparator(.hidden)
-            .listRowBackground(Color.clear)
-        }
-    }
-
-    private var noChangesSection: some View {
-        Section {
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                    .accessibilityHidden(true)
-                Text("No changes")
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-            .padding(.vertical, 6)
-        }
-    }
-
-    private var commitSection: some View {
-        Section {
-            if let notice = conflictNotice {
-                Text(notice)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-            }
-            TextField("Commit message", text: $message, axis: .vertical)
-                .lineLimit(3...8)
-
-            Button {
-                model.git.genMessage(name, files: selectedPaths)
-            } label: {
-                HStack(spacing: 8) {
-                    if generating {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Image(systemName: "sparkles")
-                    }
-                    Text(generating ? "Generating…" : "Generate message")
-                }
-            }
-            .disabled(generating || selectedPaths.isEmpty)
-
-            Button(action: commit) {
-                HStack {
-                    Spacer()
-                    if committing {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Text("Commit \(selectedPaths.count) file\(selectedPaths.count == 1 ? "" : "s")")
-                            .fontWeight(.semibold)
-                    }
-                    Spacer()
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(!canCommit)
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-            .listRowSeparator(.hidden)
-        } header: {
-            Text("Commit")
-        } footer: {
-            Text("Only the selected files are committed.")
-        }
     }
 
     private var prSection: some View {
@@ -271,6 +187,7 @@ struct GitReviewView: View {
             } label: {
                 Label("Create Pull Request", systemImage: "arrow.triangle.pull")
             }
+            .padding(.vertical, 6)
         }
     }
 
@@ -283,6 +200,22 @@ struct GitReviewView: View {
                 Label("Not a git repository", systemImage: "folder.badge.questionmark")
             } description: {
                 Text("This project isn't tracked by git, so there's nothing to review.")
+            }
+        } else if let s = snapshot, s.files.isEmpty {
+            ContentUnavailableView {
+                Label("No changes", systemImage: "checkmark.circle")
+            } description: {
+                Text("The working tree is clean.")
+            } actions: {
+                if s.ghCli {
+                    Button {
+                        showPrSheet = true
+                    } label: {
+                        Label("Create Pull Request", systemImage: "arrow.triangle.pull")
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.capsule)
+                }
             }
         } else if snapshot == nil {
             if let loadError, !loading {
@@ -302,51 +235,40 @@ struct GitReviewView: View {
 
     // MARK: actions
 
-    private func toggle(_ path: String) {
+    private func toggleSelected(_ path: String) {
         if deselected.contains(path) { deselected.remove(path) } else { deselected.insert(path) }
     }
 
-    private func commit() {
-        model.git.commit(name, message: trimmedMessage, files: selectedPaths)
+    private func toggleCollapsed(_ path: String) {
+        let now = !isCollapsed(path)
+        withAnimation(.easeInOut(duration: 0.15)) { collapsed[path] = now }
+    }
+
+    /// Marking a file viewed collapses it; unmarking opens it again. A header
+    /// pinned over its scrolled diff would collapse out from under the screen, so
+    /// the list goes back to it instead, the next file right below it.
+    private func toggleViewed(_ path: String, proxy: ScrollViewProxy) {
+        let nowViewed = !model.git.isViewed(name, path: path)
+        let wasOpen = !isCollapsed(path)
+        Haptics.tap()
+        guard nowViewed, wasOpen, pins.isPinned(path) else {
+            model.git.toggleViewed(name, path: path)
+            withAnimation(.easeInOut(duration: 0.15)) { collapsed[path] = nowViewed }
+            return
+        }
+        // The scroll lands on the next layout pass, so the diff is held open until
+        // it has: collapsed first, the list would lose its place.
+        collapsed[path] = false
+        model.git.toggleViewed(name, path: path)
+        proxy.scrollTo("file-" + path, anchor: .top)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.easeInOut(duration: 0.2)) { collapsed[path] = true }
+        }
     }
 
     private func refresh() async {
         model.git.load(name)
         try? await Task.sleep(nanoseconds: 600_000_000)
-    }
-}
-
-/// The two-line nav title: "Changes" over the aggregate +A −D, GitHub-style. Its
-/// own view so that reading every file's parsed diff (which the aggregate genuinely
-/// depends on) re-evaluates only this title as parses land, not the whole file list.
-private struct ChangesTitle: View {
-    @Environment(AppModel.self) private var model
-    let project: String
-
-    private var totals: (added: Int, removed: Int) {
-        var added = 0, removed = 0
-        for file in model.git.snapshots[project]?.files ?? [] {
-            if let parsed = model.git.parsedDiff(project, path: file.path) {
-                added += parsed.addedCount
-                removed += parsed.removedCount
-            }
-        }
-        return (added, removed)
-    }
-
-    var body: some View {
-        let t = totals
-        VStack(spacing: 1) {
-            Text("Changes").font(.headline)
-            if t.added > 0 || t.removed > 0 {
-                HStack(spacing: 6) {
-                    Text("+\(t.added)").foregroundStyle(.green)
-                    Text("−\(t.removed)").foregroundStyle(.red)
-                }
-                .font(.footnote.weight(.semibold))
-                .monospacedDigit()
-            }
-        }
     }
 }
 
@@ -357,445 +279,18 @@ struct AskContext: Identifiable {
     let diffText: String
 }
 
-/// One changed file as its own section (GitHub "Files changed" style): a full-bleed
-/// header bar (commit checkmark, collapse chevron, monospaced path, +N −M, viewed
-/// circle, ellipsis menu) followed by the whole diff — one wrapping List row per
-/// line, edge-to-edge. Diffs fetch lazily on first appearance; the List virtualizes
-/// the rows, so even huge diffs render fully with no cap.
-private struct GitFileSection: View {
-    @Environment(AppModel.self) private var model
-    let project: String
-    let file: GitFile
-    let selected: Bool
-    let toggle: () -> Void
-    let onAsk: (String) -> Void
+/// Where each file's header and first diff row sit on screen, so marking a file
+/// viewed can tell a header pinned over its scrolled diff from one in place. A
+/// plain class: scrolling updates it without re-rendering the review.
+final class HeaderPins {
+    private var headerBottom: [String: CGFloat] = [:]
+    private var firstRowTop: [String: CGFloat] = [:]
 
-    @State private var collapsed = false
-    @State private var expanded = false
-    private let softCap = 600
+    func header(_ path: String, bottom: CGFloat) { headerBottom[path] = bottom }
+    func firstRow(_ path: String, top: CGFloat) { firstRowTop[path] = top }
 
-    private var key: String { model.git.diffKey(project, file.path) }
-    private var result: GitDiffResult? { model.git.diffs[key] }
-    private var loading: Bool { model.git.diffLoading.contains(key) }
-    private var error: String? { model.git.diffError[key] }
-    private var parsed: ParsedDiff? { model.git.parsedDiff(project, path: file.path) }
-    private var viewed: Bool { model.git.isViewed(project, path: file.path) }
-    private var promptDiff: String {
-        guard let result, !result.binary else { return "" }
-        return ParsedDiff.promptDiff(result.diff)
-    }
-
-    var body: some View {
-        Section {
-            headerBar
-                .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color(.secondarySystemGroupedBackground))
-                .contextMenu { askButton }
-            if !collapsed {
-                content
-            }
-        }
-        .onAppear {
-            collapsed = viewed
-            if result == nil && !loading { model.git.loadDiff(project, path: file.path) }
-        }
-    }
-
-    private var askButton: some View {
-        Button { onAsk(promptDiff) } label: {
-            Label("Ask agent…", systemImage: "sparkles")
-        }
-    }
-
-    private var headerBar: some View {
-        HStack(spacing: 10) {
-            Button(action: toggle) {
-                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 20))
-                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Include in commit")
-            .accessibilityValue(selected ? "On" : "Off")
-
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) { collapsed.toggle() }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: collapsed ? "chevron.right" : "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-                    if file.status == "conflicted" {
-                        Text("!")
-                            .font(.system(size: 13, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.red)
-                            .accessibilityLabel("Merge conflict")
-                    }
-                    Text(file.path)
-                        .font(.system(size: 13, design: .monospaced))
-                        .lineLimit(1)
-                        .truncationMode(.head)
-                        .foregroundStyle(.primary)
-                    Spacer(minLength: 6)
-                    if let parsed {
-                        DiffStat(added: parsed.addedCount, removed: parsed.removedCount)
-                    }
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityValue(collapsed ? "Collapsed" : "Expanded")
-
-            Button {
-                let nowViewed = !viewed
-                model.git.toggleViewed(project, path: file.path)
-                withAnimation(.easeInOut(duration: 0.15)) { collapsed = nowViewed }
-            } label: {
-                Image(systemName: viewed ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 18))
-                    .foregroundStyle(viewed ? Color.green : Color.secondary)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Viewed")
-            .accessibilityValue(viewed ? "On" : "Off")
-
-            Menu {
-                askButton
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
-            }
-            .accessibilityLabel("More")
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        // A bare Divider over an HStack takes its axis and draws a vertical line.
-        .overlay(alignment: .bottom) { VStack(spacing: 0) { Divider() } }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        if let result {
-            if result.binary {
-                stateRow { InlineNote(icon: "doc.badge.gearshape", text: "Binary file") }
-            } else if result.diff.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                stateRow { InlineNote(icon: "doc.plaintext", text: "No changes to show") }
-            } else if let parsed {
-                let blocks = shownBlocks(parsed)
-                ForEach(blocks) { block in
-                    blockRow(block)
-                }
-                if blocks.count < parsed.blocks.count {
-                    showAllRow(total: parsed.lines.count)
-                }
-            } else {
-                stateRow { InlineDiffLoading() }
-            }
-        } else if let error {
-            stateRow { InlineDiffError(message: error) { model.git.loadDiff(project, path: file.path) } }
-        } else {
-            stateRow { InlineDiffLoading() }
-        }
-    }
-
-    /// Whole blocks up to the soft line cap (unless expanded), so a monster file
-    /// doesn't realize thousands of merged-Text lines at once. The cap applies from
-    /// line zero; blocks are chunked (≤48 lines) so the first block always fits and
-    /// something still renders.
-    private func shownBlocks(_ parsed: ParsedDiff) -> [DiffBlock] {
-        if expanded { return parsed.blocks }
-        var result: [DiffBlock] = []
-        var lines = 0
-        for block in parsed.blocks {
-            if block.kind == .code {
-                if lines + block.lineCount > softCap { break }
-                lines += block.lineCount
-            }
-            result.append(block)
-        }
-        if result.count < parsed.blocks.count, result.last?.kind == .hunk {
-            result.removeLast()
-        }
-        return result
-    }
-
-    @ViewBuilder
-    private func blockRow(_ block: DiffBlock) -> some View {
-        if block.kind == .hunk {
-            HunkSeparator(label: block.hunkLabel, context: block.hunkContext, indent: block.indentHint)
-                .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color(.secondarySystemFill))
-        } else {
-            DiffCodeBlock(block: block)
-                .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color(.systemBackground))
-        }
-    }
-
-    private func showAllRow(total: Int) -> some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.15)) { expanded = true }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.down")
-                Text("Show all \(total) lines")
-            }
-            .font(.footnote.weight(.medium))
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.vertical, 12)
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(.tint)
-        .listRowInsets(EdgeInsets())
-        .listRowSeparator(.hidden)
-        .listRowBackground(Color(.secondarySystemGroupedBackground))
-    }
-
-    private func stateRow<V: View>(@ViewBuilder _ content: () -> V) -> some View {
-        content()
-            .listRowInsets(EdgeInsets())
-            .listRowSeparator(.hidden)
-    }
-}
-
-/// The per-file "+N −M" change counts shown in the header once the diff has parsed.
-private struct DiffStat: View {
-    let added: Int
-    let removed: Int
-
-    var body: some View {
-        HStack(spacing: 6) {
-            if added > 0 {
-                Text("+\(added)").foregroundStyle(.green)
-            }
-            if removed > 0 {
-                Text("−\(removed)").foregroundStyle(.red)
-            }
-        }
-        .font(.system(size: 12, weight: .semibold, design: .monospaced))
-        .monospacedDigit()
-    }
-}
-
-private struct InlineNote: View {
-    let icon: String
-    let text: String
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-            Text(text)
-            Spacer(minLength: 0)
-        }
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-    }
-}
-
-private struct InlineDiffLoading: View {
-    var body: some View {
-        HStack(spacing: 10) {
-            ProgressView().controlSize(.small)
-            Text("Loading diff…")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-    }
-}
-
-private struct InlineDiffError: View {
-    let message: String
-    let retry: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle")
-                .foregroundStyle(.orange)
-            Text(message)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-            Spacer(minLength: 8)
-            Button("Retry", action: retry)
-                .font(.footnote.weight(.semibold))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-    }
-}
-
-/// Loading ghost for the review screen, matching the branch + file-row layout.
-private struct GitReviewSkeleton: View {
-    var body: some View {
-        List {
-            Section {
-                HStack(spacing: 14) {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color(.tertiarySystemFill))
-                        .frame(width: 34, height: 34)
-                    SkeletonBar(width: 120)
-                    Spacer()
-                }
-                .shimmer()
-            }
-            Section {
-                ForEach([160.0, 120.0, 190.0, 140.0], id: \.self) { w in
-                    HStack(spacing: 12) {
-                        Circle().fill(Color(.tertiarySystemFill)).frame(width: 20, height: 20)
-                        SkeletonBar(width: w)
-                        Spacer()
-                    }
-                    .shimmer()
-                }
-            }
-        }
-        .scrollDisabled(true)
-        .allowsHitTesting(false)
-        .transition(.opacity)
-    }
-}
-
-/// The create-pull-request sheet: editable title + body with an AI "generate"
-/// helper, and a Create action. Creating pushes first, so it can take a while; on
-/// success the PR's URL is shown with an Open button. Presentable from both the
-/// review screen and the project screen's Git menu.
-struct GitPrSheet: View {
-    @Environment(AppModel.self) private var model
-    let project: Project
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var title = ""
-    @State private var body_ = ""
-    @State private var createdURL: String?
-
-    private var name: String { project.name }
-    private var generating: Bool { model.git.generatingPr.contains(name) }
-    private var creating: Bool { model.git.creatingPr.contains(name) }
-    private var canCreate: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !creating && !generating
-    }
-
-    var body: some View {
-        NavigationStack {
-            Group {
-                if let url = createdURL {
-                    createdView(url)
-                } else {
-                    form
-                }
-            }
-            .navigationTitle("Pull Request")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(createdURL == nil ? "Cancel" : "Done") { dismiss() }
-                }
-                if createdURL == nil {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button(action: create) {
-                            if creating {
-                                ProgressView().controlSize(.small)
-                            } else {
-                                Text("Create").fontWeight(.semibold)
-                            }
-                        }
-                        .disabled(!canCreate)
-                    }
-                }
-            }
-            .onChange(of: model.git.prDraft[name]) { _, draft in
-                if let draft {
-                    title = draft.title
-                    body_ = draft.body
-                    model.git.consumePrDraft(name)
-                }
-            }
-            .onChange(of: model.git.createdPrURL[name]) { _, url in
-                if let url {
-                    createdURL = url
-                    model.git.consumeCreatedPrURL(name)
-                }
-            }
-            .alert(
-                "Something went wrong",
-                isPresented: Binding(get: { model.git.prError[name] != nil },
-                                     set: { if !$0 { model.git.prError[name] = nil } })
-            ) {
-                Button("OK", role: .cancel) { model.git.prError[name] = nil }
-            } message: {
-                Text(model.git.prError[name] ?? "")
-            }
-        }
-    }
-
-    private var form: some View {
-        Form {
-            Section {
-                TextField("Title", text: $title, axis: .vertical)
-                    .lineLimit(1...3)
-            } header: {
-                Text("Title")
-            }
-            Section {
-                TextField("Description", text: $body_, axis: .vertical)
-                    .lineLimit(4...16)
-            } header: {
-                Text("Description")
-            }
-            Section {
-                Button {
-                    model.git.genPr(name)
-                } label: {
-                    HStack(spacing: 8) {
-                        if generating {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "sparkles")
-                        }
-                        Text(generating ? "Generating…" : "Generate with AI")
-                    }
-                }
-                .disabled(generating)
-            } footer: {
-                Text("Creating a pull request pushes your branch first, so it can take a moment.")
-            }
-        }
-    }
-
-    private func createdView(_ url: String) -> some View {
-        ContentUnavailableView {
-            Label("Pull request created", systemImage: "checkmark.seal.fill")
-        } description: {
-            Text(url)
-                .font(.footnote)
-                .textSelection(.enabled)
-        } actions: {
-            if let link = URL(string: url) {
-                Link(destination: link) {
-                    Label("Open in Safari", systemImage: "safari")
-                }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-            }
-        }
-    }
-
-    private func create() {
-        model.git.createPr(name,
-                          title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-                          body: body_)
+    func isPinned(_ path: String) -> Bool {
+        guard let bottom = headerBottom[path], let top = firstRowTop[path] else { return false }
+        return top < bottom - 1
     }
 }

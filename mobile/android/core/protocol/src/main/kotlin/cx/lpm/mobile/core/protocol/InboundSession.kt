@@ -46,6 +46,7 @@ internal val sessionParsers = parsers {
     put("error") { o -> Inbound.Error(o.string("error") ?: "error") }
     put("pong") { Inbound.Pong }
     put("apnsToken") { o -> Inbound.ApnsToken(ok = o.ok) }
+    put("pushToken") { o -> Inbound.PushToken(ok = o.ok) }
     put("stats") { o ->
         Inbound.Stats(
             stats = if (o.ok) AgentStats.parse(o.obj("stats") ?: emptyObject) else null,

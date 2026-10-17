@@ -190,6 +190,8 @@ private fun LpmClientCallbacks.routeGitAndMore(frame: Inbound) {
 
         is Inbound.ApnsToken -> onApnsToken?.invoke(frame.ok)
 
+        is Inbound.PushToken -> onPushToken?.invoke(frame.ok)
+
         is Inbound.ComposerActions -> onComposerActions?.invoke(frame.actions)
 
         is Inbound.TransformVariant ->

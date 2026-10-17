@@ -89,6 +89,36 @@ sealed interface WireSession {
         }
     }
 
+    /**
+     * The platform-neutral registration ("fcm" here; iOS keeps [apnsToken]). `env`
+     * is APNs-only, so it's left out when null.
+     */
+    fun pushToken(
+        platform: String,
+        token: String,
+        env: String?,
+        key: String,
+        notifyWaiting: Boolean,
+        notifyDone: Boolean,
+        notifyError: Boolean,
+        notifyAutomationStarted: Boolean,
+        notifyAutomationDone: Boolean,
+        notifyAutomationError: Boolean
+    ): String = frame("pushToken") {
+        put("platform", platform)
+        put("token", token)
+        env?.let { put("env", it) }
+        put("key", key)
+        putJsonObject("notify") {
+            put("waiting", notifyWaiting)
+            put("done", notifyDone)
+            put("error", notifyError)
+            put("automationStarted", notifyAutomationStarted)
+            put("automationDone", notifyAutomationDone)
+            put("automationError", notifyAutomationError)
+        }
+    }
+
     /** The machines this Mac connects to (its Linux servers and other Macs). */
     fun machines(): String = frame("machines")
 

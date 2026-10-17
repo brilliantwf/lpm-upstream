@@ -15,16 +15,15 @@ internal val GitFile.isConflicted: Boolean get() = status == "conflicted"
 sealed interface ReviewRow {
     val key: String
 
-    /** "CHANGED FILES (4)", and "1 of 4 reviewed" once any is. */
-    data class ChangedHeader(val count: Int, val reviewed: Int) : ReviewRow {
-        override val key get() = "changed"
+    /** "4 files changed" and "1 of 4 viewed" over the viewed progress bar. */
+    data class Summary(val total: Int, val viewed: Int) : ReviewRow {
+        override val key get() = "summary"
     }
 
-    data object NoChanges : ReviewRow {
-        override val key get() = "no-changes"
-    }
-
-    /** A file's bar: select, collapse, path, +N −M once parsed, viewed, "…". */
+    /**
+     * A file's bar, pinned while its diff scrolls: collapse, status, name over folder
+     * with +N −M once parsed, "Excluded" when left out of the commit, viewed, "…".
+     */
     data class FileHeader(
         val file: GitFile,
         val selected: Boolean,
@@ -47,10 +46,6 @@ sealed interface ReviewRow {
 
     data class ShowAll(val path: String, val total: Int) : ReviewRow {
         override val key get() = "all:$path"
-    }
-
-    data object Commit : ReviewRow {
-        override val key get() = "commit"
     }
 
     data object CreatePullRequest : ReviewRow {
@@ -83,18 +78,14 @@ internal class ReviewFile(
 )
 
 /**
- * The review list (iOS `GitReviewView`'s `List`): the changed-files header, each file
- * as a header bar and (unless collapsed) its diff, the commit section, and "Create
- * Pull Request" when the GitHub CLI is there.
+ * The review list (iOS `GitReviewView`'s `List`): the summary, each file as a header
+ * bar and (unless collapsed) its diff, and "Create Pull Request" when the GitHub CLI
+ * is there. No changes leaves it empty for the "No changes" overlay.
  */
 internal fun reviewRows(files: List<ReviewFile>, ghCli: Boolean): List<ReviewRow> = buildList {
-    if (files.isEmpty()) {
-        add(ReviewRow.NoChanges)
-    } else {
-        add(ReviewRow.ChangedHeader(files.size, files.count { it.viewed }))
-        files.forEach { addFile(it) }
-        add(ReviewRow.Commit)
-    }
+    if (files.isEmpty()) return@buildList
+    add(ReviewRow.Summary(files.size, files.count { it.viewed }))
+    files.forEach { addFile(it) }
     if (ghCli) add(ReviewRow.CreatePullRequest)
 }
 

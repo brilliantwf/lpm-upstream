@@ -5,17 +5,20 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasStateDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
 import cx.lpm.mobile.core.designsystem.theme.LpmTheme
 import cx.lpm.mobile.core.model.GitFile
 import cx.lpm.mobile.feature.git.diff.ParsedDiff
@@ -52,25 +55,40 @@ class GitReviewScreenTest {
                     toggleCollapsed = { events += "collapse $it" },
                     toggleViewed = { events += "viewed $it" },
                     ask = { events += "ask $it" },
-                    generateMessage = { events += "generate" },
-                    commit = { events += "commit" },
+                    openCommit = { events += "open commit" },
                     createPullRequest = { events += "pr" }
                 )
             )
         }
     }
 
+    private fun showSheet(state: GitReviewUiState) = compose.setContent {
+        LpmTheme {
+            GitCommitSheet(
+                state = state,
+                actions = CommitActions(
+                    setMessage = { events += "message $it" },
+                    generateMessage = { events += "generate" },
+                    toggleSelected = { events += "select $it" },
+                    selectAll = { events += "all $it" },
+                    commit = { events += "commit" }
+                ),
+                onDismiss = { events += "dismiss" }
+            )
+        }
+    }
+
+    private val review = listOf(
+        ReviewFile(app, null, null, parsed, true, false, false, false),
+        ReviewFile(logo, null, "too big", null, false, true, false, false)
+    )
+
     private fun loaded(message: String = "", canCommit: Boolean = false) = GitReviewUiState(
         project = "storefront",
         overlay = null,
-        files = listOf(app, logo),
-        rows = reviewRows(
-            listOf(
-                ReviewFile(app, null, null, parsed, true, false, false, false),
-                ReviewFile(logo, null, "too big", null, false, true, false, false)
-            ),
-            ghCli = true
-        ),
+        ghCli = true,
+        rows = reviewRows(review, ghCli = true),
+        commitFiles = listOf(CommitFile(app, true, 1, 1), CommitFile(logo, false, null, null)),
         added = 1,
         removed = 1,
         message = message,
@@ -85,61 +103,54 @@ class GitReviewScreenTest {
         // In the title, and on the file's bar.
         compose.onAllNodesWithText("+1", substring = true).assertCountEquals(2)
         compose.onAllNodesWithText("−1", substring = true).assertCountEquals(2)
-        compose.onNodeWithText("CHANGED FILES (2)").assertExists()
+        compose.onNodeWithText("2 files changed").assertExists()
+        compose.onNodeWithText("1 of 2 viewed").assertExists()
         compose.onNodeWithContentDescription("Jump to file").performClick()
-        compose.onNodeWithText("app.ts").assertExists()
-        compose.onNodeWithText("logo.png").performClick()
+        val menu = hasAnyAncestor(isPopup())
+        compose.onNode(hasText("app.ts") and menu).assertExists()
+        compose.onNode(hasText("assets") and menu).assertExists()
+        compose.onNode(hasText("logo.png") and menu).performClick()
         compose.onNodeWithContentDescription("Back").performClick()
         assertEquals(listOf("back"), events)
     }
 
     @Test
-    fun eachFileBarSelectsCollapsesMarksViewedAndAsks() {
+    fun eachFileBarCollapsesMarksViewedAndOffersItsMenu() {
         show(loaded())
-        val select = compose.onAllNodesWithContentDescription("Include in commit")
-        select[0].assertIsOn()
-        select[0].assert(hasStateDescription("On"))
-        select[1].assertIsOff()
-        select[1].assert(hasStateDescription("Off"))
-        compose.onNode(hasText("src/app.ts") and hasClickAction())
+        compose.onNode(hasContentDescription("src/app.ts") and hasClickAction())
             .assert(hasStateDescription("Expanded"))
-        compose.onAllNodesWithContentDescription("Viewed")[1].assertIsOn()
-        select[1].performClick()
-        compose.onAllNodesWithContentDescription("Viewed")[0].performClick()
-        compose.onNode(hasText("src/app.ts") and hasClickAction()).performClick()
-        compose.onAllNodesWithContentDescription("More")[0].performClick()
+        compose.onNodeWithContentDescription("Modified").assertExists()
+        compose.onNodeWithText("Excluded").assertExists()
+        val viewed = compose.onAllNodesWithContentDescription("Viewed")
+        viewed[0].assertIsOff()
+        viewed[1].assertIsOn()
+        viewed[1].assert(hasStateDescription("On"))
+        viewed[0].performClick()
+        compose.onNode(hasContentDescription("src/app.ts") and hasClickAction()).performClick()
+        compose.onNode(hasContentDescription("src/app.ts") and hasClickAction())
+            .performTouchInput { longClick() }
         compose.onNodeWithText("Ask agent…").performClick()
         compose.waitForIdle()
-        assertEquals(
-            listOf(
-                "select assets/logo.png",
-                "viewed src/app.ts",
-                "collapse src/app.ts",
-                "ask src/app.ts"
-            ),
-            events
-        )
+        assertEquals(listOf("viewed src/app.ts", "collapse src/app.ts", "ask src/app.ts"), events)
     }
 
     @Test
-    fun aConflictedFileIsFlaggedAndNamedAboveTheCommitForm() {
-        val conflicted = GitFile("src/merge.ts", "conflicted", staged = false, stamp = "1")
-        show(
-            loaded().copy(
-                files = listOf(conflicted),
-                conflicted = listOf("src/merge.ts"),
-                rows = reviewRows(
-                    listOf(ReviewFile(conflicted, null, null, null, true, false, true, false)),
-                    ghCli = false
-                )
-            )
-        )
-        compose.onNodeWithContentDescription("Merge conflict").assertExists()
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Commit message"))
-        compose.onNodeWithText(
-            "src/merge.ts has merge conflicts. Resolve the conflict markers " +
-                "(<<<<<<< … >>>>>>>) before committing."
-        ).assertExists()
+    fun aFileLeftOutOfTheCommitCanBeIncludedFromItsMenu() {
+        show(loaded())
+        compose.onAllNodesWithContentDescription("More").assertCountEquals(2)
+        compose.onNode(hasContentDescription("assets/logo.png") and hasClickAction())
+            .performTouchInput { longClick() }
+        compose.onNodeWithText("Copy Path").assertExists()
+        compose.onNodeWithText("Include in Commit").performClick()
+        compose.waitForIdle()
+        assertEquals(listOf("select assets/logo.png"), events)
+    }
+
+    @Test
+    fun theCommitBarOpensTheSheet() {
+        show(loaded())
+        compose.onNodeWithText("Commit 1 file").performClick()
+        assertEquals(listOf("open commit"), events)
     }
 
     @Test
@@ -151,24 +162,62 @@ class GitReviewScreenTest {
     }
 
     @Test
-    fun theCommitFormNeedsAMessage() {
-        show(loaded())
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Create Pull Request"))
+    fun theSheetNeedsAMessageAndPicksFiles() {
+        showSheet(loaded())
         compose.onNodeWithText("Commit message").assertExists()
-        compose.onNodeWithText("Commit 1 file").assertIsNotEnabled()
+        compose.onNode(hasText("Commit") and hasClickAction()).assertIsNotEnabled()
         compose.onNodeWithText("Only the selected files are committed.").assertExists()
+        compose.onNodeWithContentDescription("src/app.ts").assert(hasStateDescription("Included"))
+        compose.onNodeWithContentDescription("assets/logo.png")
+            .assert(hasStateDescription("Excluded"))
+            .performClick()
+        compose.onNodeWithText("Select All").performClick()
         compose.onNodeWithText("Generate message").performClick()
-        compose.onNodeWithText("Create Pull Request").performClick()
-        assertEquals(listOf("generate", "pr"), events)
+        assertEquals(listOf("select assets/logo.png", "all true", "generate"), events)
     }
 
     @Test
     fun aMessageEnablesCommit() {
-        show(loaded(message = "fix: x", canCommit = true))
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Commit 1 file"))
+        showSheet(loaded(message = "fix: x", canCommit = true))
         compose.onNodeWithText("fix: x").assertExists()
-        compose.onNodeWithText("Commit 1 file").performClick()
+        compose.onNode(hasText("Commit") and hasClickAction()).performClick()
         assertEquals(listOf("commit"), events)
+    }
+
+    private val conflicted = GitFile("src/merge.ts", "conflicted", staged = false, stamp = "1")
+
+    private fun conflictedState() = loaded().copy(
+        conflicted = listOf("src/merge.ts"),
+        rows = reviewRows(
+            listOf(ReviewFile(conflicted, null, null, null, true, false, true, false)),
+            ghCli = false
+        ),
+        commitFiles = listOf(CommitFile(conflicted, true, null, null))
+    )
+
+    @Test
+    fun aConflictedFileIsFlagged() {
+        show(conflictedState())
+        compose.onNodeWithContentDescription("Merge conflict").assertExists()
+    }
+
+    @Test
+    fun theSheetNamesConflictedFiles() {
+        showSheet(conflictedState())
+        compose.onNodeWithText(
+            "src/merge.ts has merge conflicts. Resolve the conflict markers " +
+                "(<<<<<<< … >>>>>>>) before committing."
+        ).assertExists()
+    }
+
+    @Test
+    fun noChangesStillOffersAPullRequest() {
+        show(GitReviewUiState(overlay = ReviewOverlay.NoChanges, ghCli = true))
+        compose.onNodeWithText("No changes").assertExists()
+        compose.onNodeWithText("The working tree is clean.").assertExists()
+        compose.onNodeWithText("Commit", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("Create Pull Request").performClick()
+        assertEquals(listOf("pr"), events)
     }
 
     @Test

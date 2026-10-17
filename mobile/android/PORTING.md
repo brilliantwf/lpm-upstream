@@ -53,7 +53,7 @@ side by side (see `mobile/parity/README.md`).
 | Android CLI | `$ANDROID_HOME/cmdline-tools/latest/bin/android` (sdk, emulator, layout, screen, docs) |
 | Emulator | 37.2.12, AVD `lpm_parity` (Pixel 9 Pro, API 36 Google Play image, arm64) |
 | NDK | r30 (`ndk/30.0.16248370`), pinned in build-logic so native libraries are stripped |
-| gomobile / gobind | `~/go/bin` — `gomobile bind` of `tailnet/node` → AAR verified (arm64, 83 s, 16 KB-aligned) |
+| gomobile / gobind | pinned as `tool`s in `tailnet/android/go.mod`; `:core:tailnet`'s `bindTailnet` task runs them (arm64 + x86_64, ~50 s cold, cached after; needs Go: `brew install go`) |
 | Maestro | 2.11.0 — drives both the iOS simulator and the emulator |
 | Agent skills | `.claude/skills/{android-cli,navigation-3,edge-to-edge}` (official, via `android skills add`) |
 
@@ -206,7 +206,7 @@ Port order is top to bottom within each milestone below. Lines are iOS sizes.
 | Actions → `:feature:actions` | ActionColorPicker, ActionEditorSheet, ActionInputsSheet, ActionPlacement, ActionTint, ActionZoneView, ActionZones, DesktopActionButton, ProjectActionsSheet(+Host), BackgroundRunSheet | 1,840 |
 | Activity → `:feature:activity` | ActivityBuild, ActivityChrome, ActivityModel, ActivityRowViews, ActivityScreen, AgentStateStyle | 1,322 |
 | Automations → `:feature:automations` | AutomationConversationView, AutomationDetailRows, AutomationDetailView, AutomationEditorSheet, AutomationFormat, AutomationViews | 2,283 |
-| Git → `:feature:git` | GitReviewView, GitReviewStore, GitBranchSheet, GitAutoSheet, GitAutoStore, GitNotice, GitOpError, DiffHighlighter, DiffRendering, AgentAskSheet | 3,006 |
+| Git → `:feature:git` | GitReviewView, GitFileSection, GitReviewParts, GitCommitSheet, GitPrSheet, GitReviewStore, GitBranchSheet, GitAutoSheet, GitAutoStore, GitNotice, GitOpError, DiffHighlighter, DiffRendering, AgentAskSheet | 3,359 |
 | Notes → `:feature:notes` | NotesScreen, NotesChatView, NotesComposer, NotesMessageRow, NotesAttachmentView, NotesSearchStore, NotesStore, NotesTypes, NoteAttachmentStore | 1,736 |
 | Memory → `:feature:memory` | MemoryScreen, MemorySessionView, MemoryCreateSheet, MemoryEditorSheet, MemoryStore, MemoryTypes, ComposerMemorySheet | 1,167 |
 | Files / preview → `:feature:files`, `:core:web` | FileFetch, FilePreviewContent, FilePreviewKind, FilePreviewPlatformViews, FilePreviewSheet, MarkdownWebView, MarkdownImageLoader, MarkdownLink | 854 |
@@ -287,9 +287,9 @@ build Android until the same flows pass there.
 | 4 | Terminal (WebView + shim) and composer (done) | 06, 17 |
 | 5 | Activity, Automations, Stats, Usage, Settings (done) | 07–11, 35–37, 40–42, 45–47 |
 | 6 | Git review (50–55), Notes and Memory (60–66), Actions (70–76), config editors (80–87), file preview (90–94), Claude accounts and Auto Pull (95–99), speech (100–101), machines and lpm updates (unit and Robolectric tests: Demo Mode has neither) (done) | as listed |
-| 7 | Real Mac: OkHttp client + pin, Bonjour, QR, approve-on-Mac, reconnect (client built and unit-tested against PROTOCOL.md; not yet run against the desktop app) | flows against the running desktop app (emulator reaches the Mac at `10.0.2.2`; no Bonjour through emulator NAT, use Enter a Code) |
-| 8 | Push (FCM) (not started) | needs the items below |
-| 9 | Built-in Tailscale (not started; `:core:tailnet` is a stub) | `tailnet/android` AAR |
+| 7 | Real Mac: OkHttp client + pin, Bonjour, QR, approve-on-Mac, reconnect (done on the emulator against the desktop app: Bonjour, approve-on-Mac, Enter a Code at `10.0.2.2`, services, logs, terminal, Git commit, reconnect after a network drop, a cold start, a Mac restart and backgrounding, and the R8 release build; QR with a real camera and a physical phone still untested) | by hand against an isolated debug desktop app (`.claude/skills/app-review-video/scripts/review.js setup`, port 8792; a code from `remote_start_pairing` through its `eval`) |
+| 8 | Push (FCM) (built and unit-tested: `PushRegistrar` registers over the live link with `pushToken` and sweeps the other saved Macs; `:core:push` opens the sealed blob, posts it on the channel of its Settings → Notifications kind, withdraws cleared and stale ones, and a tap opens the project, terminal or automation on its Mac) | needs the items below |
+| 9 | Built-in Tailscale (built: `tailnet/android` bound with gomobile, `DefaultBuiltInTailscale` mirroring iOS — switch, sign-in, restart after the app was frozen, network changes, loopback bridge routing; on the emulator the node starts and opens a real Tailscale sign-in page, debug and R8 release; dialing a Mac over the tailnet needs a signed-in account) | `tailnet/android` |
 
 ## Decisions
 
@@ -298,7 +298,14 @@ build Android until the same flows pass there.
    channels matching the `lpm.notify.*` toggles. The protocol gets a platform-neutral
    registration (`pushToken` + `platform: "apns" | "fcm"`) beside `apnsToken`, which
    stays for existing iOS clients, and the relay (`website/app/api/push`) gets an FCM
-   HTTP v1 sender: a desktop + website + PROTOCOL.md change in milestone 8.
+   HTTP v1 sender: a desktop + website + PROTOCOL.md change in milestone 8. Built that
+   way: the phone sends `pushToken` with `platform: "fcm"` and no `env`; the desktop
+   keeps the token in the device record's `apns_token` beside `push_platform: "fcm"`
+   and posts `platform: "fcm"` to the relay, which sends a data-only FCM v1 message
+   (Vercel env `FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL`, `FCM_PRIVATE_KEY`). The app reads
+   `app/google-services.json` (gitignored) into the resource values the google-services
+   plugin would write; a build without it runs with no push, and `bundleRelease`
+   refuses to build without it.
 2. **Play: App Bundle, Play App Signing**, with a separate upload key kept outside the
    repo. Package `cx.lpm.mobile`, the iOS bundle id; it can't change after the first upload.
 3. **Demo seed: kept identical by a test, not shared.** `:core:demo` is a line-by-line
@@ -313,7 +320,9 @@ build Android until the same flows pass there.
 4. **Icon-only controls** (list below) get the same accessible name on both apps in the
    change that ports their screen; iOS gains VoiceOver labels.
 5. **Tailscale ABIs: `arm64-v8a` + `x86_64`** (emulators, ChromeOS). Play delivers only
-   the device's ABI from the bundle.
+   the device's ABI from the bundle (~21 MB of native code). A 32-bit phone gets no
+   `libgojni.so`: the node reports itself unavailable there and every address is dialed
+   directly, as with the Tailscale app.
 6. **Desktop links**: a Play link joins the App Store one in
    `desktop/frontend/src/mobile/links.ts` at release.
 
@@ -330,8 +339,9 @@ Flows can't reach these by text until both apps label them the same way (adding
 the label on iOS also helps VoiceOver). Done: the composer's send ("Send"), key bar
 ("Up", "Down", "Left", "Right", "Paste", "Hide keyboard"), attachment "Remove",
 prompt tab "Close", mention "Preview", history "New folder", the Git review jump
-menu ("Jump to file"), per-file "Include in commit" / "Viewed" (each valued On/Off) /
-"More" and the branch sheet's "New branch", Notes "New Chat", error-banner "Close",
+menu ("Jump to file"), per-file "Viewed" (valued On/Off) / "More", the commit
+sheet's file rows (named by path, valued Included/Excluded) and the branch sheet's
+"New branch", Notes "New Chat", error-banner "Close",
 "Attach", "Send", "Remove", "Download" and the memory picker's "Preview" eye. Still
 unlabeled: composer rewrite run and variant steppers; QR scanner close. The project
 "…" menu already reads "More" through SwiftUI's default symbol label.
