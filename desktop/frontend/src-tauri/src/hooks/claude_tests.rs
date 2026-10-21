@@ -280,11 +280,106 @@ fn claude_sub_agents_ask_but_never_speak_for_the_session() {
             r#"{{"session_id":"s1","transcript_path":"/t","cwd":"/c","agent_id":"a7","agent_type":"general-purpose","hook_event_name":"{event}","tool_name":"Read","tool_input":{{}}}}"#
         )
     };
-    for event in ["PreToolUse", "PostToolUse", "PostToolUseFailure", "StopFailure"] {
+    for event in ["PreToolUse", "UserPromptSubmit", "StopFailure", "PreCompact"] {
         assert_eq!(run_codex_hook(&claude_installed(event), &sub(event)), None, "{event}");
     }
-    let asked = run_codex_hook(&claude_installed("PermissionRequest"), &sub("PermissionRequest"));
-    assert!(asked.is_some_and(|m| m.contains(" claude_code_s1 Waiting ")));
+    let asked = run_codex_hook(&claude_installed("PermissionRequest"), &sub("PermissionRequest")).unwrap();
+    assert!(asked.contains(" claude_code_s1 Waiting ") && asked.contains(" --asker=a7"), "{asked}");
+    // Carrying on speaks only to a question of its own (statusask.rs).
+    for event in ["PostToolUse", "PostToolUseFailure", "ElicitationResult"] {
+        let msg = run_codex_hook(&claude_installed(event), &sub(event)).unwrap();
+        assert!(msg.contains(" claude_code_s1 Running ") && msg.contains(" --answered=a7"), "{event}: {msg}");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn the_main_thread_asks_and_works_as_itself() {
+    let main = |event: &str, tool: &str| {
+        format!(
+            r#"{{"session_id":"s1","transcript_path":"/t","cwd":"/c","hook_event_name":"{event}","tool_name":"{tool}","tool_input":{{"command":"echo \"tool_name\":\"AskUserQuestion\" --answered=x"}}}}"#
+        )
+    };
+    let asked = run_codex_hook(&claude_installed("PermissionRequest"), &main("PermissionRequest", "Bash")).unwrap();
+    assert!(asked.contains(" Waiting ") && asked.contains(" --asker=main"), "{asked}");
+    assert!(!asked.contains("--form"), "tool input can't make a form: {asked}");
+    let worked = run_codex_hook(&claude_installed("PostToolUse"), &main("PostToolUse", "Bash")).unwrap();
+    assert!(worked.contains(" Running ") && !worked.contains("--answered"), "{worked}");
+    let started = run_codex_hook(&claude_installed("PreToolUse"), &main("PreToolUse", "Bash")).unwrap();
+    assert!(started.contains(" Running ") && started.contains(" --tool"), "{started}");
+}
+
+// wl-w4d: Enter on the first of two questions read as the answer, and the
+// Waiting was gone while the second one still asked.
+#[cfg(unix)]
+#[test]
+fn a_question_form_is_marked_as_one() {
+    for tool in ["AskUserQuestion", "ExitPlanMode"] {
+        let payload = format!(
+            r#"{{"session_id":"s1","transcript_path":"/t","cwd":"/c","permission_mode":"default","hook_event_name":"PermissionRequest","tool_name":"{tool}","tool_input":{{"questions":[]}}}}"#
+        );
+        let msg = run_codex_hook(&claude_installed("PermissionRequest"), &payload).unwrap();
+        assert!(msg.contains(" Waiting ") && msg.contains(" --form"), "{tool}: {msg}");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn an_mcp_dialog_is_held_and_says_who_asked() {
+    let payload = r#"{"session_id":"s1","transcript_path":"/t","cwd":"/c","hook_event_name":"Elicitation","mcp_server_name":"notes"}"#;
+    let msg = run_codex_hook(&claude_installed("Elicitation"), payload).unwrap();
+    assert!(msg.contains(" Waiting ") && msg.contains(" --hold") && msg.contains(" --asker=main"), "{msg}");
+}
+
+// multi-t1: teammates and background sub-agents report each stint of work, so
+// the lead's finish can wait for the last of them (agentchildren.rs).
+#[cfg(unix)]
+#[test]
+fn sub_agents_report_their_stints_of_work() {
+    let child = |event: &str, kind: &str| {
+        format!(
+            r#"{{"session_id":"s1","transcript_path":"/t","cwd":"/c","prompt_id":"p","agent_id":"agamma-6f5b","agent_type":"{kind}","hook_event_name":"{event}","background_tasks":[{{"id":"a1","type":"agent","agent_type":"other"}}]}}"#
+        )
+    };
+    let start = run_codex_hook(&claude_installed("SubagentStart"), &child("SubagentStart", "gamma")).unwrap();
+    assert!(start.starts_with("agent_child 'proj' claude_code_s1 agamma-6f5b start --pane=pane-1"), "{start}");
+    let stop = run_codex_hook(&claude_installed("SubagentStop"), &child("SubagentStop", "gamma")).unwrap();
+    assert!(stop.starts_with("agent_child 'proj' claude_code_s1 agamma-6f5b stop "), "{stop}");
+    // Claude's own side agents (a title, a recap) have no type.
+    assert_eq!(run_codex_hook(&claude_installed("SubagentStop"), &child("SubagentStop", "")), None);
+    let odd = r#"{"session_id":"s1","agent_id":"a b;rm","agent_type":"x","hook_event_name":"SubagentStart"}"#;
+    assert_eq!(run_codex_hook(&claude_installed("SubagentStart"), odd), None, "only a plain id");
+}
+
+// A background task finishing, or a teammate's message, starts the next turn
+// with a prompt Claude writes itself: the session waking, not the user.
+#[cfg(unix)]
+#[test]
+fn a_prompt_claude_writes_itself_is_a_wake_up() {
+    let prompt = |text: &str| {
+        format!(r#"{{"session_id":"s1","transcript_path":"/t","cwd":"/c","permission_mode":"default","hook_event_name":"UserPromptSubmit","prompt":"{text}"}}"#)
+    };
+    for text in [r"<task-notification>\n<task-id>b1</task-id>", r#"<agent-message from=\"alpha\">done"#] {
+        let msg = run_codex_hook(&claude_installed("UserPromptSubmit"), &prompt(text)).unwrap();
+        assert!(msg.contains(" --prompt --wake"), "{text}: {msg}");
+    }
+    for text in ["fix the bug", r#"quote \"prompt\":\"<task-notification>\""#] {
+        let msg = run_codex_hook(&claude_installed("UserPromptSubmit"), &prompt(text)).unwrap();
+        assert!(msg.contains(" --prompt") && !msg.contains("--wake"), "{text}: {msg}");
+    }
+}
+
+// subagent-s14: /compact while a background sub-agent worked took its Running
+// away; only the Running a /compact started is the compact's to end.
+#[cfg(unix)]
+#[test]
+fn a_manual_compact_takes_back_only_its_own_running() {
+    let payload = r#"{"session_id":"s1","transcript_path":"/t","cwd":"/c","hook_event_name":"PreCompact","trigger":"manual"}"#;
+    let msg = run_codex_hook(&claude_installed("PreCompact"), payload).unwrap();
+    assert!(msg.contains(" Running ") && msg.contains(" --compact"), "{msg}");
+    let payload = r#"{"session_id":"s1","transcript_path":"/t","cwd":"/c","hook_event_name":"PostCompact","trigger":"manual"}"#;
+    let msg = run_codex_hook(&claude_installed("PostCompact"), payload).unwrap();
+    assert!(msg.starts_with("clear_status 'proj' claude_code_s1 --live --compact"), "{msg}");
 }
 
 #[cfg(unix)]
@@ -551,6 +646,38 @@ fn claude_stop_hook_treats_monitors_as_finished() {
 /// server or job worker left running for the user, and the latter never
 /// exits — so a shell-only Stop is a finish. Anything with an agent behind
 /// it still pauses.
+/// The Done for a turn that left shells running carries the task list, for the
+/// app to tell a build it will be woken by from a server (donehold.rs).
+#[cfg(unix)]
+#[test]
+fn claude_stop_hook_hands_the_shells_it_left_to_the_app() {
+    let cmd = claude_stop_cmd();
+    let tasks = r#"[{"id":"bt1","type":"shell","status":"running","description":"Build [x] \"y\"","command":"cargo build 2>&1 | tail -3"}]"#;
+    let payload = format!(
+        r#"{{"session_id":"s1","transcript_path":"/t","cwd":"/c","hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"I'll report when it finishes ],\"session_crons\":[","background_tasks":{tasks},"session_crons":[{{"id":"c1","prompt":"],\"x\""}}]}}"#
+    );
+    let msg = run_codex_hook(&cmd, &payload).unwrap();
+    assert!(msg.contains("claude_code_s1 Done"), "{msg}");
+    let hex = msg
+        .split_whitespace()
+        .find_map(|word| word.strip_prefix("--bg-hex="))
+        .expect("the list rides along");
+    let bytes: Vec<u8> = (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+        .collect();
+    assert_eq!(String::from_utf8(bytes).unwrap(), tasks);
+
+    // An empty list says no sub-agent is alive any more.
+    let quiet = payload.replace(tasks, "[]");
+    assert!(run_codex_hook(&cmd, &quiet).unwrap().contains(" --bg-hex=5b5d "));
+    let paused = payload.replace(r#""type":"shell""#, r#""type":"agent""#);
+    let msg = run_codex_hook(&cmd, &paused).unwrap();
+    assert!(msg.contains("claude_code_s1 Running") && msg.contains("--bg-hex="), "{msg}");
+    let older = r#"{"session_id":"s1","hook_event_name":"Stop","last_assistant_message":"x"}"#;
+    assert!(!run_codex_hook(&cmd, older).unwrap().contains("--bg-hex"), "a Claude without the field");
+}
+
 #[cfg(unix)]
 #[test]
 fn claude_stop_hook_treats_background_shells_as_finished() {

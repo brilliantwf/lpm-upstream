@@ -1,0 +1,166 @@
+use super::*;
+
+fn observed(age: i64) -> Observed {
+    Observed {
+        age,
+        ..Default::default()
+    }
+}
+
+// cc-race: a background shell exited while the final message streamed, and
+// Claude took its notification as a new turn 40 ms after the Stop. The Done
+// announced in between was the first of two "finished" for one piece of work.
+#[test]
+fn a_next_turn_that_was_already_due_takes_the_finish_over() {
+    assert_eq!(verdict(&observed(40)), Verdict::Hold);
+    let next_turn = Observed {
+        rev_moved: true,
+        ..observed(40)
+    };
+    assert_eq!(verdict(&next_turn), Verdict::Drop);
+    assert_eq!(verdict(&observed(GRACE_MS)), Verdict::Publish);
+}
+
+// multi-t1: the lead stopped with two teammates mid-task; each later report from
+// them rang "finished" again until the last one was really done.
+#[test]
+fn a_finish_waits_for_the_sub_agents_still_working() {
+    let working = Observed {
+        children: true,
+        ..observed(60_000)
+    };
+    assert_eq!(verdict(&working), Verdict::Hold);
+    let asking = Observed {
+        asking: true,
+        ..observed(60_000)
+    };
+    assert_eq!(verdict(&asking), Verdict::Hold);
+}
+
+// bg-b3: "I'll reply with its output when it finishes" was announced as
+// finished, 40 s before Claude woke up and did.
+#[test]
+fn a_finish_waits_for_the_background_shell_the_turn_started() {
+    let waiting = Observed {
+        why: Why {
+            waits: true,
+            ..Default::default()
+        },
+        ..observed(10 * 60_000)
+    };
+    assert_eq!(verdict(&waiting), Verdict::Hold);
+    let woke = Observed {
+        rev_moved: true,
+        ..waiting
+    };
+    assert_eq!(
+        verdict(&woke),
+        Verdict::Drop,
+        "the wake-up turn reports the finish"
+    );
+    let forgotten = Observed {
+        why: Why {
+            waits: true,
+            ..Default::default()
+        },
+        ..observed(WAIT_CAP_MS)
+    };
+    assert_eq!(verdict(&forgotten), Verdict::Publish);
+}
+
+#[test]
+fn a_queued_prompts_finish_waits_for_the_pane_to_go_quiet() {
+    let drawing = Observed {
+        drawing: true,
+        why: Why {
+            drawing: true,
+            ..Default::default()
+        },
+        ..observed(5_000)
+    };
+    assert_eq!(verdict(&drawing), Verdict::Hold);
+    let idle_footer = Observed {
+        capped_drawing: true,
+        ..drawing
+    };
+    assert_eq!(
+        verdict(&Observed {
+            age: DRAW_CAP_MS,
+            ..idle_footer
+        }),
+        Verdict::Publish
+    );
+    let codex = Observed {
+        drawing: true,
+        why: Why {
+            drawing: true,
+            ..Default::default()
+        },
+        ..observed(DRAW_CAP_MS * 5)
+    };
+    assert_eq!(
+        verdict(&codex),
+        Verdict::Hold,
+        "a Codex /goal turn has no cap"
+    );
+}
+
+// A crashed session's held finish must not, half an hour later, retire the
+// session that has taken over its tab.
+#[test]
+fn a_finish_another_session_took_the_tab_from_is_dropped() {
+    let taken = Observed {
+        taken_over: true,
+        ..observed(GRACE_MS)
+    };
+    assert_eq!(verdict(&taken), Verdict::Drop);
+}
+
+#[test]
+fn a_finish_whose_turn_vanished_is_dropped() {
+    let gone = Observed {
+        gone: true,
+        ..observed(GRACE_MS)
+    };
+    assert_eq!(verdict(&gone), Verdict::Drop);
+}
+
+// multi-t1: the lead took the last teammate's report up in a turn with no hook
+// of its own; "finished" went out 0.7 s before that turn's Stop.
+#[test]
+fn a_finish_waits_for_the_lead_to_take_up_the_last_report() {
+    let handed_back = Observed {
+        children_quiet: Some(200),
+        ..observed(60_000)
+    };
+    assert_eq!(verdict(&handed_back), Verdict::Hold);
+    let drawing = Observed {
+        children_quiet: Some(5_000),
+        drawing: true,
+        ..observed(60_000)
+    };
+    assert_eq!(verdict(&drawing), Verdict::Hold);
+    let settled = Observed {
+        children_quiet: Some(5_000),
+        ..observed(60_000)
+    };
+    assert_eq!(verdict(&settled), Verdict::Publish);
+}
+
+#[test]
+fn only_work_after_the_stop_redates_the_finish() {
+    assert!(!observed(GRACE_MS - 1).work_goes_on());
+    let waits = Observed {
+        why: Why {
+            waits: true,
+            ..Default::default()
+        },
+        ..observed(60_000)
+    };
+    assert!(!waits.work_goes_on(), "a shell it was never woken by");
+    assert!(Observed {
+        children: true,
+        ..observed(0)
+    }
+    .work_goes_on());
+}

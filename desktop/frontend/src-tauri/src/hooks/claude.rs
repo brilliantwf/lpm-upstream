@@ -174,7 +174,7 @@ pub(super) fn merge_claude_hooks(data: &[u8]) -> Option<Vec<u8>> {
 }
 
 /// The Claude events lpm reports on, each with the matcher it is installed under.
-const CLAUDE_EVENTS: [(&str, &str); 14] = [
+const CLAUDE_EVENTS: [(&str, &str); 16] = [
     ("SessionStart", ""),
     ("PreCompact", "manual"),
     ("PostCompact", "manual"),
@@ -188,6 +188,8 @@ const CLAUDE_EVENTS: [(&str, &str); 14] = [
     ("Notification", CLAUDE_ASKS),
     ("Stop", ""),
     ("StopFailure", ""),
+    ("SubagentStart", ""),
+    ("SubagentStop", ""),
     ("SessionEnd", ""),
 ];
 
@@ -224,11 +226,10 @@ pub(super) fn merge_claude_hooks_in(data: &[u8], form: &HookForm) -> Option<Vec<
     // tab (they would clobber one key); a per-session key survives both. `--pane`
     // still carries the resolved tab attribution. Keys must not collide in the
     // StatusStore (keyed by project+key), or only one would show as running.
-    let set_running = claude_main_thread_cmd("set_status '$pq' claude_code_${sid:-$LPM_PANE_ID} Running --icon=bolt --color=#4C8DFF --pane=$LPM_PANE_ID");
-    // Marked as a prompt: one submitted while a turn is still going queues
-    // behind it (socketsrv.rs), and its own turn starts without a hook.
-    let set_prompted = claude_main_thread_cmd("set_status '$pq' claude_code_${sid:-$LPM_PANE_ID} Running --icon=bolt --color=#4C8DFF --pane=$LPM_PANE_ID --prompt");
+    // A tool call draws nothing of its own while it runs (agentturn.rs).
+    let set_tool = claude_main_thread_cmd("set_status '$pq' claude_code_${sid:-$LPM_PANE_ID} Running --icon=bolt --color=#4C8DFF --pane=$LPM_PANE_ID --tool");
     let set_error = claude_main_thread_cmd("set_status '$pq' claude_code_${sid:-$LPM_PANE_ID} Error --icon=warning --color=#ef4444 --pane=$LPM_PANE_ID");
+    // Only the 6 s reminder of a dialog: it can't say whose dialog it is.
     let set_waiting = claude_sid_cmd("set_status '$pq' claude_code_${sid:-$LPM_PANE_ID} Waiting --icon=bell --color=#f59e0b --pane=$LPM_PANE_ID");
     // An ended session takes back only what was happening in it; a finish it
     // reported stays until the user has seen it.
@@ -236,28 +237,32 @@ pub(super) fn merge_claude_hooks_in(data: &[u8], form: &HookForm) -> Option<Vec<
     let set_resume = claude_resume_cmd();
 
     append_hook(hooks, "SessionStart", claude_hook(&set_resume, ""));
-    append_hook(hooks, "UserPromptSubmit", claude_hook(&set_prompted, ""));
-    append_hook(hooks, "PreToolUse", claude_hook(&set_running, ""));
+    append_hook(hooks, "UserPromptSubmit", claude_hook(&claude_prompt_cmd(), ""));
+    append_hook(hooks, "PreToolUse", claude_hook(&set_tool, ""));
     // Answering a dialog fires no hook of its own; a tool that ran or failed
     // after it is the first sign the agent is back at work (agentturn.rs covers
-    // the answer itself).
-    append_hook(hooks, "PostToolUse", claude_hook(&set_running, ""));
-    append_hook(hooks, "PostToolUseFailure", claude_hook(&set_running, ""));
+    // the answer itself). A sub-agent's says so for its own question only.
+    append_hook(hooks, "PostToolUse", claude_hook(&claude_work_cmd(), ""));
+    append_hook(hooks, "PostToolUseFailure", claude_hook(&claude_work_cmd(), ""));
     // PermissionRequest fires as the dialog opens; the permission_prompt
     // Notification only after it has sat unanswered for 6 s.
-    append_hook(hooks, "PermissionRequest", claude_hook(&set_waiting, ""));
+    append_hook(hooks, "PermissionRequest", claude_hook(&claude_ask_cmd(false), ""));
     // An MCP dialog's spinner keeps animating while it waits, so only its own
     // ElicitationResult may end this Waiting (agentturn.rs).
-    let set_asked = claude_sid_cmd("set_status '$pq' claude_code_${sid:-$LPM_PANE_ID} Waiting --icon=bell --color=#f59e0b --pane=$LPM_PANE_ID --hold");
-    append_hook(hooks, "Elicitation", claude_hook(&set_asked, ""));
-    append_hook(hooks, "ElicitationResult", claude_hook(&set_running, ""));
+    append_hook(hooks, "Elicitation", claude_hook(&claude_ask_cmd(true), ""));
+    append_hook(hooks, "ElicitationResult", claude_hook(&claude_work_cmd(), ""));
     append_hook(hooks, "Notification", claude_hook(&set_waiting, CLAUDE_ASKS));
     // A /compact is model work started without a prompt; compaction inside a
-    // turn (matcher "auto") is already covered by the turn's own reports.
-    append_hook(hooks, "PreCompact", claude_hook(&set_running, "manual"));
-    append_hook(hooks, "PostCompact", claude_hook(&clear, "manual"));
+    // turn (matcher "auto") is already covered by the turn's own reports. Its
+    // end takes back only the Running it started itself.
+    let set_compacting = claude_main_thread_cmd("set_status '$pq' claude_code_${sid:-$LPM_PANE_ID} Running --icon=bolt --color=#4C8DFF --pane=$LPM_PANE_ID --compact");
+    let clear_compacted = claude_sid_cmd("clear_status '$pq' claude_code_${sid:-$LPM_PANE_ID} --live --compact");
+    append_hook(hooks, "PreCompact", claude_hook(&set_compacting, "manual"));
+    append_hook(hooks, "PostCompact", claude_hook(&clear_compacted, "manual"));
     append_hook(hooks, "Stop", claude_hook(&claude_stop_cmd(), ""));
     append_hook(hooks, "StopFailure", claude_hook(&set_error, ""));
+    append_hook(hooks, "SubagentStart", claude_hook(&claude_child_cmd("start"), ""));
+    append_hook(hooks, "SubagentStop", claude_hook(&claude_child_cmd("stop"), ""));
     append_hook(hooks, "SessionEnd", claude_hook(&clear, ""));
 
     changed_json(&settings, &original)
@@ -371,6 +376,76 @@ fn claude_main_thread_cmd(frame: &str) -> String {
     .line()
 }
 
+/// Reads the payload into `$p` and the id of the sub-agent whose hook this is
+/// into `$a`, empty for the main thread. The id serializes ahead of
+/// `hook_event_name`, so only that prefix is read and tool input can't fake
+/// it; one that isn't a plain token ends the hook.
+const SUB_AGENT_PREP: &str = r#"p=$(cat); q=${p%%hook_event_name*}; a=; case "$q" in *\"agent_id\"*) a=$(printf '%s' "$q" | sed -n 's/.*"agent_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'); case "$a" in ''|*[!A-Za-z0-9_.-]*) exit 0;; esac;; esac;"#;
+
+/// A hook reading `SUB_AGENT_PREP` and the session id, then `more`.
+fn claude_sub_agent_cmd(more: &str, frame: &str) -> String {
+    let prep = format!("{SUB_AGENT_PREP} sid=$(printf '%s' \"$p\" | {SID_SED}); {more}");
+    Hook {
+        read: NOT_UNDER_CURSOR,
+        prep: &prep,
+        frame,
+        ..Default::default()
+    }
+    .line()
+}
+
+/// The main thread at work, or a sub-agent carrying on — which says nothing
+/// about the session, except that a question that sub-agent asked has been
+/// answered (statusask.rs).
+fn claude_work_cmd() -> String {
+    claude_sub_agent_cmd(
+        r#"x=; [ -n "$a" ] && x=" --answered=$a";"#,
+        "set_status '$pq' claude_code_${sid:-$LPM_PANE_ID} Running --icon=bolt --color=#4C8DFF --pane=$LPM_PANE_ID$x",
+    )
+}
+
+/// A dialog opening, with who asked: `main` or the sub-agent, so that the main
+/// thread's own reports don't take a sub-agent's question off the tab. A
+/// question form (AskUserQuestion, a plan to approve) takes several answers;
+/// `tool_name` serializes right after `hook_event_name`, ahead of the input.
+/// `held` marks an MCP dialog, which only its ElicitationResult ends.
+fn claude_ask_cmd(held: bool) -> String {
+    let hold = if held { " --hold" } else { "" };
+    let frame = format!("set_status '$pq' claude_code_${{sid:-$LPM_PANE_ID}} Waiting --icon=bell --color=#f59e0b --pane=$LPM_PANE_ID{hold}$x");
+    claude_sub_agent_cmd(
+        r#"x=" --asker=${a:-main}"; r=${p#*hook_event_name}; r=${r%%\"tool_input\"*}; printf '%s' "$r" | grep -Eq '"tool_name"[[:space:]]*:[[:space:]]*"(AskUserQuestion|ExitPlanMode)"' && x="$x --form";"#,
+        &frame,
+    )
+}
+
+/// A sub-agent or teammate starting or ending a stint of work: the session's
+/// finish waits for the last of them (agentchildren.rs). Claude's own side
+/// agents (a title, a summary) report no type and are left out.
+fn claude_child_cmd(phase: &str) -> String {
+    let frame = format!("agent_child '$pq' claude_code_${{sid:-$LPM_PANE_ID}} $a {phase} --pane=$LPM_PANE_ID");
+    claude_sub_agent_cmd(
+        r#"t=$(printf '%s' "$q" | sed -n 's/.*"agent_type"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'); [ -n "$a" ] && [ -n "$t" ] || exit 0;"#,
+        &frame,
+    )
+}
+
+/// UserPromptSubmit, marked as a prompt: one submitted while a turn is still
+/// going queues behind it (socketsrv.rs), and its own turn starts without a
+/// hook. A prompt the harness writes itself — a background task reporting in,
+/// a teammate's message — wakes the session rather than coming from the user.
+fn claude_prompt_cmd() -> String {
+    let prep = format!(
+        "p=$(cat); case \"${{p%%hook_event_name*}}\" in *\\\"agent_id\\\"*) exit 0;; esac; sid=$(printf '%s' \"$p\" | {SID_SED}); w=; printf '%s' \"$p\" | grep -Eq '\"prompt\"[[:space:]]*:[[:space:]]*\"<(task-notification|agent-message|teammate-message)' && w=' --wake';"
+    );
+    Hook {
+        read: NOT_UNDER_CURSOR,
+        prep: &prep,
+        frame: "set_status '$pq' claude_code_${sid:-$LPM_PANE_ID} Running --icon=bolt --color=#4C8DFF --pane=$LPM_PANE_ID --prompt$w",
+        ..Default::default()
+    }
+    .line()
+}
+
 /// Claude Stop hook: `Stop` fires at every TURN boundary, not at the end of the
 /// work — a turn that hands off to a workflow, a backgrounded shell command or a
 /// background agent ends right there, and the harness re-prompts the session
@@ -391,24 +466,25 @@ fn claude_main_thread_cmd(frame: &str) -> String {
 /// agent): the harness leaves it registered with `status: "running"` for the
 /// whole session and tracks liveness in a separate `isIdle` flag that it never
 /// serializes into the hook payload, so an idle teammate is byte-identical to a
-/// working one. A `monitor` (a wake-on-event watch): publishing an Artifact
+/// working one. A `monitor` (an MCP or websocket watch): publishing an Artifact
 /// auto-arms a persistent ambient comment watcher (`timeout_ms: 0`, status
 /// `running` forever) that rides in every later Stop payload, so any session
-/// that published an artifact would otherwise pin on Running for good; a
-/// deliberate Monitor watch is a wake-later signal like `session_crons`, which
-/// have never held Running either. And a `shell` (a backgrounded Bash command):
-/// nothing is thinking while it runs — the harness's own transcript calls the
-/// turn done and merely notes "1 shell still running" — and its exit, like a
-/// monitor firing, starts a fresh turn whose own hooks re-assert Running and
-/// land a Done of their own. The payload carries no start time and no hint of
-/// what the command is, so a dev server or job worker an agent deliberately
-/// leaves running for the user's manual test is indistinguishable from a build
-/// it expects to be woken by — and the server never exits. A turn that ends
-/// with nothing but teammates, monitors and shells in flight is a real finish,
-/// and treating it as a pause pinned tabs on Running for hours — every later
-/// Stop re-reported the same value, which dedups away in status.rs and so never
-/// healed. These are therefore the only types that can be downgraded, and only
-/// on POSITIVE evidence. Claude's own housekeeping — a `dream` (memory
+/// that published an artifact would otherwise pin on Running for good. And a
+/// `shell` (a backgrounded Bash command, or a Monitor tool watch, which Claude
+/// runs as one): nothing is thinking while it runs — the harness's own
+/// transcript calls the turn done and merely notes "1 shell still running" — and
+/// its exit, or a watch firing, starts a fresh turn whose own hooks re-assert
+/// Running and land a Done of their own. A dev server or job worker an agent
+/// deliberately leaves running for the user's manual test never exits, so a
+/// turn that ends with nothing but teammates, monitors and shells in flight
+/// reports Done here, and treating it as a pause pinned tabs on Running for
+/// hours — every later Stop re-reported the same value, which dedups away in
+/// status.rs and so never healed. These are therefore the only types that can
+/// be downgraded, and only on POSITIVE evidence. Whether that Done is announced
+/// at once is the app's call (donehold.rs): it holds the finish of a turn that
+/// started a build it will be woken by, and of one whose teammates still work,
+/// so every Stop carries its task list (`--bg-hex`), an empty one included —
+/// a sub-agent missing from it is gone, even one Claude stopped silently. Claude's own housekeeping — a `dream` (memory
 /// consolidation), an `auto-mode scan`, a `memory import` — joins them: it is
 /// ambient work that finishes without ever waking the session, so a Running it
 /// held up stayed until the next prompt.
@@ -445,9 +521,9 @@ pub(super) fn claude_stop_cmd() -> String {
     let running = "Running --icon=bolt --color=#4C8DFF";
     let ty = "\"type\"[[:space:]]*:[[:space:]]*";
     let prep = format!(
-        "p=$(cat); sid=$(printf '%s' \"$p\" | {SID_SED}); bt=$(printf '%s' \"$p\" | sed -n 's/.*\"background_tasks\"[[:space:]]*:[[:space:]]*\\[[[:space:]]*\\(.\\{{0,1\\}}\\).*/\\1/p'); st=\"{done}\"; if [ \"$bt\" = \"{{\" ]; then st=\"{running}\"; f=$(printf '%s' \"$p\" | sed -n 's/.*\"background_tasks\"[[:space:]]*:[[:space:]]*\\[//p' | sed -e 's/\\\\./Z/g' -e 's/{ty}\"teammate\"/T/g' -e 's/{ty}\"monitor\"/T/g' -e 's/{ty}\"shell\"/T/g' -e 's/{ty}\"dream\"/T/g' -e 's/{ty}\"auto-mode scan\"/T/g' -e 's/{ty}\"memory import\"/T/g' -e 's/{ty}\"[^\"]*\"/X/g' -e 's/\"[^\"]*\"/Q/g'); b=${{f%%]*}}; case \"$f\" in *\"]\"*) case \"$b\" in *\"[\"*) ;; *) n=$(printf '%s' \"$b\" | tr -cd '{{' | wc -c | tr -d ' '); c=$(printf '%s' \"$b\" | tr -cd '}}' | wc -c | tr -d ' '); k=$(printf '%s' \"$b\" | tr -cd 'T' | wc -c | tr -d ' '); x=$(printf '%s' \"$b\" | tr -cd 'X' | wc -c | tr -d ' '); if [ \"$n\" -gt 0 ] && [ \"$n\" = \"$c\" ] && [ \"$k\" = \"$n\" ] && [ \"$x\" = 0 ]; then st=\"{done}\"; fi;; esac;; esac; fi;"
+        "p=$(cat); sid=$(printf '%s' \"$p\" | {SID_SED}); bt=$(printf '%s' \"$p\" | sed -n 's/.*\"background_tasks\"[[:space:]]*:[[:space:]]*\\[[[:space:]]*\\(.\\{{0,1\\}}\\).*/\\1/p'); st=\"{done}\"; if [ \"$bt\" = \"{{\" ]; then st=\"{running}\"; f=$(printf '%s' \"$p\" | sed -n 's/.*\"background_tasks\"[[:space:]]*:[[:space:]]*\\[//p' | sed -e 's/\\\\./Z/g' -e 's/{ty}\"teammate\"/T/g' -e 's/{ty}\"monitor\"/T/g' -e 's/{ty}\"shell\"/T/g' -e 's/{ty}\"dream\"/T/g' -e 's/{ty}\"auto-mode scan\"/T/g' -e 's/{ty}\"memory import\"/T/g' -e 's/{ty}\"[^\"]*\"/X/g' -e 's/\"[^\"]*\"/Q/g'); b=${{f%%]*}}; case \"$f\" in *\"]\"*) case \"$b\" in *\"[\"*) ;; *) n=$(printf '%s' \"$b\" | tr -cd '{{' | wc -c | tr -d ' '); c=$(printf '%s' \"$b\" | tr -cd '}}' | wc -c | tr -d ' '); k=$(printf '%s' \"$b\" | tr -cd 'T' | wc -c | tr -d ' '); x=$(printf '%s' \"$b\" | tr -cd 'X' | wc -c | tr -d ' '); if [ \"$n\" -gt 0 ] && [ \"$n\" = \"$c\" ] && [ \"$k\" = \"$n\" ] && [ \"$x\" = 0 ]; then st=\"{done}\"; fi;; esac;; esac; fi; bg=$(printf '%s' \"$p\" | sed -n 's/.*\"background_tasks\"[[:space:]]*:[[:space:]]*\\(\\[.*\\]\\)[[:space:]]*,[[:space:]]*\"session_crons\".*/\\1/p' | od -An -v -tx1 | tr -d ' \\n'); [ -n \"$bg\" ] && bg=\" --bg-hex=$bg\";"
     );
-    let frame = format!("set_status '$pq' {key} $st --pane=$LPM_PANE_ID");
+    let frame = format!("set_status '$pq' {key} $st$bg --pane=$LPM_PANE_ID");
     Hook {
         read: NOT_UNDER_CURSOR,
         prep: &prep,

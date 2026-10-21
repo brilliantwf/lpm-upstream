@@ -26,6 +26,10 @@ const READ_BUF: usize = 16_384;
 const FLUSH_SIZE: usize = 32_768;
 const FLUSH_MS: u64 = 4;
 const PENDING_CAP: usize = 65_536;
+/// Cursor sets this for the hooks it runs, and lpm's Claude hooks step aside for
+/// Cursor's own when they see it (hooks/claude.rs): inherited from whatever
+/// launched the app, it would switch off every Claude hook in every terminal.
+const CURSOR_VERSION: &str = "CURSOR_VERSION";
 
 struct FlowState {
     unacked: i64,
@@ -65,11 +69,37 @@ pub struct PtySession {
     /// When the pane last drew anything (unix millis) — how agentturn.rs tells a
     /// working agent, which animates, from one that stopped without a hook.
     last_output: AtomicI64,
+    /// When the pane drew its last few chunks, oldest first: how fast it draws
+    /// tells a working agent from a dialog that only blinks.
+    recent_output: Mutex<std::collections::VecDeque<i64>>,
 }
+
+/// How many of a pane's latest output times are kept.
+const RECENT_OUTPUTS: usize = 16;
 
 impl PtySession {
     pub fn last_output(&self) -> i64 {
         self.last_output.load(Ordering::Relaxed)
+    }
+
+    /// When the pane drew each of its latest chunks of output from `since` on.
+    pub fn outputs_since(&self, since: i64) -> Vec<i64> {
+        self.recent_output
+            .lock()
+            .unwrap()
+            .iter()
+            .copied()
+            .filter(|at| *at >= since)
+            .collect()
+    }
+
+    fn drew(&self, at: i64) {
+        self.last_output.store(at, Ordering::Relaxed);
+        let mut recent = self.recent_output.lock().unwrap();
+        if recent.len() == RECENT_OUTPUTS {
+            recent.pop_front();
+        }
+        recent.push_back(at);
     }
 
     /// Whether the reader is holding off until the window catches up. Output
@@ -344,8 +374,7 @@ fn spawn_io_threads(
                         return;
                     }
                     Ok(n) => {
-                        sess.last_output
-                            .store(crate::status::now_millis(), Ordering::Relaxed);
+                        sess.drew(crate::status::now_millis());
                         #[cfg(windows)]
                         let chunk = handshake.answer(&buf[..n], &sess.writer);
                         #[cfg(not(windows))]
@@ -525,6 +554,7 @@ fn start_internal(
         // a leaked TMUX makes TUIs like Claude Code disable their mouse UX.
         builder.env_remove("TMUX");
         builder.env_remove("TMUX_PANE");
+        builder.env_remove(CURSOR_VERSION);
         #[cfg(target_os = "linux")]
         if let Some(key) = crate::webengine::app_only_env() {
             builder.env_remove(key);
@@ -562,6 +592,7 @@ fn start_internal(
         // a leaked TMUX makes TUIs like Claude Code disable their mouse UX.
         builder.env_remove("TMUX");
         builder.env_remove("TMUX_PANE");
+        builder.env_remove(CURSOR_VERSION);
         #[cfg(target_os = "linux")]
         if let Some(key) = crate::webengine::app_only_env() {
             builder.env_remove(key);
@@ -663,6 +694,7 @@ fn spawn_with_builder(
         cols: AtomicU16::new(80),
         rows: AtomicU16::new(24),
         last_output: AtomicI64::new(0),
+        recent_output: Mutex::new(std::collections::VecDeque::with_capacity(RECENT_OUTPUTS)),
     });
     state
         .sessions
@@ -853,6 +885,7 @@ pub fn start_claude_login(
     }
     builder.env_remove("TMUX");
     builder.env_remove("TMUX_PANE");
+    builder.env_remove(CURSOR_VERSION);
     #[cfg(target_os = "linux")]
     if let Some(key) = crate::webengine::app_only_env() {
         builder.env_remove(key);

@@ -90,6 +90,8 @@ fn sweep(app: &AppHandle) -> bool {
         return false;
     }
     for (pane_id, w) in ended {
+        // An agent killed, or one that crashed, ran no SessionEnd hook.
+        crate::donehold::session_gone(app, &w.project, &format!("claude_code_{}", w.session_id));
         let _ = app.emit(
             ENDED_EVENT,
             json!({ "project": w.project, "paneId": pane_id, "sessionId": w.session_id }),

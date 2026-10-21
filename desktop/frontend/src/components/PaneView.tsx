@@ -537,8 +537,8 @@ function PaneViewImpl(props: PaneViewProps) {
             {pane.tabs.map((t, i) => {
               const isActive = activeServiceName === null && i === terminalIdx;
               const isDone = paneStatus?.done.has(t.id) ?? false;
-              // Waiting survives the tab merely being in view, unlike Done and
-              // Error; clicking the tab is what acknowledges it.
+              // Waiting persists across tab clicks, unlike Done and Error: the
+              // dialog is still open, and answering it is what ends the wait.
               const isWaiting = paneStatus?.waiting.has(t.id) ?? false;
               const isError = paneStatus?.error.has(t.id) ?? false;
               // Done/Error render on the active tab as well; retiring them is
@@ -569,7 +569,6 @@ function PaneViewImpl(props: PaneViewProps) {
                     }
                     onClick={(e) => {
                       if (isDone) onClearStatus(t.id, "Done");
-                      if (isWaiting) onClearStatus(t.id, "Waiting");
                       if (isError) onClearStatus(t.id, "Error");
                       onFocusTab(pane.id, i);
                       scrollTabIntoView(e.currentTarget);

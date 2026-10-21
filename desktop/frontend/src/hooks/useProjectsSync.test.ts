@@ -16,6 +16,10 @@ vi.mock("../../bridge/runtime", () => ({
     mocks.handlers.set(eventName, callback);
     return () => mocks.handlers.delete(eventName);
   },
+  EventsOnReady: async (eventName: string, callback: (...data: unknown[]) => void) => {
+    mocks.handlers.set(eventName, callback);
+    return () => mocks.handlers.delete(eventName);
+  },
 }));
 
 vi.mock("../store/app", () => ({
@@ -63,6 +67,12 @@ afterEach(() => {
 });
 
 describe("useProjectsSync", () => {
+  it("refreshes once the status listener is attached, so a change before it isn't lost", () => {
+    expect(mocks.handlers.has("status-changed")).toBe(true);
+    act(() => void vi.advanceTimersByTime(250));
+    expect(mocks.refreshProjects).toHaveBeenCalledTimes(1);
+  });
+
   it("coalesces a burst of status-changed events into one refresh", () => {
     for (let i = 0; i < 5; i++) emit("status-changed");
     act(() => void vi.advanceTimersByTime(250));

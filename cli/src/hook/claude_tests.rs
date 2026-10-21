@@ -11,26 +11,35 @@ fn claude_frames_match_the_sh_hooks() {
         one("claude", "UserPromptSubmit", p),
         "set_status 'proj' claude_code_s1 Running --icon=bolt --color=#4C8DFF --prompt --pane=pane-1 --reporter-pid=42"
     );
-    for event in [
-        "PreToolUse",
-        "PostToolUse",
-        "PostToolUseFailure",
-        "ElicitationResult",
-    ] {
+    for event in ["PostToolUse", "PostToolUseFailure", "ElicitationResult"] {
         assert_eq!(
             one("claude", event, p),
             "set_status 'proj' claude_code_s1 Running --icon=bolt --color=#4C8DFF --pane=pane-1 --reporter-pid=42"
         );
     }
-    for event in ["Notification", "PermissionRequest"] {
-        assert_eq!(
-            one("claude", event, p),
-            "set_status 'proj' claude_code_s1 Waiting --icon=bell --color=#f59e0b --pane=pane-1 --reporter-pid=42"
-        );
-    }
+    assert_eq!(
+        one("claude", "PreToolUse", p),
+        "set_status 'proj' claude_code_s1 Running --icon=bolt --color=#4C8DFF --tool --pane=pane-1 --reporter-pid=42"
+    );
+    assert_eq!(
+        one("claude", "PreCompact", p),
+        "set_status 'proj' claude_code_s1 Running --icon=bolt --color=#4C8DFF --compact --pane=pane-1 --reporter-pid=42"
+    );
+    assert_eq!(
+        one("claude", "PostCompact", p),
+        "clear_status 'proj' claude_code_s1 --live --compact --reporter-pid=42"
+    );
+    assert_eq!(
+        one("claude", "Notification", p),
+        "set_status 'proj' claude_code_s1 Waiting --icon=bell --color=#f59e0b --pane=pane-1 --reporter-pid=42"
+    );
+    assert_eq!(
+        one("claude", "PermissionRequest", p),
+        "set_status 'proj' claude_code_s1 Waiting --icon=bell --color=#f59e0b --asker=main --pane=pane-1 --reporter-pid=42"
+    );
     assert_eq!(
         one("claude", "Elicitation", p),
-        "set_status 'proj' claude_code_s1 Waiting --icon=bell --color=#f59e0b --hold --pane=pane-1 --reporter-pid=42"
+        "set_status 'proj' claude_code_s1 Waiting --icon=bell --color=#f59e0b --hold --asker=main --pane=pane-1 --reporter-pid=42"
     );
     assert_eq!(
         one("claude", "StopFailure", p),
@@ -126,8 +135,67 @@ fn claude_stop_ignores_task_types_quoted_in_cron_prompts() {
 #[test]
 fn a_claude_sub_agent_can_ask_but_not_speak_for_the_session() {
     let sub = r#"{"session_id":"s1","agent_id":"a7","agent_type":"general-purpose"}"#;
-    for event in ["UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "StopFailure"] {
+    for event in ["UserPromptSubmit", "PreToolUse", "PreCompact", "StopFailure"] {
         none("claude", event, sub);
     }
-    assert!(one("claude", "PermissionRequest", sub).contains("claude_code_s1 Waiting"));
+    let asked = one("claude", "PermissionRequest", sub);
+    assert!(asked.contains("claude_code_s1 Waiting") && asked.contains(" --asker=a7"), "{asked}");
+    for event in ["PostToolUse", "PostToolUseFailure", "ElicitationResult"] {
+        assert_eq!(
+            one("claude", event, sub),
+            "set_status 'proj' claude_code_s1 Running --icon=bolt --color=#4C8DFF --answered=a7 --pane=pane-1 --reporter-pid=42"
+        );
+    }
+    none("claude", "PostToolUse", r#"{"session_id":"s1","agent_id":"a b"}"#);
+}
+
+#[test]
+fn a_claude_question_form_is_marked_as_one() {
+    let form = r#"{"session_id":"s1","hook_event_name":"PermissionRequest","tool_name":"AskUserQuestion","tool_input":{}}"#;
+    assert!(one("claude", "PermissionRequest", form).contains(" --asker=main --form "));
+    let bash = r#"{"session_id":"s1","tool_name":"Bash","tool_input":{"command":"AskUserQuestion"}}"#;
+    assert!(!one("claude", "PermissionRequest", bash).contains("--form"));
+}
+
+#[test]
+fn claude_sub_agents_report_their_stints_of_work() {
+    let child = r#"{"session_id":"s1","agent_id":"agamma-6f5b","agent_type":"gamma"}"#;
+    assert_eq!(
+        one("claude", "SubagentStart", child),
+        "agent_child 'proj' claude_code_s1 agamma-6f5b start --pane=pane-1 --reporter-pid=42"
+    );
+    assert_eq!(
+        one("claude", "SubagentStop", child),
+        "agent_child 'proj' claude_code_s1 agamma-6f5b stop --pane=pane-1 --reporter-pid=42"
+    );
+    none("claude", "SubagentStop", r#"{"session_id":"s1","agent_id":"a1","agent_type":""}"#);
+}
+
+#[test]
+fn a_claude_prompt_the_harness_wrote_is_a_wake_up() {
+    for prompt in ["<task-notification>\\n<task-id>b1</task-id>", "<agent-message from=\\\"alpha\\\">done"] {
+        let payload = format!(r#"{{"session_id":"s1","prompt":"{prompt}"}}"#);
+        assert!(one("claude", "UserPromptSubmit", &payload).contains(" --prompt --wake "), "{prompt}");
+    }
+    let user = r#"{"session_id":"s1","prompt":"fix <task-notification> parsing"}"#;
+    assert!(!one("claude", "UserPromptSubmit", user).contains("--wake"));
+}
+
+#[test]
+fn a_claude_done_beside_settled_tasks_carries_their_list() {
+    let tasks = r#"[{"id":"bt1","type":"shell","status":"running","description":"Build","command":"cargo build"}]"#;
+    let line = stop(tasks);
+    let hex = line
+        .split_whitespace()
+        .find_map(|w| w.strip_prefix("--bg-hex="))
+        .expect("the list rides along");
+    let bytes: Vec<u8> = (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+        .collect();
+    let sent: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(sent, serde_json::from_str::<serde_json::Value>(tasks).unwrap());
+    assert!(stop("[]").contains(" --bg-hex=5b5d "));
+    assert!(stop(r#"[{"id":"a","type":"subagent","status":"running"}]"#).contains("Running --icon=bolt --color=#4C8DFF --bg-hex="));
+    assert!(!one("claude", "Stop", r#"{"session_id":"s1"}"#).contains("--bg-hex"));
 }

@@ -25,6 +25,7 @@ mod fwdspool;
 mod agentturn;
 mod bannerwithdraw;
 mod approvalgrace;
+mod bgtasks;
 mod aigen;
 mod autosync;
 mod bounds;
@@ -61,6 +62,7 @@ mod daemonize;
 mod daemonlaunch;
 mod detached;
 mod detect;
+mod donehold;
 #[cfg(any(windows, test))]
 mod dirdelete;
 mod dockmenu;
@@ -218,6 +220,7 @@ mod sshsync;
 #[cfg(any(windows, test))]
 mod sshsync_tar;
 mod status;
+mod statusask;
 mod statusfwd;
 mod statusnotify;
 #[cfg(any(windows, test))]

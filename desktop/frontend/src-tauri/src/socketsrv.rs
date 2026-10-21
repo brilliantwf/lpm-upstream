@@ -1082,10 +1082,16 @@ fn cmd_set_status(args: &[String], store: &StatusStore, app: &AppHandle) -> Stri
         agent_pid: options.get("pid").and_then(|p| p.parse().ok()).unwrap_or(0),
         pane_id: pane_id.clone(),
         held: options.contains_key("hold"),
+        tool: options.contains_key("tool"),
+        askers: options.get("asker").cloned().into_iter().collect(),
+        form: options.contains_key("form"),
+        compact: options.contains_key("compact"),
         // Filled in by the store, which is the only thing that sees the state
         // this report replaces.
         ..Default::default()
     };
+    // A sub-agent's report: it speaks only to a question that sub-agent asked.
+    let answered = options.get("answered").map(String::as_str);
     // Hook frames arrive async (backgrounded `nc`), so a Done/Error can land
     // after its pane was closed and cleaned up — drop those instead of storing
     // an entry nothing can ever clear.
@@ -1108,6 +1114,9 @@ fn cmd_set_status(args: &[String], store: &StatusStore, app: &AppHandle) -> Stri
         }
         return "OK".into();
     }
+    if crate::status::is_agent_key(&entry.key) && speaks_for_the_turn(&entry, answered, &options) {
+        store.note_report(project, &entry.key);
+    }
     if options.contains_key("approval") {
         crate::approvalgrace::defer(app, project, entry);
         return "OK".into();
@@ -1115,24 +1124,57 @@ fn cmd_set_status(args: &[String], store: &StatusStore, app: &AppHandle) -> Stri
     if !options.contains_key("step") {
         crate::approvalgrace::settle(project, &entry.key);
     }
-    // A prompt submitted while the session is still busy queues behind the
-    // turn instead of starting one; it is held for the Stop that ends that turn.
-    if options.contains_key("prompt") && store.queue_prompt(project, &entry.key) {
-        return "OK".into();
+    let agent = crate::status::is_agent_key(&entry.key);
+    let route = if agent {
+        crate::statusask::route(store.get(project, &entry.key).as_ref(), &entry, answered)
+    } else {
+        crate::statusask::Route::Publish
+    };
+    match route {
+        crate::statusask::Route::Ignore => return "OK".into(),
+        crate::statusask::Route::Amend(askers) => {
+            store.amend(project, &entry.key, |e| {
+                e.askers = askers;
+                e.held |= entry.held;
+                e.form |= entry.form;
+            });
+            // A finish still waits its turn behind the question (donehold.rs).
+            if value != crate::status::STATUS_DONE {
+                return "OK".into();
+            }
+        }
+        crate::statusask::Route::Publish => {}
     }
-    if value == crate::status::STATUS_DONE && crate::agentchildren::hold_done(store, project, &entry) {
-        return "OK".into();
+    let background = options.get("bg").map(String::as_str);
+    if let Some(tasks) = background.filter(|_| agent) {
+        crate::bgtasks::stopped_beside(project, &entry.key, tasks);
     }
-    if value == crate::status::STATUS_DONE
-        && (store.take_queued_prompt(project, &entry.key)
-            || crate::agentkind::AgentKind::of_key(&entry.key)
-                == Some(crate::agentkind::AgentKind::Codex))
-    {
-        crate::agentturn::finish_unless_still_working(app, project, entry);
-        return "OK".into();
+    if options.contains_key("prompt") {
+        if !options.contains_key("wake") {
+            crate::bgtasks::user_prompted(project, &entry.key);
+        }
+        // A prompt submitted while the session is still busy queues behind the
+        // turn instead of starting one; it is held for the Stop that ends that turn.
+        if store.queue_prompt(project, &entry.key) {
+            return "OK".into();
+        }
+    }
+    if value == crate::status::STATUS_DONE {
+        if let Some(why) = crate::donehold::why(store, project, &entry, background) {
+            crate::donehold::hold(app, project, entry, why);
+            return "OK".into();
+        }
     }
     publish(app, store, project, entry);
     "OK".into()
+}
+
+/// Whether a report is the agent's own word on its turn, which a Done held back
+/// for that turn gives way to (donehold.rs). A question isn't — whoever asked
+/// it, the turn it interrupts goes on — and neither is a sub-agent's report or
+/// a /compact, which works on the session rather than in a turn of it.
+fn speaks_for_the_turn(entry: &StatusEntry, answered: Option<&str>, options: &HashMap<String, String>) -> bool {
+    entry.value != crate::status::STATUS_WAITING && answered.is_none() && !options.contains_key("compact")
 }
 
 /// Store a report and tell everyone who listens: the status-changed event, the
@@ -1169,13 +1211,42 @@ pub(crate) fn publish(app: &AppHandle, store: &StatusStore, project: &str, entry
 /// `agent_child <project> <key> <child> start|stop`: a sub-agent of the agent
 /// reporting under `key` began or ended (agentchildren.rs).
 fn cmd_agent_child(args: &[String], app: &AppHandle) -> String {
-    let (positional, _) = parse_options(args);
+    let (positional, options) = parse_options(args);
     let [project, key, child, phase] = positional.as_slice() else {
         return "ERROR: usage: agent_child <project> <key> <child> start|stop".into();
     };
+    let store = app.state::<Arc<StatusStore>>();
+    let pane = store.current_pane(options.get("pane").map_or("", String::as_str));
+    // A sub-agent of an agent the tab's agent launched is nobody's work here.
+    if crate::status::is_agent_key(key) && nested_agent_report(app, &pane, &options) {
+        return "OK".into();
+    }
     match phase.as_str() {
-        "start" => crate::agentchildren::started(project, key, child),
-        "stop" => crate::agentchildren::stopped(app, project, key, child),
+        "start" => {
+            crate::agentchildren::started(project, key, child);
+            if let Some(entry) = crate::agentchildren::resumed_work(&store, project, key, Some(&pane)) {
+                let alive = crate::pty::session_exists(&app.state::<crate::pty::PtyState>(), &entry.pane_id);
+                if alive {
+                    publish(app, &store, project, entry);
+                }
+            }
+        }
+        "stop" => {
+            crate::agentchildren::stopped(project, key, child);
+            // A sub-agent that stopped asks nothing any more.
+            let Some(open) = store.get(project, key) else {
+                return "OK".into();
+            };
+            match crate::statusask::route(Some(&open), &open, Some(child)) {
+                crate::statusask::Route::Amend(askers) => {
+                    store.amend(project, key, |e| e.askers = askers);
+                }
+                crate::statusask::Route::Publish => {
+                    publish(app, &store, project, crate::agentturn::running(&open));
+                }
+                crate::statusask::Route::Ignore => {}
+            }
+        }
         _ => return "ERROR: agent_child phase is start or stop".into(),
     }
     "OK".into()
@@ -1188,8 +1259,19 @@ fn cmd_clear_status(args: &[String], store: &StatusStore, app: &AppHandle) -> St
         return "ERROR: usage: clear_status <project> <key> [--live]".into();
     };
     crate::approvalgrace::settle(project, &key);
+    // PostCompact: only what the /compact itself started ends with it.
+    if options.contains_key("compact") {
+        if store.clear_compact(project, &key) {
+            let _ = app.emit("status-changed", project);
+        }
+        return "OK".into();
+    }
     if options.contains_key("live") {
         crate::agentchildren::forget(project, &key);
+        crate::donehold::end_session(app, store, project, &key);
+    }
+    if crate::status::is_agent_key(&key) {
+        store.note_report(project, &key);
     }
     let cleared = if options.contains_key("live") {
         store.clear_live(project, &key)

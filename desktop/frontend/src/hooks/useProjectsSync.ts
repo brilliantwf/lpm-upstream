@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { EventsOn } from "../../bridge/runtime";
+import { EventsOn, EventsOnReady } from "../../bridge/runtime";
 import { useAppStore } from "../store/app";
 
 const POLL_INTERVAL_MS = 10_000;
@@ -48,7 +48,16 @@ export function useProjectsSync(options: ProjectsSyncOptions = {}): void {
     // events: a peer that can't reach its host re-announces the failure on every
     // reconnect attempt.
     const cancelPeers = EventsOn("peer-state-changed", refreshSoon);
-    const cancelStatus = EventsOn("status-changed", refreshSoon);
+    // Attached before a refresh of its own: a status change between the first
+    // fetch and the listener attaching was otherwise lost — for good in a
+    // detached window, which has no poll.
+    let cancelStatus: (() => void) | null = null;
+    let unmounted = false;
+    void EventsOnReady("status-changed", refreshSoon).then((off) => {
+      if (unmounted) return off();
+      cancelStatus = off;
+      refreshSoon();
+    });
     const cancelDetached = EventsOn("detached-changed", refreshDetached);
     const cancelSidebar = EventsOn("sidebar-changed", rehydrateSidebarLayout);
     const cancelTemplates = isMain
@@ -71,6 +80,7 @@ export function useProjectsSync(options: ProjectsSyncOptions = {}): void {
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
+      unmounted = true;
       if (interval) clearInterval(interval);
       if (statusTimer) clearTimeout(statusTimer);
       document.removeEventListener("visibilitychange", onVisibility);

@@ -53,6 +53,36 @@ pub struct StatusEntry {
     /// UserPromptSubmit having fired at queue time.
     #[serde(skip)]
     pub queued: u32,
+    /// When the agent last reported this state, a re-report included: the dedup
+    /// keeps `timestamp` at the first one, but each says the agent is still here.
+    #[serde(skip)]
+    pub reported_at: i64,
+    /// A tool call of the main thread is running: it draws nothing of its own,
+    /// and a fullscreen agent scrolled away from its spinner draws nothing at all.
+    #[serde(skip)]
+    pub tool: bool,
+    /// Who a Waiting is waiting for: `main`, or the id of the sub-agent that
+    /// asked. Empty when the report didn't say (a Notification).
+    #[serde(skip)]
+    pub askers: Vec<String>,
+    /// A Waiting for a dialog of several steps (questions, plan feedback): an
+    /// answer to one step is not the end of it, so only the hooks end it.
+    #[serde(skip)]
+    pub form: bool,
+    /// A Running a manual /compact started, which its PostCompact takes back.
+    #[serde(skip)]
+    pub compact: bool,
+}
+
+/// The `askers` entry of a question the main thread asked.
+pub const MAIN_ASKER: &str = "main";
+
+impl StatusEntry {
+    /// A Waiting a sub-agent raised, which the main thread's own reports don't
+    /// answer.
+    pub fn sub_agent_asking(&self) -> bool {
+        self.value == STATUS_WAITING && self.askers.iter().any(|a| a != MAIN_ASKER)
+    }
 }
 
 /// Carry `turn_start` from the entry being replaced, and stamp `ended_at` when
@@ -88,6 +118,10 @@ pub struct StatusStore {
     closing: RwLock<HashSet<String>>,
     // Pane ids a reconnected tab left behind, to the id it has now.
     moved: RwLock<HashMap<String, String>>,
+    // (project, key) -> how many reports its agent has made, so a report held
+    // back (donehold.rs) can tell whether the agent has spoken since. lpm's own
+    // inferences (agentturn.rs) change entries without counting here.
+    revs: RwLock<HashMap<(String, String), u64>>,
 }
 
 /// How many reconnects the store remembers; past it, the oldest are forgotten.
@@ -105,9 +139,10 @@ fn should_replace(existing: &StatusEntry, incoming: &StatusEntry) -> bool {
 }
 
 /// Whether `current` is still the report `seen` was taken of: the dedup above
-/// keeps a re-reported entry's timestamp, so value and timestamp name a report.
+/// keeps a re-reported entry's timestamp, so value and timestamp name a report —
+/// and a question another asker joined or left since is not the one seen.
 fn same_report(current: &StatusEntry, seen: &StatusEntry) -> bool {
-    current.value == seen.value && current.timestamp == seen.timestamp
+    current.value == seen.value && current.timestamp == seen.timestamp && current.askers == seen.askers
 }
 
 /// Whether an agent's hooks report under `key` (agentkind.rs).
@@ -136,15 +171,84 @@ impl StatusStore {
     pub fn set(&self, project: &str, mut entry: StatusEntry) -> bool {
         let mut m = self.entries.write().unwrap();
         let bucket = m.entry(project.to_string()).or_default();
-        let existing = bucket.get(&entry.key);
+        entry.reported_at = entry.timestamp;
         // A re-report of the state already held keeps the entry it would have
         // replaced, timestamps and all, so the turn is dated from its first
-        // report rather than its latest.
-        if existing.is_some_and(|e| !should_replace(e, &entry)) {
+        // report rather than its latest. What it says about right now is kept.
+        if let Some(e) = bucket.get_mut(&entry.key).filter(|e| !should_replace(e, &entry)) {
+            e.reported_at = entry.reported_at;
+            e.tool = entry.tool;
+            e.compact &= entry.compact;
             return false;
         }
+        let existing = bucket.get(&entry.key);
+        // A /compact of a session already working takes back only what it added.
+        entry.compact &= !existing.is_some_and(|e| is_live(&e.value));
         carry_turn(existing, &mut entry);
         bucket.insert(entry.key.clone(), entry);
+        true
+    }
+
+    /// Count a report the agent made under `key`, returning the new count.
+    pub fn note_report(&self, project: &str, key: &str) -> u64 {
+        let mut revs = self.revs.write().unwrap();
+        let rev = revs.entry((project.to_string(), key.to_string())).or_default();
+        *rev += 1;
+        *rev
+    }
+
+    /// How many reports the agent has made under `key`.
+    pub fn rev(&self, project: &str, key: &str) -> u64 {
+        let revs = self.revs.read().unwrap();
+        revs.get(&(project.to_string(), key.to_string()))
+            .copied()
+            .unwrap_or(0)
+    }
+
+    /// The entry `key` holds right now.
+    pub fn get(&self, project: &str, key: &str) -> Option<StatusEntry> {
+        let m = self.entries.read().unwrap();
+        m.get(project)?.get(key).cloned()
+    }
+
+    /// Change the entry `key` holds in place, leaving everything that dates or
+    /// orders it alone. Nothing is announced: the visible state stays the same.
+    pub fn amend(&self, project: &str, key: &str, change: impl FnOnce(&mut StatusEntry)) -> bool {
+        let mut m = self.entries.write().unwrap();
+        let Some(e) = m.get_mut(project).and_then(|b| b.get_mut(key)) else {
+            return false;
+        };
+        change(e);
+        true
+    }
+
+    /// [`Self::amend`], under the condition of [`Self::clear_if_unchanged`].
+    pub fn amend_if_unchanged(&self, project: &str, seen: &StatusEntry, change: impl FnOnce(&mut StatusEntry)) -> bool {
+        let mut m = self.entries.write().unwrap();
+        let Some(e) = m.get_mut(project).and_then(|b| b.get_mut(&seen.key)) else {
+            return false;
+        };
+        if !same_report(e, seen) {
+            return false;
+        }
+        change(e);
+        true
+    }
+
+    /// Take back the Running a manual /compact started, and nothing else: a
+    /// session that was already working when it compacted still is.
+    pub fn clear_compact(&self, project: &str, key: &str) -> bool {
+        let mut m = self.entries.write().unwrap();
+        let Some(bucket) = m.get_mut(project) else {
+            return false;
+        };
+        if !bucket.get(key).is_some_and(|e| e.compact && is_live(&e.value)) {
+            return false;
+        }
+        bucket.remove(key);
+        if bucket.is_empty() {
+            m.remove(project);
+        }
         true
     }
 
@@ -181,14 +285,15 @@ impl StatusStore {
     }
 
     /// Count a submitted prompt against `key`'s turn when that turn is still
-    /// live, so it queues rather than restarting it. False when nothing is live,
-    /// in which case the prompt simply starts a turn.
+    /// working, so it queues rather than restarting it. False otherwise, in which
+    /// case the prompt simply starts a turn: one sent while the agent waits on a
+    /// dialog is the answer that ends the wait.
     pub fn queue_prompt(&self, project: &str, key: &str) -> bool {
         let mut m = self.entries.write().unwrap();
         let Some(e) = m.get_mut(project).and_then(|b| b.get_mut(key)) else {
             return false;
         };
-        if !is_live(&e.value) {
+        if e.value != STATUS_RUNNING {
             return false;
         }
         e.queued += 1;
@@ -230,20 +335,6 @@ impl StatusStore {
         } else {
             self.retain_where(project, other)
         }
-    }
-
-    /// Whether `key` still holds the report `seen` was taken of.
-    pub fn holds(&self, project: &str, seen: &StatusEntry) -> bool {
-        let m = self.entries.read().unwrap();
-        m.get(project)
-            .and_then(|b| b.get(&seen.key))
-            .is_some_and(|e| same_report(e, seen))
-    }
-
-    /// The live entry `key` holds right now, if any.
-    pub fn live_entry(&self, project: &str, key: &str) -> Option<StatusEntry> {
-        let m = self.entries.read().unwrap();
-        m.get(project)?.get(key).filter(|e| is_live(&e.value)).cloned()
     }
 
     /// Every agent report that says something is happening on a terminal right
@@ -737,6 +828,63 @@ mod tests {
         assert!(!s.take_queued_prompt("p", "k"));
         s.set("p", entry("k", STATUS_DONE, 0, 400, "p-1"));
         assert!(!s.queue_prompt("p", "k"), "a finished turn queues nothing");
+    }
+
+    // cc-scrollblur: a fullscreen Claude scrolled away from its spinner drew
+    // nothing while its hooks kept reporting; the sweep only saw the silence.
+    #[test]
+    fn a_repeated_report_still_says_the_agent_is_there() {
+        let s = StatusStore::new();
+        let tool = StatusEntry {
+            tool: true,
+            ..entry("k", STATUS_RUNNING, 0, 100, "p-1")
+        };
+        assert!(s.set("p", tool));
+        assert!(!s.set("p", entry("k", STATUS_RUNNING, 0, 900, "p-1")));
+        let e = only(&s, "p");
+        assert_eq!((e.timestamp, e.reported_at, e.tool), (100, 900, false));
+    }
+
+    // subagent-s4d: a task notification arriving while a sub-agent's dialog was
+    // open queued behind the Waiting, and the turn's Done was never told.
+    #[test]
+    fn a_prompt_sent_to_a_waiting_agent_is_no_queue() {
+        let s = StatusStore::new();
+        s.set("p", entry("k", STATUS_WAITING, 0, 100, "p-1"));
+        assert!(!s.queue_prompt("p", "k"));
+    }
+
+    #[test]
+    fn a_compact_takes_back_only_the_running_it_started() {
+        let s = StatusStore::new();
+        let compacting = || StatusEntry {
+            compact: true,
+            ..entry("k", STATUS_RUNNING, 0, 200, "p-1")
+        };
+        s.set("p", compacting());
+        assert!(s.clear_compact("p", "k"));
+
+        s.set("p", entry("k", STATUS_RUNNING, 0, 100, "p-1"));
+        s.set("p", compacting());
+        assert!(!s.clear_compact("p", "k"), "the session was working before");
+
+        s.set("p", entry("k", STATUS_DONE, 0, 300, "p-1"));
+        assert!(s.set("p", compacting()));
+        assert!(s.clear_compact("p", "k"));
+        assert!(s.list("p").is_empty());
+    }
+
+    #[test]
+    fn reports_are_counted_per_key() {
+        let s = StatusStore::new();
+        assert_eq!(s.rev("p", "k"), 0);
+        assert_eq!(s.note_report("p", "k"), 1);
+        assert_eq!(s.note_report("p", "k"), 2);
+        assert_eq!(s.rev("p", "j"), 0);
+        s.set("p", entry("k", STATUS_WAITING, 0, 100, "p-1"));
+        assert!(s.amend("p", "k", |e| e.askers = vec!["a7".into()]));
+        assert!(s.get("p", "k").unwrap().sub_agent_asking());
+        assert_eq!(s.rev("p", "k"), 2, "only the agent's reports count");
     }
 
     #[test]
